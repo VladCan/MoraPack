@@ -1,8 +1,6 @@
 package pe.pucp.edu.morapack.planner;
 import java.time.*;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+
 import java.util.Scanner;
 
 public class Vuelo {

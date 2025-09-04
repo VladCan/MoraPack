@@ -3,6 +3,7 @@ package pe.pucp.edu.morapack.planner;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Scanner;
 
 public class Pedido {
     private int idPedido;       // Identificador único del pedido
@@ -12,6 +13,11 @@ public class Pedido {
     private int cantidad;       // Cantidad de producto solicitada
 
     // Constructor
+
+
+    public Pedido() {
+    }
+
     public Pedido(int idPedido, int idCliente, String destino, LocalDateTime  fecha, int cantidad) {
         this.idPedido = idPedido;
         this.idCliente = idCliente;
@@ -63,12 +69,19 @@ public class Pedido {
 
     @Override
     public String toString() {
-        return "Pedido{" +
-                "idPedido=" + idPedido +
-                ", idCliente=" + idCliente +
-                ", destino='" + destino + '\'' +
-                ", fecha=" + fecha +
-                ", cantidad=" + cantidad +
-                '}';
+        return idPedido + " | Cliente: " + idCliente + " | Destino: " + destino +
+                " | Fecha: " + fecha + " | Cant: " + cantidad;
+    }
+
+    public void leer(Scanner sc){
+        if (!sc.hasNextLine()) return;
+        String linea = sc.nextLine();
+        String[] partes = linea.split(",");
+        idPedido = Integer.parseInt(partes[0].trim());
+        idCliente = Integer.parseInt(partes[1].trim());
+        destino = partes[2].trim();
+        fecha = LocalDateTime.parse(partes[3].trim());
+        cantidad = Integer.parseInt(partes[4].trim());
+
     }
 }
