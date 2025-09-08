@@ -9,8 +9,10 @@ public class Pedido {
     private int idPedido;       // Identificador único del pedido
     private int idCliente;      // Identificador del cliente
     private String destino;     // Ciudad o código de aeropuerto destino
+    private String origen;
     private LocalDateTime  fecha;    // Fecha del pedido
     private int cantidad;       // Cantidad de producto solicitada
+    private String continenteDestino;
 
     // Constructor
 
@@ -67,6 +69,22 @@ public class Pedido {
         this.cantidad = cantidad;
     }
 
+    public String getOrigen() {
+        return origen;
+    }
+
+    public void setOrigen(String origen) {
+        this.origen = origen;
+    }
+
+    public String getContinenteDestino() {
+        return continenteDestino;
+    }
+
+    public void setContinenteDestino(String continenteDestino) {
+        this.continenteDestino = continenteDestino;
+    }
+
     @Override
     public String toString() {
         return idPedido + " | Cliente: " + idCliente + " | Destino: " + destino +
@@ -82,6 +100,14 @@ public class Pedido {
         destino = partes[2].trim();
         fecha = LocalDateTime.parse(partes[3].trim());
         cantidad = Integer.parseInt(partes[4].trim());
-
     }
+
+    public long getPlazoMaxMinutos(String continenteOrigen) {
+        if (continenteOrigen.equals(continenteDestino)) {
+            return 2 * 24 * 60; // 2 días
+        } else {
+            return 3 * 24 * 60; // 3 días
+        }
+    }
+
 }

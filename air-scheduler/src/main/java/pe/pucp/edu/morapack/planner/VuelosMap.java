@@ -18,7 +18,6 @@ public class VuelosMap {
         if (key == null) return; // Evitar claves nulas
         vue.llenarHoraGMT(aeropuertosMap.obtener(vue.getOrigen()).getGMT(),
                 aeropuertosMap.obtener(vue.getDestino()).getGMT());
-
         vuelosPorOrigen.computeIfAbsent(key, k -> new ArrayList<>()).add(vue);
     }
     // Leer vuelos desde un Scanner

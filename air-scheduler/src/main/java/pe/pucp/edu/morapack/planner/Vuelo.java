@@ -135,4 +135,8 @@ public class Vuelo {
                 this.horaGMTDestino=horaDestino.minusHours(destino);
             }
     }
+
+    public double getCosto() {
+        return  0;
+    }
 }

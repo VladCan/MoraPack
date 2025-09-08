@@ -1,10 +1,5 @@
 package pe.pucp.edu.morapack.planner;
 
-import pe.pucp.edu.morapack.planner.GA.AlgoritmoGenetico;
-
-import java.util.ArrayList;
-import java.util.List;
-
 
 public class ProcesadorPedidos {
    /* private ColaPedidos cola;

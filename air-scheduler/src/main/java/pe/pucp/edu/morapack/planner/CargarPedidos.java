@@ -1,8 +1,6 @@
 package pe.pucp.edu.morapack.planner;
 
-import java.util.LinkedList;
-import java.util.Queue;
-import java.util.Scanner;
+import java.util.*;
 
 public class CargarPedidos {
     private final Queue<Pedido> colaPedidos;
@@ -16,6 +14,10 @@ public class CargarPedidos {
 
     public void agregar(Pedido pe) {
         colaPedidos.add(pe);
+    }
+
+    public List<Pedido> getLista() {
+        return new ArrayList<>(colaPedidos);
     }
 
     public void leerDatos(Scanner sc) {

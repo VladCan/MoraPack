@@ -13,7 +13,7 @@ public class Aeropuerto {
     private int capacidad;
     private String latitud;
     private String longitud;
-
+    private String continente;
     public Aeropuerto() {
     }
 
@@ -93,6 +93,14 @@ public class Aeropuerto {
         this.longitud = longitud;
     }
 
+    public String getContinente() {
+        return continente;
+    }
+
+    public void setContinente(String continente) {
+        this.continente = continente;
+    }
+
     public String leer(Scanner sc){
         if (!sc.hasNextLine()) return null;
         String linea = sc.nextLine();
@@ -119,6 +127,13 @@ public class Aeropuerto {
             this.latitud = m.group(8);
             this.longitud = m.group(9);
 
+            if (this.id >= 1 && this.id <= 10) {
+                this.continente = "AmericaSur";
+            } else if (this.id >= 11 && this.id <= 20) {
+                this.continente = "Europa";
+            } else if (this.id >= 21 && this.id <= 30) {
+                this.continente = "Asia";
+            }
             //System.out.println(id+" "+codigo+" "+ciudad+" "+pais+" "+GMT+" "+capacidad+" "+latitud+" "+longitud);
 
         }
