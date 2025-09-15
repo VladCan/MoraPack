@@ -7,12 +7,14 @@ import pe.edu.pucp.morapack.airscheduler.flights.domain.model.Aeropuerto;
 
 public class AeropuertosMap {
     private final Map<String, Aeropuerto> aeropuertos;
+
     public AeropuertosMap() {
         aeropuertos = new HashMap<>();
     }
 
     public void agregar(Aeropuerto ae, String key) {
-        if (key ==null || ae == null) return; // Evitar claves o aeropuertos nulos
+        if (key == null || ae == null)
+            return; // Evitar claves o aeropuertos nulos
         aeropuertos.put(key, ae);
     }
 
@@ -28,7 +30,8 @@ public class AeropuertosMap {
         while (sc.hasNextLine()) {
             Aeropuerto ae = new Aeropuerto();
             String key = ae.leer(sc); // key = origen
-            if(key!=null) agregar(ae, key);
+            if (key != null)
+                agregar(ae, key);
         }
     }
 
@@ -45,7 +48,20 @@ public class AeropuertosMap {
         }
     }
 
+    public Collection<Aeropuerto> values() {
+        return aeropuertos.values();
+    }
 
+    public Set<String> keys() {
+        return aeropuertos.keySet();
+    }
+
+    public int size() {
+        return aeropuertos.size();
+    }
+
+    public boolean contains(String code) {
+        return aeropuertos.containsKey(code);
+    }
 
 }
-
