@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Scanner;
 
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
+import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.FlightGraphBuilder;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosMap;
 import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.CargarPedidos;
@@ -47,10 +48,18 @@ public class Main {
             }
         }
         */
+        //Grafo
+        var graph = FlightGraphBuilder.build(aeropuertosMap, mapa);
+
+        /*
+        //Sanity check
+        Sanity.run(aeropuertosMap, mapa, graph);
+         */
         //Pedidos
         CargarPedidos pedidos = new CargarPedidos();
         try (Scanner sc = ArchivoUtils.getScannerFromResource("pedidos.txt")) {
             if (sc != null) {
+                Sanity.runPedidosTiempo(aeropuertosMap, sc);
                 pedidos.leerDatos(sc);
             } else return;
         }

@@ -17,11 +17,13 @@ public class VuelosMap {
 
     // Agrega un vuelo al HashMap
     public void agregar(Vuelo vue, String key) {
-        if (key == null) return; // Evitar claves nulas
+        if (key == null)
+            return; // Evitar claves nulas
         vue.llenarHoraGMT(aeropuertosMap.obtener(vue.getOrigen()).getGMT(),
                 aeropuertosMap.obtener(vue.getDestino()).getGMT());
         vuelosPorOrigen.computeIfAbsent(key, k -> new ArrayList<>()).add(vue);
     }
+
     // Leer vuelos desde un Scanner
     public void leerDatos(Scanner sc) {
         int i = 1;
@@ -60,5 +62,17 @@ public class VuelosMap {
             }
             System.out.println();
         }
+    }
+
+    public int totalVuelos() {
+        return vuelosPorOrigen.values().stream().mapToInt(List::size).sum();
+    }
+
+    public Set<String> origenes() {
+        return vuelosPorOrigen.keySet();
+    }
+
+    public List<Vuelo> vuelosDesde(String origen) {
+        return vuelosPorOrigen.getOrDefault(origen, List.of());
     }
 }
