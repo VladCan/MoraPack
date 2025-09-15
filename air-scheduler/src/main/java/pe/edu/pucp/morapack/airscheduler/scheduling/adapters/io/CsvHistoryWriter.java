@@ -33,7 +33,7 @@ public final class CsvHistoryWriter implements AutoCloseable {
 
     public void appendBookings(List<BookingRecord> list) throws IOException {
         for (var b : list) {
-            bookings.write(b.batchNo + "," + b.idPedido + "," + b.origen + "," + b.destino + ","
+            bookings.write(b.batchNo + "," + b.orderId + "," + b.origen + "," + b.destino + ","
                     + b.depUtc + "," + b.arrUtc + "," + b.cantidad + "\n");
         }
         bookings.flush();
@@ -41,8 +41,8 @@ public final class CsvHistoryWriter implements AutoCloseable {
 
     public void appendDeliveries(List<DeliveryRecord> list) throws IOException {
         for (var d : list) {
-            deliveries.write(d.batchNo + "," + d.idPedido + "," + d.aeropuerto + ","
-                    + d.timeUtc + "," + d.cantidad + "\n");
+            deliveries.write(d.batchNo + "," + d.orderId + "," + d.destino + ","
+                    + d.arrUtc + "," + d.cantidadAceptada + "\n");
         }
         deliveries.flush();
     }

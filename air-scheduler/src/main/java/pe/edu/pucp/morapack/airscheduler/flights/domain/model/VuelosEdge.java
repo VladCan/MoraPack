@@ -19,6 +19,11 @@ public final class VuelosEdge {
     public int getCapacity() { return capacity; }
     public Vuelo getVuelo() { return vuelo; }
 
+    // ==== NUEVO ====
+    public boolean isFlight()  { return type == Type.FLIGHT; }
+    public boolean isWait()    { return type == Type.WAIT; }
+    public boolean isSupply()  { return type == Type.SUPPLY; }
+    // ==============
     @Override public String toString() {
         switch (type) {
             case FLIGHT -> {

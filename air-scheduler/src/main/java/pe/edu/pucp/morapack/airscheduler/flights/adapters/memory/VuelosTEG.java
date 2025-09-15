@@ -70,4 +70,12 @@ public final class VuelosTEG {
             for (VuelosEdge e : lst) consumer.accept(e);
         }
     }
+
+    // ==== NUEVO: iterador de TODAS las aristas ====
+    public Iterable<VuelosEdge> edges() {
+        List<VuelosEdge> all = new ArrayList<>();
+        for (List<VuelosEdge> lst : adj.values()) all.addAll(lst);
+        return all;
+    }
+    // ==============================================
 }

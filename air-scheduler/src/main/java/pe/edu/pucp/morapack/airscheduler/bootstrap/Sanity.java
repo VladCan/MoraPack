@@ -1,6 +1,7 @@
 package pe.edu.pucp.morapack.airscheduler.bootstrap;
 
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
+import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.LiveTEGState;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosMap;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosTEG;
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.VuelosEdge;
@@ -36,7 +37,7 @@ public final class Sanity {
         if (faltantes.isEmpty()) System.out.println("OK: todos los códigos de vuelos existen en aeropuertos.");
         else System.out.println("Faltan en aeropuertos: " + faltantes);
 
-        // 3) conteo por tipo de arco
+        // 3) conteo por tipo de arco + checks de tiempo
         int cFlight=0, cWait=0, cSupply=0, badTimes=0;
         for (var n : G.nodes()) {
             for (var e : G.out(n)) {
@@ -66,14 +67,14 @@ public final class Sanity {
             if (n.isSuperSource()) continue;
             outArcosPorIcao.merge(n.getIcao(), (long) G.out(n).size(), Long::sum);
         }
-        // muestra algunos
-        for (String o : List.of("SPIM","SKBO","SEQM","SVMI","SBBR","EBCI")) {
+        // muestra algunos (ajusta a tus hubs)
+        for (String o : List.of("SPIM","EBCI","UBBB","SEQM","SVMI","SBBR")) {
             long nCount = nodosPorIcao.getOrDefault(o, 0L);
             long eCount = outArcosPorIcao.getOrDefault(o, 0L);
             System.out.printf("%s -> nodos=%d, outArcos=%d%n", o, nCount, eCount);
         }
 
-        // 5) validar: NO debe haber WAIT en sedes “siempre llenas”
+        // 5) WAIT en sedes: ahora INFO (modelo de bodega limitada admite WAIT también en sedes)
         int waitsInSedes = 0;
         List<VuelosEdge> muestrasWaitSede = new ArrayList<>();
         for (var n : G.nodes()) {
@@ -87,9 +88,9 @@ public final class Sanity {
             }
         }
         if (waitsInSedes == 0) {
-            System.out.println("OK: sin WAIT en sedes (modelo JIT).");
+            System.out.println("INFO: sin WAIT en sedes (JIT o sin encadenamiento visible).");
         } else {
-            System.out.printf("WARN: %d arcos WAIT en sedes. Ejemplos:%n", waitsInSedes);
+            System.out.printf("INFO: %d arcos WAIT en sedes (válido con bodega limitada). Ejemplos:%n", waitsInSedes);
             for (var e : muestrasWaitSede) System.out.println("  " + e);
         }
 
@@ -108,6 +109,32 @@ public final class Sanity {
             }
             System.out.printf("SUPPLY[%s]: arcos=%d, capTotal=%d%n", sede, cnt, capSum);
             for (var e : muestras) System.out.println("  " + e);
+        }
+
+        // 7) Consistencia de WAIT: capacidad del WAIT = capacidad de bodega del aeropuerto
+        int mismatches = 0;
+        List<String> ejemplos = new ArrayList<>();
+        for (var n : G.nodes()) {
+            if (n.isSuperSource()) continue;
+            int capBodega = Optional.ofNullable(aMap.obtener(n.getIcao()))
+                                    .map(ap -> ap.getCapacidad())
+                                    .orElse(0);
+            for (var e : G.out(n)) {
+                if (e.getType() != VuelosEdge.Type.WAIT) continue;
+                if (e.getCapacity() != capBodega) {
+                    mismatches++;
+                    if (ejemplos.size() < 5) {
+                        ejemplos.add(String.format("WAIT %s -> %s cap=%d (bodega=%d)",
+                                e.getFrom(), e.getTo(), e.getCapacity(), capBodega));
+                    }
+                }
+            }
+        }
+        if (mismatches == 0) {
+            System.out.println("OK: capacidad de WAIT coincide con capacidad de bodega en todos los aeropuertos.");
+        } else {
+            System.out.printf("WARN: %d WAIT(s) con capacidad distinta a bodega. Ejemplos:%n", mismatches);
+            ejemplos.forEach(s -> System.out.println("  " + s));
         }
     }
 
@@ -182,7 +209,6 @@ public final class Sanity {
 
             Instant utc;
             try {
-                // Si el modelo ya trae createdAtUtc, úsalo; si no, convierte la fecha local del destino
                 if (p.getCreatedAtUtc() != null) {
                     utc = p.getCreatedAtUtc();
                 } else {
@@ -216,5 +242,74 @@ public final class Sanity {
         } else if (total > 0) {
             System.out.println("OK: pedidos en orden no-decreciente por tiempo UTC (lista).");
         }
+    }
+
+    /* =========================================================
+     *  Extras útiles para el nuevo modelo con LiveTEGState
+     * ========================================================= */
+
+    /** Muestra snapshot de inventarios y verifica que ninguno exceda su bodega. */
+    public static void runEstadoVivo(LiveTEGState live, AeropuertosMap aMap, int topN) {
+        var inv = live.snapshotInventory();
+        if (inv.isEmpty()) {
+            System.out.println("Inventario: (vacío)");
+            return;
+        }
+        // Top-N por inventario
+        var top = inv.entrySet().stream()
+                .sorted((a,b) -> Integer.compare(b.getValue(), a.getValue()))
+                .limit(Math.max(1, topN))
+                .toList();
+
+        System.out.println("Inventario (Top " + top.size() + "):");
+        for (var e : top) {
+            int cap = Optional.ofNullable(aMap.obtener(e.getKey())).map(ap -> ap.getCapacidad()).orElse(0);
+            System.out.printf("  %s: %d / %d%n", e.getKey(), e.getValue(), cap);
+        }
+
+        // Excesos (no debería haber)
+        var excesos = inv.entrySet().stream()
+                .filter(e -> {
+                    int cap = Optional.ofNullable(aMap.obtener(e.getKey())).map(ap -> ap.getCapacidad()).orElse(0);
+                    return e.getValue() > cap;
+                })
+                .toList();
+        if (excesos.isEmpty()) {
+            System.out.println("OK: ningún aeropuerto supera su capacidad de bodega.");
+        } else {
+            System.out.println("WARN: inventarios que superan bodega:");
+            for (var e : excesos) {
+                int cap = Optional.ofNullable(aMap.obtener(e.getKey())).map(ap -> ap.getCapacidad()).orElse(0);
+                System.out.printf("  %s: %d > %d%n", e.getKey(), e.getValue(), cap);
+            }
+        }
+    }
+
+    /** Resumen de nodos/arcos del TEG filtrando por ventana temporal [t0, t1]. */
+    public static void runVentanaTEG(VuelosTEG G, Instant t0, Instant t1) {
+        int nodes = 0, eFlight=0, eWait=0, eSupply=0, bad=0;
+
+        for (var n : G.nodes()) {
+            if (n.isSuperSource()) continue;
+            Instant t = n.getTimeUtc();
+            if (t == null || t.isBefore(t0) || t.isAfter(t1)) continue;
+            nodes++;
+
+            for (var e : G.out(n)) {
+                switch (e.getType()) {
+                    case FLIGHT -> {
+                        Instant dep = e.getFrom().getTimeUtc();
+                        Instant arr = e.getTo().getTimeUtc();
+                        if (dep == null || arr == null || !arr.isAfter(dep)) bad++;
+                        if (!arr.isAfter(t1) && !dep.isBefore(t0)) eFlight++;
+                    }
+                    case WAIT   -> eWait++;
+                    case SUPPLY -> eSupply++;
+                }
+            }
+        }
+        System.out.printf("Ventana [%s .. %s] -> nodos=%d, FLIGHT=%d, WAIT=%d, SUPPLY=%d%n",
+                t0, t1, nodes, eFlight, eWait, eSupply);
+        if (bad > 0) System.out.printf("WARN: %d FLIGHT con tiempos inconsistentes en ventana.%n", bad);
     }
 }
