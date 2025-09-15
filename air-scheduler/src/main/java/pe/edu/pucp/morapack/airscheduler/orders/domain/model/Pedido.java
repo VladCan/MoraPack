@@ -1,7 +1,9 @@
 package pe.edu.pucp.morapack.airscheduler.orders.domain.model;
 
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Scanner;
 
 public class Pedido {
@@ -10,6 +12,7 @@ public class Pedido {
     private String destino;     // Ciudad o código de aeropuerto destino
     private String origen;
     private LocalDateTime  fecha;    // Fecha del pedido
+    private Instant createdAtUtc;   // <<— NUEVO: normalizado a UTC
     private int cantidad;       // Cantidad de producto solicitada
     private String continenteDestino;
 
@@ -84,10 +87,19 @@ public class Pedido {
         this.continenteDestino = continenteDestino;
     }
 
+    public Instant getCreatedAtUtc() {
+        return createdAtUtc;
+    }
+
+    /** Normaliza 'fecha' (LocalDateTime local en destino) a UTC dado un GMT entero. */
+    public void computeUtcFromGmt(int gmtHours) {
+        this.createdAtUtc = fecha.atOffset(ZoneOffset.ofHours(gmtHours)).toInstant();
+    }
+
     @Override
     public String toString() {
         return idPedido + " | Cliente: " + idCliente + " | Destino: " + destino +
-                " | Fecha: " + fecha + " | Cant: " + cantidad;
+               " | FechaLocal: " + fecha + " | UTC: " + createdAtUtc + " | Cant: " + cantidad;
     }
 
     public void leer(Scanner sc){
