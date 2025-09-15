@@ -123,9 +123,13 @@ public final class VueloTEGBuilder {
 
     // Overload por comodidad: horizonte a partir de pedidos (si lo necesitas)
     public static VuelosTEG build(AeropuertosMap aMap,
-                                  VuelosMap vMap,
-                                  Instant start, Duration horizon,
-                                  Set<String> sedesSiempreLlenas) {
-        return build(aMap, vMap, start, start.plus(horizon), sedesSiempreLlenas);
+                                  LiveTEGState live,
+                                  Instant t0,
+                                  Instant t1,
+                                  Set<String> sedes) {
+        VuelosTEG teg = new VuelosTEG();
+        // Delegamos en el estado vivo para poblar el grafo recortado al horizonte
+        live.populateTEG(teg, aMap, t0, t1, sedes);
+        return teg;
     }
 }

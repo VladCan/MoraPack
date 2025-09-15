@@ -2,6 +2,8 @@ package pe.edu.pucp.morapack.airscheduler.flights.adapters.memory;
 
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Consumer;
+
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.VuelosEdge;
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.VuelosNode;
 
@@ -34,4 +36,38 @@ public final class VuelosTEG {
 
     public int nodeCount() { return nodes.size(); }
     public int edgeCount() { return adj.values().stream().mapToInt(List::size).sum(); }
+
+    /* ======================================================
+     * NUEVOS HELPERS: vistas “aplanadas” de todas las aristas
+     * ====================================================== */
+
+    /** Snapshot de TODAS las aristas del TEG (copia defensiva). */
+    public List<VuelosEdge> getEdges() {
+        List<VuelosEdge> all = new ArrayList<>(edgeCount());
+        for (List<VuelosEdge> lst : adj.values()) {
+            all.addAll(lst);
+        }
+        return all;
+    }
+
+    /** Snapshot de aristas filtradas por tipo. */
+    public List<VuelosEdge> getEdges(VuelosEdge.Type type) {
+        List<VuelosEdge> res = new ArrayList<>();
+        forEachEdge(e -> {
+            if (e.getType() == type) res.add(e);
+        });
+        return res;
+    }
+
+    /** Conveniencia: sólo aristas de vuelo (FLIGHT). */
+    public List<VuelosEdge> getFlightEdges() {
+        return getEdges(VuelosEdge.Type.FLIGHT);
+    }
+
+    /** Iteración sin asignaciones extra. */
+    public void forEachEdge(Consumer<VuelosEdge> consumer) {
+        for (List<VuelosEdge> lst : adj.values()) {
+            for (VuelosEdge e : lst) consumer.accept(e);
+        }
+    }
 }
