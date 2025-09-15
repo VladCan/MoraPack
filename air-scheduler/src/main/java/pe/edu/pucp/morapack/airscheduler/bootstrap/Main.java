@@ -112,6 +112,10 @@ public class Main {
                 Instant t1 = t0.plus(Duration.ofHours(HORIZONTE_TEG_H));
                 var teg = VueloTEGBuilder.build(aeropuertosMap, live, t0, t1, sedes);
 
+                Sanity.run(aeropuertosMap, mapa, teg, sedes);
+                Sanity.runPedidosTiempo(aeropuertosMap, listaPedidos);
+                System.exit(1);
+
                 // 6) Seed (misma política de minimizar vuelos)
                 CostPolicy policy = new PreferredCostPolicy(1, 10, 0.2, null);
                 var seedSvc = new SSPSeedService(teg, policy, sedes);

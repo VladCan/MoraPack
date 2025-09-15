@@ -7,7 +7,6 @@ import pe.edu.pucp.morapack.airscheduler.flights.domain.model.Aeropuerto;
 
 public class AeropuertosMap {
     private final Map<String, Aeropuerto> aeropuertos;
-
     public AeropuertosMap() {
         aeropuertos = new HashMap<>();
     }
@@ -62,6 +61,16 @@ public class AeropuertosMap {
 
     public boolean contains(String code) {
         return aeropuertos.containsKey(code);
+    }
+    // ==== NUEVO ====
+    public int getCapBodega(String icao) {
+        Aeropuerto a = aeropuertos.get(icao);
+        return (a != null) ? a.getCapacidad() : 0;
+    }
+
+    // ==== OPCIONAL (útil para inicializar inventarios) ====
+    public Set<String> allIcaos() {
+        return Collections.unmodifiableSet(aeropuertos.keySet());
     }
 
 }
