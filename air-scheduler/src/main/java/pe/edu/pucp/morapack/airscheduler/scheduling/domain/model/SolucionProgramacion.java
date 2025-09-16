@@ -20,6 +20,17 @@ public class SolucionProgramacion {
 
     private final CargaPorVuelo cargaPorVuelo;
 
+    public SolucionProgramacion(Map<Integer, PlanPedido> planPorPedido, CargaPorVuelo cargaPorVuelo) {
+        this.planPorPedido = Map.copyOf(planPorPedido); // hacemos copia inmutable
+        this.cargaPorVuelo = cargaPorVuelo; // si es mutable, considerar copia defensiva
+    }
+
+    public SolucionProgramacion(SolucionProgramacion otra) {
+        this.planPorPedido = Map.copyOf(otra.planPorPedido); // inmutable
+        this.cargaPorVuelo = otra.cargaPorVuelo; // si es mutable, deberías copiar también
+    }
+
+
     public PlanPedido planDe(int idPedido) {
         return planPorPedido.get(idPedido);
     }

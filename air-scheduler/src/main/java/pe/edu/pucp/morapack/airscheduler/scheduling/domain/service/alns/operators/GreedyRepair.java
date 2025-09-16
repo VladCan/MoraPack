@@ -1,28 +1,62 @@
 package pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators;
 
-import pe.edu.pucp.morapack.airscheduler.*;
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.Vuelo;
-import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.Solution;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.PlanPedido;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.TramoAsignado;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.VueloProgramadoId;
 
-
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
-
 public class GreedyRepair implements RepairOperator {
+
+    private final List<String> sedes; // sedes válidas
+    private final Map<String, List<Vuelo>> vuelosPorOrigen; // vuelos disponibles
+
+    public GreedyRepair(List<String> sedes, Map<String, List<Vuelo>> vuelosPorOrigen) {
+        this.sedes = sedes;
+        this.vuelosPorOrigen = vuelosPorOrigen;
+    }
+
     @Override
-    public void repair(Solution s) {
-        for (Map.Entry<Pedido, List<Vuelo>> e : s.getAsignaciones().entrySet()) {
-            if (e.getValue().isEmpty()) {
-                Pedido p = e.getKey();
-                // Simple heurística: primer vuelo disponible desde sedes
-                for (Vuelo v : s.vuelosPorOrigen.get("SPIM")) {
-                    if (v.getDestino().equals(p.getDestino()) && v.getCapacidad() >= p.getCantidad()) {
-                        e.getValue().add(v);
-                        break;
+    public void repair(SolucionProgramacion s) {
+        for (PlanPedido plan : s.getPlanPorPedido().values()) {
+            if (plan.getTramos() != null && !plan.getTramos().isEmpty()) continue;
+
+            // Heurística simple: primer vuelo disponible desde alguna sede
+            for (String sede : sedes) {
+                List<Vuelo> vuelos = vuelosPorOrigen.get(sede);
+                if (vuelos == null) continue;
+
+                for (Vuelo v : vuelos) {
+                    if (v.getDestino().equals(plan.getDestinoIcao()) &&
+                            v.getCapacidad() >= plan.getDemanda()) {
+
+                        // Convertir LocalTime a Instant usando la fecha de creación del plan
+                        LocalDate fecha = plan.getCreadoUtc().atZone(ZoneOffset.UTC).toLocalDate();
+                        Instant salidaUtc = v.getHoraGMTOrigen().atDate(fecha).toInstant(ZoneOffset.UTC);
+                        Instant llegadaUtc = v.getHoraGMTDestino().atDate(fecha).toInstant(ZoneOffset.UTC);
+
+                        // Crear TramoAsignado
+                        VueloProgramadoId id = new VueloProgramadoId(
+                                v.getOrigen(),
+                                v.getDestino(),
+                                salidaUtc,
+                                llegadaUtc
+                        );
+
+                        TramoAsignado tramo = new TramoAsignado(id, plan.getDemanda(), llegadaUtc);
+
+                        plan.getTramos().clear(); // aseguramos que esté vacío
+                        plan.getTramos().add(tramo);
+                        break; // asignamos solo un vuelo
                     }
                 }
+                if (!plan.getTramosMutable().isEmpty()) break; // ya se asignó
             }
         }
     }
