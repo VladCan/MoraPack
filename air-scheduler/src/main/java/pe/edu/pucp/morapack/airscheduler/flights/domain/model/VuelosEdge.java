@@ -1,8 +1,8 @@
 package pe.edu.pucp.morapack.airscheduler.flights.domain.model;
 
 public record VuelosEdge(
-        VuelosNode salida,
-        VuelosNode destino,
+        AereopuertoNode salida,
+        AereopuertoNode destino,
         Type tipo,
         int capacidad,
         Vuelo vuelo

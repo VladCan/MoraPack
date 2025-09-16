@@ -8,23 +8,28 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public final class VuelosNode {
-    @EqualsAndHashCode.Include
-    private String codigoAP; // código aeropuerto o "OMEGA"
+public final class AereopuertoNode {
 
     @EqualsAndHashCode.Include
-    private Instant tiempoUTC; // null sólo para Ω
-
-    private int capacidadAP; // informativo (para no-sedes)
+    private String codigoAP;
 
     @EqualsAndHashCode.Include
-    private boolean esSede; // true si es Ω
+    private Instant tiempoUTC; // válido siempre, excepto si es Ω
 
-    public VuelosNode(String codigoAP, Instant tiempoUTC, int capacidadAP, boolean esSede) {
+    private int capacidadAP; // informativo
+
+    @EqualsAndHashCode.Include
+    private boolean esSede; // true = Ω
+
+    public AereopuertoNode(String codigoAP, Instant tiempoUTC, int capacidadAP, boolean esSede) {
         this.codigoAP = Objects.requireNonNull(codigoAP, "codigoAP");
-        this.tiempoUTC = Objects.requireNonNull(tiempoUTC, "tiempoUTC");
-        this.capacidadAP = capacidadAP;
         this.esSede = esSede;
+        if (!esSede) {
+            this.tiempoUTC = Objects.requireNonNull(tiempoUTC, "tiempoUTC");
+        } else {
+            this.tiempoUTC = null; // sólo Ω
+        }
+        this.capacidadAP = capacidadAP;
     }
 
     @Override

@@ -1,110 +1,38 @@
 package pe.edu.pucp.morapack.airscheduler.flights.domain.model;
-import java.time.*;
 
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+// Opcional: si quieres construir con builder, descomenta:
+// import lombok.Builder;
+
+import java.time.LocalTime;
 import java.util.Scanner;
 
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+// @Builder  // <- opcional, si quieres usar patrón builder
 public class Vuelo {
+    // ORIGEN-DESTINO-HoraOrigen-HoraDestino-Capacidad
+    private int id;
+    private String origen;
+    private String destino;
+    private LocalTime horaOrigen;
+    private LocalTime horaDestino;
+    private LocalTime horaGMTOrigen;
+    private LocalTime horaGMTDestino;
+    private int capacidad;
 
-    //ORIGEN-DESTINO-HoraOrigen-HoraDestino-Capacidad
-        private int id;
-        private String origen;
-        private String destino;
-        private LocalTime horaOrigen;
-        private LocalTime horaDestino;
-        private LocalTime horaGMTOrigen;
-        private LocalTime horaGMTDestino;
-        private int capacidad;
-
-    public Vuelo() {
-    }
-
+    // Constructor corto: conserva tu firma y comportamiento; delega al all-args
     public Vuelo(int id, String origen, String destino, LocalTime horaOrigen, LocalTime horaDestino, int capacidad) {
-        this.id = id;
-        this.origen = origen;
-        this.destino = destino;
-        this.horaOrigen = horaOrigen;
-        this.horaDestino = horaDestino;
-        this.capacidad = capacidad;
+        this(id, origen, destino, horaOrigen, horaDestino, null, null, capacidad);
     }
 
-    public Vuelo(int id, String origen, String destino, LocalTime horaOrigen, LocalTime horaDestino, LocalTime horaGMTOrigen, LocalTime horaGMTDestino, int capacidad) {
-        this.id = id;
-        this.origen = origen;
-        this.destino = destino;
-        this.horaOrigen = horaOrigen;
-        this.horaDestino = horaDestino;
-        this.horaGMTOrigen = horaGMTOrigen;
-        this.horaGMTDestino = horaGMTDestino;
-        this.capacidad = capacidad;
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
-    public String getOrigen() {
-        return origen;
-    }
-
-    public void setOrigen(String origen) {
-        this.origen = origen;
-    }
-
-    public LocalTime getHoraDestino() {
-        return horaDestino;
-    }
-
-    public void setHoraDestino(LocalTime horaDestino) {
-        this.horaDestino = horaDestino;
-    }
-
-    public int getCapacidad() {
-        return capacidad;
-    }
-
-    public void setCapacidad(int capacidad) {
-        this.capacidad = capacidad;
-    }
-
-    public LocalTime getHoraOrigen() {
-        return horaOrigen;
-    }
-
-    public void setHoraOrigen(LocalTime horaOrigen) {
-        this.horaOrigen = horaOrigen;
-    }
-
-    public LocalTime getHoraGMTOrigen() {
-        return horaGMTOrigen;
-    }
-
-    public void setHoraGMTOrigen(LocalTime horaGMTOrigen) {
-        this.horaGMTOrigen = horaGMTOrigen;
-    }
-
-    public LocalTime getHoraGMTDestino() {
-        return horaGMTDestino;
-    }
-
-    public void setHoraGMTDestino(LocalTime horaGMTDestino) {
-        this.horaGMTDestino = horaGMTDestino;
-    }
-
-    public String getDestino() {
-        return destino;
-    }
-
-    public void setDestino(String destino) {
-        this.destino = destino;
-    }
-
-    public String leer(Scanner sc,int i){
+    /** Lee una línea ORIGEN-DESTINO-HH:mm-HH:mm-capacidad, muta this y retorna this.origen (igual que antes). */
+    public String leer(Scanner sc, int i) {
         if (!sc.hasNextLine()) return null;
-        String linea = sc.nextLine();
+        String linea = sc.nextLine(); // sin trim para respetar formato original
         String[] partes = linea.split("-");
         if (partes.length != 5) {
             System.out.println("Formato incorrecto: " + linea);
@@ -124,19 +52,18 @@ public class Vuelo {
     @Override
     public String toString() {
         return "Vuelo " + id + " [" + origen + " → " + destino + "] "
-                + horaOrigen + " - " + horaDestino + " Capacidad: " + capacidad + " OrigenGMT " + horaGMTOrigen + " DestinoGMT "+horaGMTDestino;
+                + horaOrigen + " - " + horaDestino
+                + " Capacidad: " + capacidad
+                + " OrigenGMT " + horaGMTOrigen
+                + " DestinoGMT " + horaGMTDestino;
     }
 
-    public void llenarHoraGMT(int origen,int destino ){
-            if(horaOrigen!=null){
-                this.horaGMTOrigen=horaOrigen.minusHours(origen);
-            }
-            if(horaDestino!=null){
-                this.horaGMTDestino=horaDestino.minusHours(destino);
-            }
+    public void llenarHoraGMT(int offsetOrigenHoras, int offsetDestinoHoras) {
+        if (horaOrigen != null)  this.horaGMTOrigen  = horaOrigen.minusHours(offsetOrigenHoras);
+        if (horaDestino != null) this.horaGMTDestino = horaDestino.minusHours(offsetDestinoHoras);
     }
 
     public double getCosto() {
-        return  0;
+        return 0;
     }
 }
