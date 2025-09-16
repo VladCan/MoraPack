@@ -21,4 +21,4 @@ public record VuelosEdge(
             case SUPPLY -> "Ω -> " + destino + " [SUPPLY cap=" + capacidad + "]";
         };
     }
-}
+}   
