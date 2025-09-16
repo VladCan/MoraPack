@@ -2,18 +2,14 @@ package pe.edu.pucp.morapack.airscheduler.flights.adapters.memory;
 
 import java.io.File;
 import java.util.*;
-
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.Aeropuerto;
 
-public class AeropuertosMap {
-    private final Map<String, Aeropuerto> aeropuertos;
-    public AeropuertosMap() {
-        aeropuertos = new HashMap<>();
-    }
+public final class AeropuertosMap {
+
+    private final Map<String, Aeropuerto> aeropuertos = new HashMap<>();
 
     public void agregar(Aeropuerto ae, String key) {
-        if (key == null || ae == null)
-            return; // Evitar claves o aeropuertos nulos
+        if (key == null || ae == null) return; // Evitar claves o aeropuertos nulos
         aeropuertos.put(key, ae);
     }
 
@@ -28,21 +24,17 @@ public class AeropuertosMap {
     public void leerDatos(Scanner sc) {
         while (sc.hasNextLine()) {
             Aeropuerto ae = new Aeropuerto();
-            String key = ae.leer(sc); // key = origen
-            if (key != null)
-                agregar(ae, key);
+            String key = ae.leer(sc); // key = código
+            if (key != null) agregar(ae, key);
         }
     }
 
-    // Leer datos desde System.in
     public void leerDatos() {
         leerDatos(new Scanner(System.in));
     }
 
-    // Leer datos desde archivo
     public void leerDatos(String nomArch) throws Exception {
-        File file = new File(nomArch);
-        try (Scanner sc = new Scanner(file)) {
+        try (Scanner sc = new Scanner(new File(nomArch))) {
             leerDatos(sc);
         }
     }
@@ -62,6 +54,7 @@ public class AeropuertosMap {
     public boolean contains(String code) {
         return aeropuertos.containsKey(code);
     }
+
     // ==== NUEVO ====
     public int getCapBodega(String icao) {
         Aeropuerto a = aeropuertos.get(icao);
@@ -72,5 +65,4 @@ public class AeropuertosMap {
     public Set<String> allIcaos() {
         return Collections.unmodifiableSet(aeropuertos.keySet());
     }
-
 }
