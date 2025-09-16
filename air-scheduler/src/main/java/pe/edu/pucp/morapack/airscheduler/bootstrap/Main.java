@@ -9,6 +9,7 @@ import java.util.Set;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.TEGEventBuilder;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosMap;
+import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.TEGEventBuilderHelpers.TEGParametros;
 import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.CargarPedidos;
 
@@ -17,7 +18,6 @@ public class Main {
     // Parámetros de simulación (ajustables)
     private static final long HORAS_VENTANA   = 6;
     private static final long HORIZONTE_TEG_H = 72;   // cuánto futuro modelar
-    private static final int  MIN_CONEXION_MIN = 45;  // conexión mínima en min
 
     public static void main(String[] args) {
         /* =======================
@@ -71,15 +71,15 @@ public class Main {
             var finUTC      = presenteUTC.plus(HORIZONTE_TEG_H, ChronoUnit.HOURS);
 
 
-            var builder = new TEGEventBuilder(
-            aeropuertosMap, mapa /* VuelosMap */)
-            .inicio(inicioUTC)
-            .fin(finUTC)
-            .minConexionMin(MIN_CONEXION_MIN)
-            .capacidadWaitPorDefecto(null)     // null => usa capacidad del aeropuerto (bodega)
-            .sedes(sedes);
+            var params = TEGParametros.builder()
+                .inicioUtc(inicioUTC)
+                .finUtc(finUTC)
+                .capacidadWaitPorDefecto(null) // null => usa cap. de bodega del aeropuerto
+                .sedes(sedes)
+                // .arribosExogenos(arribosDesdeSolucionAnterior) // opcional
+                .build();
 
-            var teg = builder.build();
+            var teg = new TEGEventBuilder(aeropuertosMap, mapa).construir(params);
 
             
             if(i==4){
