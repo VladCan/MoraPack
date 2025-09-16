@@ -1,4 +1,5 @@
 package pe.edu.pucp.morapack.airscheduler.bootstrap;
+import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -57,13 +58,17 @@ public class Main {
         pedidos.normalizarUtc(aeropuertosMap);
         //el while es para simular la llegada de pedidos en el tiempo
         
+        Instant reloj = pedidos.primerInstanteUTC();
+        if (reloj == null) return;
+        int i=0;
         while (!pedidos.isEmpty()) {
-            var ventanaDePedidos = pedidos.ultimasHoras(HORAS_VENTANA);
-            var listaPedidos = ventanaDePedidos.pedidos();
+            var ventana = pedidos.ventanaDesde(reloj, HORAS_VENTANA);
+            var listaPedidos = ventana.pedidos();
             if (listaPedidos.isEmpty()) break;
-            var presenteUTC = ventanaDePedidos.presenteUTC();     // tu “ahora”
-            var inicioUTC   = presenteUTC;                        // no creamos pasado
-            var finUTC      = presenteUTC.plus(HORIZONTE_TEG_H,ChronoUnit.HOURS);
+
+            var presenteUTC = ventana.presenteUTC();          // reloj + 6h
+            var inicioUTC   = presenteUTC;                    // TEG sin pasado
+            var finUTC      = presenteUTC.plus(HORIZONTE_TEG_H, ChronoUnit.HOURS);
 
 
             var builder = new TEGEventBuilder(
@@ -76,10 +81,14 @@ public class Main {
 
             var teg = builder.build();
 
-            Sanity.todoOk(sedes, aeropuertosMap, ventanaDePedidos, teg);
-            Sanity.dumpTEGSample(teg, 5);
-            Sanity.chequearDuplicados(teg);
-            System.exit(1);
+            
+            if(i==4){
+                Sanity.todoOk(sedes, aeropuertosMap, ventana, teg);
+                Sanity.dumpTEGSample(teg, 5);
+                Sanity.chequearDuplicados(teg);
+                break;
+            }
+            i++;
         }
 
     }

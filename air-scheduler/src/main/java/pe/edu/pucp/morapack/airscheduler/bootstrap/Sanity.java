@@ -58,7 +58,7 @@ public final class Sanity {
     }
 
     // ===========================
-    // 2) Chequeo de VENTANA DE PEDIDOS
+    // 2) Chequeo de VENTANA DE PEDIDOS (backlog + <= presenteUTC)
     // ===========================
     public static boolean pedidosVentanaOk(CargarPedidos.VentanaPedidos ventana) {
         System.out.println("=== Chequeo de VENTANA DE PEDIDOS ===");
@@ -66,19 +66,18 @@ public final class Sanity {
             System.out.println("❌ Ventana nula");
             return false;
         }
-        Instant inicio = ventana.inicioUTC();
         Instant presente = ventana.presenteUTC();
         List<Pedido> lista = ventana.pedidos();
 
-        System.out.printf("Ventana: inicio=%s | presente=%s | totalPedidos=%d%n", inicio, presente, lista.size());
+        System.out.printf("Ventana: hasta=%s | totalPedidos=%d%n", presente, lista.size());
 
-        if (inicio == null || presente == null) {
+        if (presente == null) {
             if (lista.isEmpty()) {
                 System.out.println("ℹ️ Ventana vacía (sin pedidos).");
                 System.out.println("=====================================\n");
                 return true;
             } else {
-                System.out.println("❌ Ventana inconsistente (inicio/presente nulos con pedidos).");
+                System.out.println("❌ Ventana inconsistente (presente nulo con pedidos).");
                 System.out.println("=====================================\n");
                 return false;
             }
@@ -86,24 +85,21 @@ public final class Sanity {
 
         boolean ok = true;
 
-        // a) Todos en rango
+        // a) Todos con createdAtUtc <= presente y no nulo
         long fuera = lista.stream().filter(p ->
-                p.getCreatedAtUtc() == null ||
-                        p.getCreatedAtUtc().isBefore(inicio) ||
-                        p.getCreatedAtUtc().isAfter(presente)
+                p.getCreatedAtUtc() == null || p.getCreatedAtUtc().isAfter(presente)
         ).count();
         if (fuera > 0) {
-            System.out.println("❌ Hay pedidos fuera de rango de la ventana: " + fuera);
+            System.out.println("❌ Hay pedidos fuera de la ventana (createdAtUtc > presente) o con fecha nula: " + fuera);
             ok = false;
         } else {
-            System.out.println("✅ Todos los pedidos están dentro del rango de la ventana.");
+            System.out.println("✅ Todos los pedidos están ≤ presenteUTC.");
         }
 
-        // b) Orden ascendente por createdAtUtc
+        // b) Orden ascendente por createdAtUtc (respeta orden de llegada)
         boolean ordenado = estaOrdenadoPorUtcAsc(lista);
         if (!ordenado) {
             System.out.println("❌ La lista de pedidos NO está en orden ascendente por createdAtUtc.");
-            // Imprime los primeros desordenados (si hay)
             imprimirPrimerDesorden(lista);
             ok = false;
         } else {
@@ -162,7 +158,7 @@ public final class Sanity {
 
         System.out.println("====================================\n");
         return ok;
-        }
+    }
 
     /** FLIGHT: llegada > salida y nodos no nulos. */
     private static boolean checkArcosFlight(VuelosTEG teg) {
@@ -246,9 +242,9 @@ public final class Sanity {
     public static void resumen(CargarPedidos.VentanaPedidos ventana, VuelosTEG teg) {
         System.out.println("=== RESUMEN ===");
         if (ventana != null) {
-            System.out.printf("Pedidos en ventana: %d | [%s .. %s]%n",
+            System.out.printf("Pedidos en ventana: %d | hasta=%s%n",
                     ventana.pedidos() == null ? 0 : ventana.pedidos().size(),
-                    ventana.inicioUTC(), ventana.presenteUTC());
+                    ventana.presenteUTC());
         }
         if (teg != null) {
             long flights = teg.arcos().stream().filter(a -> a.tipo() == VuelosEdge.Type.FLIGHT).count();
@@ -273,18 +269,19 @@ public final class Sanity {
         }
         System.out.println("=========================\n");
     }
+
     public static void chequearDuplicados(VuelosTEG teg) {
-    System.out.println("\n=== Chequeo de DUPLICADOS ===");
-    int dups = 0;
-    for (var n : teg.nodos()) {
-        var lista = teg.out(n);
-        var set = new java.util.HashSet<>(lista);
-        if (set.size() != lista.size()) {
-            dups += (lista.size() - set.size());
-            System.out.printf("⚠️  Duplicados en %s: lista=%d set=%d%n", n, lista.size(), set.size());
+        System.out.println("\n=== Chequeo de DUPLICADOS ===");
+        int dups = 0;
+        for (var n : teg.nodos()) {
+            var lista = teg.out(n);
+            var set = new java.util.HashSet<>(lista);
+            if (set.size() != lista.size()) {
+                dups += (lista.size() - set.size());
+                System.out.printf("⚠️  Duplicados en %s: lista=%d set=%d%n", n, lista.size(), set.size());
+            }
         }
+        if (dups == 0) System.out.println("✅ Sin arcos duplicados.");
+        else System.out.println("❌ Arcos duplicados totales: " + dups);
     }
-    if (dups == 0) System.out.println("✅ Sin arcos duplicados.");
-    else System.out.println("❌ Arcos duplicados totales: " + dups);
-}
 }
