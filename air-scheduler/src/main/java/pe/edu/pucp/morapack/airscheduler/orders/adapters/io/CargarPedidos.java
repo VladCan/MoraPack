@@ -17,7 +17,7 @@ public class CargarPedidos {
     private boolean utcNormalizada = false; // evita doble normalización
 
     // DTO simple de la ventana
-    public record VentanaPedidos(Instant inicioUTC, Instant presenteUTC, List<Pedido> pedidos) {}
+    public record VentanaPedidos(Instant presenteUTC, List<Pedido> pedidos) {}
 
     // ========== Operaciones básicas ==========
     public void agregar(Pedido pedido) {
@@ -57,48 +57,37 @@ public class CargarPedidos {
         return utcNormalizada;
     }
 
-    // ========== Ventanas de pedidos ==========
-    /** Devuelve pedidos con createdAtUtc en (presente - horas, presente], orden ascendente por tiempo. */
-    public VentanaPedidos ultimasHoras(long horas) {
-        return ultimasHoras(horas, null, true);
+    public Instant primerInstanteUTC() {
+        if (!utcNormalizada) 
+            throw new IllegalStateException("Primero llama a normalizarUtc(aeropuertosMap).");
+        for (Pedido p : colaPedidos) {
+            if (p.getCreatedAtUtc() != null) return p.getCreatedAtUtc();
+        }
+        return null;
     }
 
-    public VentanaPedidos ultimasHoras(long horas, Instant presenteUTCOverride, boolean ordenarAscPorUTC) {
+    /********** NUEVO: ventana desde un inicio dado y duración en horas **********/
+    public VentanaPedidos ventanaDesde(Instant relojUTC, long horasVentana) {
         if (!utcNormalizada)
             throw new IllegalStateException("Primero llama a normalizarUtc(aeropuertosMap).");
-        if (horas <= 0) return new VentanaPedidos(null, null, List.of());
+        if (relojUTC == null || horasVentana <= 0 || colaPedidos.isEmpty())
+            return new VentanaPedidos(null, List.of());
 
-        // 1) Definir "presente": el mayor createdAtUtc (o el override si lo pasas)
-        Instant presenteUTC = (presenteUTCOverride != null)
-                ? presenteUTCOverride
-                : colaPedidos.stream()
-                        .map(Pedido::getCreatedAtUtc)
-                        .filter(Objects::nonNull)
-                        .max(Comparator.naturalOrder())
-                        .orElse(null);
+        Instant presenteUTC = relojUTC.plus(Duration.ofHours(horasVentana));
 
-        if (presenteUTC == null) return new VentanaPedidos(null, null, List.of());
-
-        // 2) Intervalo [inicio, presente]
-        Instant inicioUTC = presenteUTC.minus(Duration.ofHours(horas));
-
-        // 3) Filtrar y ordenar (ascendente por tiempo si se pide)
-        List<Pedido> ventana = colaPedidos.stream()
-                .filter(p -> {
-                    Instant t = p.getCreatedAtUtc();
-                    return t != null && !t.isBefore(inicioUTC) && !t.isAfter(presenteUTC);
-                })
-                .sorted((a, b) -> {
-                    if (!ordenarAscPorUTC) return 0; // preserva orden de la cola
-                    return a.getCreatedAtUtc().compareTo(b.getCreatedAtUtc());
-                })
-                .collect(Collectors.toList());
-
-        return new VentanaPedidos(inicioUTC, presenteUTC, ventana);
+        List<Pedido> candidatos = new ArrayList<>();
+        for (Pedido p : colaPedidos) {
+            Instant t = p.getCreatedAtUtc();
+            if (t == null) continue;
+            if (!t.isAfter(presenteUTC)) candidatos.add(p);
+            else break; // la cola está ordenada temporalmente: podemos cortar
+        }
+        return new VentanaPedidos(presenteUTC, candidatos);
     }
 
+
     // ========== Consumo / utilidades ==========
-    /** Elimina de la cola los pedidos planificados en la tanda (por idPedido). */
+    /** Elimina de la cola los pedidos planificados en la tanda (por id). */
     public void consumir(List<Pedido> tanda) {
         if (tanda == null || tanda.isEmpty()) return;
         Set<Integer> ids = tanda.stream().map(Pedido::getIdPedido).collect(Collectors.toSet());
