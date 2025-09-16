@@ -1,40 +1,24 @@
 package pe.edu.pucp.morapack.airscheduler.flights.domain.model;
 
-public final class VuelosEdge {
+public record VuelosEdge(
+        VuelosNode salida,
+        VuelosNode destino,
+        Type tipo,
+        int capacidad,
+        Vuelo vuelo
+) {
     public enum Type { FLIGHT, WAIT, SUPPLY }
 
-    private final VuelosNode from;
-    private final VuelosNode to;
-    private final Type type;
-    private final int capacity;   // cap del vuelo, del almacén (WAIT), o del supply (SUPPLY)
-    private final Vuelo vuelo;    // sólo para FLIGHT; null en WAIT/SUPPLY
+    public boolean isFlight()  { return tipo == Type.FLIGHT; }
+    public boolean isWait()    { return tipo == Type.WAIT; }
+    public boolean isSupply()  { return tipo == Type.SUPPLY; }
 
-    public VuelosEdge(VuelosNode from, VuelosNode to, Type type, int capacity, Vuelo vuelo) {
-        this.from = from; this.to = to; this.type = type; this.capacity = capacity; this.vuelo = vuelo;
-    }
-
-    public VuelosNode getFrom() { return from; }
-    public VuelosNode getTo() { return to; }
-    public Type getType() { return type; }
-    public int getCapacity() { return capacity; }
-    public Vuelo getVuelo() { return vuelo; }
-
-    // ==== NUEVO ====
-    public boolean isFlight()  { return type == Type.FLIGHT; }
-    public boolean isWait()    { return type == Type.WAIT; }
-    public boolean isSupply()  { return type == Type.SUPPLY; }
-    // ==============
-    @Override public String toString() {
-        switch (type) {
-            case FLIGHT -> {
-                return from + " => " + to + " [FLIGHT cap=" + capacity + "]";
-            }
-            case WAIT -> {
-                return from + " -> " + to + " [WAIT cap=" + capacity + "]";
-            }
-            default -> {
-                return "Ω -> " + to + " [SUPPLY cap=" + capacity + "]";
-            }
-        }
+    @Override
+    public String toString() {
+        return switch (tipo) {
+            case FLIGHT -> salida + " => " + destino + " [FLIGHT cap=" + capacidad + "]";
+            case WAIT   -> salida + " -> " + destino + " [WAIT cap=" + capacidad + "]";
+            case SUPPLY -> "Ω -> " + destino + " [SUPPLY cap=" + capacidad + "]";
+        };
     }
 }
