@@ -42,7 +42,7 @@ public final class IndexadorEventos {
         }
 
         // Añadir instantes de arribos exógenos (para que existan nodos y WAITs)
-        Map<String, List<ArriboExogeno>> exo = p.getArribosExogenos();
+        Map<String, List<ArriboExogeno>> exo = p.getArribosLibres();
         if (exo != null && !exo.isEmpty()) {
             for (var e : exo.entrySet()) {
                 String ap = e.getKey();

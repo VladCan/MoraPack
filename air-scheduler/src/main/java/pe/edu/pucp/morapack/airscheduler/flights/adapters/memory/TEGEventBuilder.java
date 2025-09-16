@@ -39,7 +39,7 @@ public final class TEGEventBuilder {
         CreadorTEG.crearSupplySedes(teg, nodosPorAP, p.getSedes());
 
         // 5) SUPPLY puntual de carga ya en vuelo
-        CreadorTEG.inyectarArribosExogenos(teg, p, aeropuertosMap);
+        CreadorTEG.inyectarArribosLibres(teg, p, aeropuertosMap);
 
         // 6) WAIT entre eventos contiguos por aeropuerto
         CreadorTEG.crearWaits(teg, nodosPorAP, p, aeropuertosMap);
