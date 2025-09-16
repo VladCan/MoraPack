@@ -1,8 +1,10 @@
 package pe.edu.pucp.morapack.airscheduler.bootstrap;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 
@@ -12,6 +14,9 @@ import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosMap;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.TEGEventBuilderHelpers.TEGParametros;
 import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.CargarPedidos;
+import pe.edu.pucp.morapack.airscheduler.scheduling.adapters.io.ImpresorSolucion;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.VerificadorSLA;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.ssp.SSPGeneradorSeed;
 
 public class Main {
 
@@ -60,7 +65,7 @@ public class Main {
         
         Instant reloj = pedidos.primerInstanteUTC();
         if (reloj == null) return;
-        int i=0;
+        //int i=0;
         while (!pedidos.isEmpty()) {
             var ventana = pedidos.ventanaDesde(reloj, HORAS_VENTANA);
             var listaPedidos = ventana.pedidos();
@@ -76,19 +81,29 @@ public class Main {
                 .finUtc(finUTC)
                 .capacidadWaitPorDefecto(null) // null => usa cap. de bodega del aeropuerto
                 .sedes(sedes)
-                // .arribosExogenos(arribosDesdeSolucionAnterior) // opcional
+                // .arribosLibres(arribosDesdeSolucionAnterior) // opcional
                 .build();
 
             var teg = new TEGEventBuilder(aeropuertosMap, mapa).construir(params);
-
             
-            if(i==4){
-                Sanity.todoOk(sedes, aeropuertosMap, ventana, teg);
-                Sanity.dumpTEGSample(teg, 5);
-                Sanity.chequearDuplicados(teg);
-                break;
-            }
-            i++;
+
+            var ssp = new SSPGeneradorSeed(sedes,Map.of());
+            var seed = ssp.generarSeed(teg, listaPedidos, ventana.presenteUTC());
+            VerificadorSLA.assertBasicos(seed, Duration.ofHours(2));
+
+            // Mostrar por consola
+            ImpresorSolucion.imprimirEnConsola(seed);
+
+            // Guardar TXT + CSV con un prefijo (por ejemplo "seed")
+            ImpresorSolucion.guardarTodo(seed, ventana.presenteUTC(), "seed");
+            break;
+            //if(i==4){
+            //    Sanity.todoOk(sedes, aeropuertosMap, ventana, teg);
+            //    Sanity.dumpTEGSample(teg, 5);
+            //    Sanity.chequearDuplicados(teg);
+            //    break;
+            //}
+            //i++;
         }
 
     }

@@ -21,5 +21,5 @@ public class TEGParametros {
     Set<String> sedes;
     /** Arribos de carga ya en vuelo: destino -> lista de (instante, cantidad). */
     @Builder.Default
-    Map<String, List<ArriboExogeno>> arribosExogenos = Map.of();
+    Map<String, List<ArriboExogeno>> arribosLibres = Map.of();
 }

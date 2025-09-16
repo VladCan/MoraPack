@@ -47,14 +47,13 @@ public final class CreadorTEG {
         }
     }
 
-    public static void inyectarArribosExogenos(VuelosTEG teg, TEGParametros p, AeropuertosMap aeropuertosMap) {
-        Map<String, List<ArriboExogeno>> exo = p.getArribosExogenos();
+    public static void inyectarArribosLibres(VuelosTEG teg, TEGParametros p, AeropuertosMap aeropuertosMap) {
+        Map<String, List<ArriboExogeno>> exo = p.getArribosLibres();
         if (exo == null || exo.isEmpty()) return;
 
         for (var e : exo.entrySet()) {
             String destino = e.getKey();
             if (destino == null) continue;
-
             AereopuertoNode omegaArr = teg.agregarONodo("OMEGA-ARR-" + destino, null, 0, true);
 
             for (ArriboExogeno ax : e.getValue()) {
