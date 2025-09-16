@@ -26,7 +26,7 @@ public class ALNS {
     private final Random rnd = new Random();
 
     //Parametros ALNS
-    private final int maxIter = 5000000;
+    private final int maxIter = 100000;
     private final double tasaCambio = 0.3;  // para probabilidades de aceptar peor solución
 
     public ALNS(VuelosTEG teg, List<Pedido> pedidos,
