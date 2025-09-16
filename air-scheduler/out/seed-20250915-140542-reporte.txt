@@ -1,6 +1,6 @@
 === SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 9 | Completos: 8 | Incompletos: 1
-Demanda total: 1.272 | Asignado: 1.198
+Pedidos: 9 | Completos: 9 | Incompletos: 0
+Demanda total: 1.123 | Asignado: 1.123
 Capacidades OK: sí | Ventana 2h OK: sí | SLA 48h OK: sí
 ================================
 
@@ -23,14 +23,14 @@ ID     DST    CREADO_UTC              DEMANDA   ASIGNADO OK?   1a_LLEGADA       
    • EBCI→LATI | sale:2025-09-15T16:39:00Z llega:2025-09-15T19:34:00Z | asignado:162
 8      OOMS   2025-09-15T13:00:57Z        107        107 sí    2025-09-15T19:56:00Z 2025-09-15T19:56:00Z sí    sí     
    • UBBB→OOMS | sale:2025-09-15T15:23:00Z llega:2025-09-15T19:56:00Z | asignado:107
-9      EHAM   2025-09-15T13:32:57Z        249        175 NO    2025-09-15T19:48:00Z 2025-09-15T19:48:00Z sí    sí     
-   • EBCI→EHAM | sale:2025-09-15T17:32:00Z llega:2025-09-15T19:48:00Z | asignado:175
+9      EHAM   2025-09-15T13:32:57Z        100        100 sí    2025-09-15T19:48:00Z 2025-09-15T19:48:00Z sí    sí     
+   • EBCI→EHAM | sale:2025-09-15T17:32:00Z llega:2025-09-15T19:48:00Z | asignado:100
 
 == VUELOS UTILIZADOS ==
 ORI    DST    SALIDA_UTC           LLEGADA_UTC               CAPAC       ASIG      RESID
 ------------------------------------------------------------------------------------------
 EBCI   LATI   2025-09-15T16:39:00Z 2025-09-15T19:34:00Z        360        292         68
-EBCI   EHAM   2025-09-15T17:32:00Z 2025-09-15T19:48:00Z        340        340          0
+EBCI   EHAM   2025-09-15T17:32:00Z 2025-09-15T19:48:00Z        340        265         75
 UBBB   OOMS   2025-09-15T15:23:00Z 2025-09-15T19:56:00Z        340        107        233
 SPIM   SVMI   2025-09-15T17:15:00Z 2025-09-15T22:41:00Z        320        242         78
 UBBB   VIDP   2025-09-15T19:03:00Z 2025-09-16T00:34:00Z        320         83        237

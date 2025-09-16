@@ -7,4 +7,4 @@ pedido_id,destino,creado_utc,demanda,asignado,completo,primera_llegada,ultima_ll
 6,"SVMI","2025-09-15T11:26:36Z",242,242,true,"2025-09-15T22:41:00Z","2025-09-15T22:41:00Z",true,true
 7,"LATI","2025-09-15T11:57:49Z",162,162,true,"2025-09-15T19:34:00Z","2025-09-15T19:34:00Z",true,true
 8,"OOMS","2025-09-15T13:00:57Z",107,107,true,"2025-09-15T19:56:00Z","2025-09-15T19:56:00Z",true,true
-9,"EHAM","2025-09-15T13:32:57Z",249,175,false,"2025-09-15T19:48:00Z","2025-09-15T19:48:00Z",true,true
+9,"EHAM","2025-09-15T13:32:57Z",100,100,true,"2025-09-15T19:48:00Z","2025-09-15T19:48:00Z",true,true
