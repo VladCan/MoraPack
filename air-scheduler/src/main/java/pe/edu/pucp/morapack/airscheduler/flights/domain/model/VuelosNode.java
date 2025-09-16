@@ -3,37 +3,32 @@ package pe.edu.pucp.morapack.airscheduler.flights.domain.model;
 import java.time.Instant;
 import java.util.Objects;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public final class VuelosNode {
-    private final String icao;            // código aeropuerto o "OMEGA"
-    private final Instant timeUtc;        // null sólo para Ω
-    private final int capacidadAlmacen;   // informativo (para no-sedes)
-    private final boolean superSource;    // true si es Ω
+    @EqualsAndHashCode.Include
+    private String codigoAP; // código aeropuerto o "OMEGA"
 
-    public VuelosNode(String icao, Instant timeUtc, int capacidadAlmacen, boolean superSource) {
-        this.icao = Objects.requireNonNull(icao, "icao");
-        this.timeUtc = timeUtc;
-        this.capacidadAlmacen = capacidadAlmacen;
-        this.superSource = superSource;
+    @EqualsAndHashCode.Include
+    private Instant tiempoUTC; // null sólo para Ω
+
+    private int capacidadAP; // informativo (para no-sedes)
+
+    @EqualsAndHashCode.Include
+    private boolean esSede; // true si es Ω
+
+    public VuelosNode(String codigoAP, Instant tiempoUTC, int capacidadAP, boolean esSede) {
+        this.codigoAP = Objects.requireNonNull(codigoAP, "codigoAP");
+        this.tiempoUTC = Objects.requireNonNull(tiempoUTC, "tiempoUTC");
+        this.capacidadAP = capacidadAP;
+        this.esSede = esSede;
     }
 
-    public String getIcao() { return icao; }
-    public Instant getTimeUtc() { return timeUtc; }
-    public int getCapacidadAlmacen() { return capacidadAlmacen; }
-    public boolean isSuperSource() { return superSource; }
-
-    @Override public String toString() {
-        return superSource ? "Ω" : (icao + "@" + timeUtc);
-    }
-
-    @Override public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof VuelosNode v)) return false;
-        return superSource == v.superSource
-                && Objects.equals(icao, v.icao)
-                && Objects.equals(timeUtc, v.timeUtc);
-    }
-
-    @Override public int hashCode() {
-        return Objects.hash(icao, timeUtc, superSource);
+    @Override
+    public String toString() {
+        return esSede ? "Ω" : (codigoAP + "@" + tiempoUTC);
     }
 }
