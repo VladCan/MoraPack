@@ -85,6 +85,37 @@ public class CargarPedidos {
         return new VentanaPedidos(presenteUTC, candidatos);
     }
 
+    // --- NUEVO: listar sin remover ---
+    /** Lista (NO remueve) los pedidos con createdAtUtc <= hastaIncl, respetando el orden de la cola. */
+    public List<Pedido> listarHasta(Instant hastaIncl) {
+        if (!utcNormalizada)
+            throw new IllegalStateException("Primero llama a normalizarUtc(aeropuertosMap).");
+        List<Pedido> res = new ArrayList<>();
+        for (Pedido p : colaPedidos) {
+            Instant t = p.getCreatedAtUtc();
+            if (t == null || t.isAfter(hastaIncl)) break; // la cola está ordenada por tiempo
+            res.add(p);
+        }
+        return res;
+    }
+
+    // --- NUEVO: remover solo los ya completados ---
+    /** Elimina de la cola únicamente los pedidos cuyo id esté en idsCompletados. */
+    public void eliminarPedidosCompletados(Set<Integer> idsCompletados) {
+        if (idsCompletados == null || idsCompletados.isEmpty()) return;
+        colaPedidos.removeIf(p -> idsCompletados.contains(p.getIdPedido()));
+    }
+
+    // --- NUEVO: saber si aún hay pedidos “futuros” (para saber si seguimos simulando) ---
+    /** ¿Quedan pedidos con createdAtUtc > t? */
+    public boolean hayPedidosDespuesDe(Instant t) {
+        for (Pedido p : colaPedidos) {
+            Instant c = p.getCreatedAtUtc();
+            if (c != null && c.isAfter(t)) return true;
+        }
+        return false;
+    }
+
 
     // ========== Consumo / utilidades ==========
     /** Elimina de la cola los pedidos planificados en la tanda (por id). */
