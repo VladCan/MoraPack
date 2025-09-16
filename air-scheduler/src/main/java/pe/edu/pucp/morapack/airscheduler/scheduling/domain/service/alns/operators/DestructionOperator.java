@@ -1,7 +1,7 @@
 package pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators;
 
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.Solution;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
 
 public interface DestructionOperator {
-    void destroy(Solution s);
+    void destroy(SolucionProgramacion s);
 }

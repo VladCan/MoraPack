@@ -9,14 +9,14 @@ import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.Vuelo;
 import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
 
-public class Solution {
+public class Solucion {
     private final Map<Pedido, List<Vuelo>> asignaciones;
     private final List<Pedido> pedidos;
     public final Map<String, List<Vuelo>> vuelosPorOrigen;
     private final AeropuertosMap aeropuertosMap;
     public final List<String> sedes;
 
-    public Solution(List<Pedido> pedidos, Map<String, List<Vuelo>> vuelosPorOrigen,
+    public Solucion(List<Pedido> pedidos, Map<String, List<Vuelo>> vuelosPorOrigen,
                     AeropuertosMap aeropuertosMap, List<String> sedes) {
         this.pedidos = pedidos;
         this.vuelosPorOrigen = vuelosPorOrigen;
@@ -26,7 +26,7 @@ public class Solution {
     }
 
     // Copiar solución
-    public Solution(Solution other) {
+    public Solucion(Solucion other) {
         this.pedidos = other.pedidos;
         this.vuelosPorOrigen = other.vuelosPorOrigen;
         this.aeropuertosMap = other.aeropuertosMap;

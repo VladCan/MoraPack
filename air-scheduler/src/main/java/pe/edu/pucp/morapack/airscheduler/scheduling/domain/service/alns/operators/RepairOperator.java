@@ -3,8 +3,8 @@ package pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operato
 
 
 
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.Solution;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
 
 public interface RepairOperator {
-    void repair(Solution s);
+    void repair(SolucionProgramacion s);
 }

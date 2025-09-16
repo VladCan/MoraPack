@@ -2,11 +2,7 @@ package pe.edu.pucp.morapack.airscheduler.bootstrap;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Scanner;
-import java.util.Set;
+import java.util.*;
 
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.TEGEventBuilder;
@@ -16,6 +12,8 @@ import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.scheduling.adapters.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.VerificadorSLA;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.ALNS;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators.*;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.ssp.SSPGeneradorSeed;
 
 public class Main {
@@ -71,7 +69,7 @@ public class Main {
             var listaPedidos = ventana.pedidos();
             if (listaPedidos.isEmpty()) break;
 
-            var presenteUTC = ventana.presenteUTC();          // reloj + 6h
+            var presenteUTC = ventana.presenteUTC();          // reloj + 6 h
             var inicioUTC   = presenteUTC;                    // TEG sin pasado
             var finUTC      = presenteUTC.plus(HORIZONTE_TEG_H, ChronoUnit.HOURS);
 
@@ -93,9 +91,24 @@ public class Main {
 
             // Mostrar por consola
             ImpresorSolucion.imprimirEnConsola(seed);
-
             // Guardar TXT + CSV con un prefijo (por ejemplo "seed")
             ImpresorSolucion.guardarTodo(seed, ventana.presenteUTC(), "seed");
+
+            // ALNS
+
+            List<DestructionOperator> destructions = new ArrayList<>();
+            destructions.add(new RandomRemoval(20));
+            destructions.add(new WorstRemoval(20));
+
+            List<RepairOperator> repairs = new ArrayList<>();
+            repairs.add(new RegretRepair(2, new ArrayList<>(sedes), mapa.getVuelosPorOrigen()));
+
+            ALNS alns = new ALNS(teg, listaPedidos, destructions, repairs);
+            System.out.println("Seed");
+            ImpresorSolucion.imprimirEnConsola(seed);
+            var solucionOptima = alns.ejecutar(seed);
+            System.out.println("ALNS");
+            ImpresorSolucion.imprimirEnConsola(solucionOptima);
             break;
             //if(i==4){
             //    Sanity.todoOk(sedes, aeropuertosMap, ventana, teg);

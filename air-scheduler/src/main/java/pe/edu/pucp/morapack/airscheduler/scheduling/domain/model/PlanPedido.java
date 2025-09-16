@@ -6,6 +6,7 @@ import lombok.Value;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 /** Plan consolidado de un pedido (posibles múltiples vuelos directos). */
@@ -48,5 +49,9 @@ public class PlanPedido {
     public boolean respetaSLA(Duration slaMax) {
         var fin = ultimaLlegada();
         return fin == null || !fin.isAfter(creadoUtc.plus(slaMax));
+    }
+
+    public List<TramoAsignado> getTramosMutable() {
+        return new ArrayList<>(tramos);
     }
 }
