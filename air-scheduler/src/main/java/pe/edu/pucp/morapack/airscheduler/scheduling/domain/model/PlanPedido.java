@@ -54,4 +54,10 @@ public class PlanPedido {
     public List<TramoAsignado> getTramosMutable() {
         return new ArrayList<>(tramos);
     }
+    public boolean respetaSLAConPickup(Duration maxLlegadaDesdeCreacion) {
+        Instant ult = ultimaLlegada();
+        if (ult == null) return false; // no hay llegadas => no cumple
+        Instant limite = creadoUtc.plus(maxLlegadaDesdeCreacion);
+        return !ult.isAfter(limite);
+    }
 }

@@ -6,6 +6,11 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Scanner;
 
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
 public class Pedido {
     private int idPedido;       // Identificador único del pedido
     private int idCliente;      // Identificador del cliente
@@ -30,66 +35,6 @@ public class Pedido {
         this.cantidad = cantidad;
     }
 
-    // Getters y Setters
-    public int getIdPedido() {
-        return idPedido;
-    }
-
-    public void setIdPedido(int idPedido) {
-        this.idPedido = idPedido;
-    }
-
-    public int getIdCliente() {
-        return idCliente;
-    }
-
-    public void setIdCliente(int idCliente) {
-        this.idCliente = idCliente;
-    }
-
-    public String getDestino() {
-        return destino;
-    }
-
-    public void setDestino(String destino) {
-        this.destino = destino;
-    }
-
-    public LocalDateTime  getFecha() {
-        return fecha;
-    }
-
-    public void setFecha(LocalDateTime  fecha) {
-        this.fecha = fecha;
-    }
-
-    public int getCantidad() {
-        return cantidad;
-    }
-
-    public void setCantidad(int cantidad) {
-        this.cantidad = cantidad;
-    }
-
-    public String getOrigen() {
-        return origen;
-    }
-
-    public void setOrigen(String origen) {
-        this.origen = origen;
-    }
-
-    public String getContinenteDestino() {
-        return continenteDestino;
-    }
-
-    public void setContinenteDestino(String continenteDestino) {
-        this.continenteDestino = continenteDestino;
-    }
-
-    public Instant getCreatedAtUtc() {
-        return createdAtUtc;
-    }
 
     /** Normaliza 'fecha' (LocalDateTime local en destino) a UTC dado un GMT entero. */
     public void computeUtcFromGmt(int gmtHours) {

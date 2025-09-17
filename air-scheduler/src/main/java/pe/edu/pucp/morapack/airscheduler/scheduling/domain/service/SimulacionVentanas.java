@@ -65,24 +65,7 @@ public final class SimulacionVentanas {
         this.horizonteTegHoras = horizonteTegHoras;
     }
 
-    /** Estado interno de un pedido activo. */
-    private static final class EstadoPedido {
-        final int id;
-        final String destino;
-        final Instant creadoUtc;
-        final int demandaTotal;
-        int entregado;           // suma de llegadas al destino
-        int reservadoEnVuelo;    // suma de tramos comprometidos aún no arribados
-
-        EstadoPedido(int id, String destino, Instant creadoUtc, int demanda) {
-            this.id = id; this.destino = destino; this.creadoUtc = creadoUtc; this.demandaTotal = demanda;
-        }
-        int remanenteParaPlan() {
-            int r = demandaTotal - entregado - reservadoEnVuelo;
-            return Math.max(0, r);
-        }
-        boolean completado() { return entregado >= demandaTotal; }
-    }
+    
     /** Tramo comprometido (ya no se puede cambiar). */
     private record TramoComprometido(
             int pedidoId,
@@ -131,7 +114,7 @@ public final class SimulacionVentanas {
             for (EstadoPedido ep : activos.values()) {
                 int rem = ep.remanenteParaPlan();
                 if (rem <= 0) continue;
-                aPlanificar.add(wrapPedido(ep.id, ep.destino, ep.creadoUtc, rem));
+                aPlanificar.add(wrapPedido(ep.getId(), ep.getDestino(), ep.getCreadoUtc(), rem));
             }
 
             // 4) Ejecutar SSP con stockLibre (arribos ya ocurridos)
@@ -150,19 +133,19 @@ public final class SimulacionVentanas {
                     if (!sal.isBefore(finVentana)) continue; // aún no despega, puede replanificarse la próxima
 
                     // Reservar en vuelo
-                    ep.reservadoEnVuelo += t.getCantidad();
-                    enVuelo.add(new TramoComprometido(ep.id, id, t.getCantidad(), ep.destino));
+                    ep.setReservadoEnVuelo(ep.getReservadoEnVuelo() + t.getCantidad());
+                    enVuelo.add(new TramoComprometido(ep.getId(), id, t.getCantidad(), ep.getDestino()));
 
                     // Si alcanza a llegar en esta ventana, procesarlo de inmediato
                     if (!lle.isAfter(finVentana)) {
-                        if (id.getDestino().equals(ep.destino)) {
-                            ep.entregado += t.getCantidad();
-                            entregadoPorPedido.merge(ep.id, t.getCantidad(), Integer::sum);
+                        if (id.getDestino().equals(ep.getDestino())) {
+                            ep.setEntregado(ep.getEntregado() + t.getCantidad());
+                            entregadoPorPedido.merge(ep.getId(), t.getCantidad(), Integer::sum);
                         } else {
                             stockLibre.computeIfAbsent(id.getDestino(), k -> new ArrayList<>())
                                       .add(new ArriboExogeno(lle, t.getCantidad()));
                         }
-                        ep.reservadoEnVuelo -= t.getCantidad();
+                        ep.setReservadoEnVuelo(ep.getReservadoEnVuelo() - t.getCantidad());
                         // también quitar el tramo de “enVuelo”
                     }
                 }
@@ -197,13 +180,13 @@ public final class SimulacionVentanas {
             EstadoPedido ep = activos.get(tc.pedidoId());
             if (ep != null) {
                 if (id.getDestino().equals(tc.destinoFinal())) {
-                    ep.entregado += tc.cantidad();
-                    entregadoPorPedido.merge(ep.id, tc.cantidad(), Integer::sum);
+                    ep.setEntregado(ep.getEntregado() + tc.cantidad());
+                    entregadoPorPedido.merge(ep.getId(), tc.cantidad(), Integer::sum);
                 } else {
                     stockLibre.computeIfAbsent(id.getDestino(), k -> new ArrayList<>())
                               .add(new ArriboExogeno(id.getLlegadaUtc(), tc.cantidad()));
                 }
-                ep.reservadoEnVuelo -= tc.cantidad();
+                ep.setReservadoEnVuelo(ep.getReservadoEnVuelo() - tc.cantidad());
             }
             it.remove();
         }
@@ -254,20 +237,20 @@ public final class SimulacionVentanas {
 
                 if (sal.isBefore(presenteUtc)) {
                     // 1) YA DESPEGA antes del presente: comprometer y, si llega ≤ presente, procesar arribo
-                    ep.reservadoEnVuelo += t.getCantidad();
-                    enVuelo.add(new TramoComprometido(ep.id, id, t.getCantidad(), ep.destino));
+                    ep.setReservadoEnVuelo(ep.getReservadoEnVuelo() + t.getCantidad());
+                    enVuelo.add(new TramoComprometido(ep.getId(), id, t.getCantidad(), ep.getDestino()));
 
                     if (!lle.isAfter(presenteUtc)) {
-                        if (id.getDestino().equals(ep.destino)) {
-                            ep.entregado += t.getCantidad();
-                            entregadoPorPedido.merge(ep.id, t.getCantidad(), Integer::sum);
+                        if (id.getDestino().equals(ep.getDestino())) {
+                            ep.setEntregado(ep.getEntregado() + t.getCantidad());
+                            entregadoPorPedido.merge(ep.getId(), t.getCantidad(), Integer::sum);
                         } else {
                             stockLibre.computeIfAbsent(id.getDestino(), k -> new ArrayList<>())
                                     .add(new ArriboExogeno(lle, t.getCantidad()));
                         }
-                        ep.reservadoEnVuelo -= t.getCantidad();
+                        ep.setReservadoEnVuelo(ep.getReservadoEnVuelo() - t.getCantidad());
                         // quitar de enVuelo si corresponde
-                        enVuelo.removeIf(tc -> tc.pedidoId()==ep.id && tc.vueloId().equals(id));
+                        enVuelo.removeIf(tc -> tc.pedidoId()==ep.getId() && tc.vueloId().equals(id));
                     }
                 } else if (!sal.isAfter(proximoCorte)) {
                     // 2) Sale entre (presente, próximo corte]: RESERVA para la siguiente ventana
