@@ -10,6 +10,9 @@ import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.TEGEventBuilder
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosMap;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosTEG;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.TEGEventBuilderHelpers.TEGParametros;
+import pe.edu.pucp.morapack.airscheduler.flights.adapters.utils.EstadoAnteriorExtractor;
+import pe.edu.pucp.morapack.airscheduler.flights.domain.model.ArriboExogeno;
+import pe.edu.pucp.morapack.airscheduler.flights.domain.model.OcupacionAlmacen;
 import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.CargarPedidos.VentanaPedidos;
@@ -80,38 +83,49 @@ public class Main {
             return;
 
         SolucionProgramacion solucionAnterior = null;
-        int i=0;
         while (!pedidos.isEmpty()) {
-            reloj=reloj.plus(Duration.ofHours(HORAS_VENTANA));
+            // reloj avanza 6 horas
+            reloj = reloj.plus(Duration.ofHours(HORAS_VENTANA));
             Instant presenteUTC = reloj;
-            Instant finUTC = presenteUTC.plus(HORIZONTE_TEG_H, ChronoUnit.HOURS);
+            Instant finUTC = presenteUTC.plus(HORIZONTE_TEG_H, ChronoUnit.HOURS);// para TEG
 
             if (solucionAnterior != null) {
+                // quitamos pedidos cumplidos y actualizamos los pedidos medio cumplidos
                 pedidos.eliminarYActualizarCumplidosHasta(presenteUTC, solucionAnterior);
             }
 
-            VentanaPedidos ventana = pedidos.ventanaDesde(presenteUTC, HORAS_VENTANA);// solo sacamos los pedidos de la
-                                                                                      // ventana
             if (solucionAnterior != null) {
-                solucionAnterior.imprimir(reloj, "reporteSimulacion.txt");
+                solucionAnterior.imprimir(presenteUTC, "reporteSimulacion.txt");
             }
+
+            // solo copia los pedidos no desencola
+            VentanaPedidos ventana = pedidos.acumuladoHasta(presenteUTC);// solo sacamos los pedidos de la
+                                                                                      // ventana
 
             List<Pedido> listaPedidos = ventana.pedidos();
             if (listaPedidos.isEmpty())
                 break;
+
+            Map<String, List<ArriboExogeno>> enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior,
+                    presenteUTC);
+
+            List<OcupacionAlmacen> reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior,
+                    presenteUTC, Duration.ofHours(2));
 
             TEGParametros params = TEGParametros.builder()
                     .inicioUtc(presenteUTC)
                     .finUtc(finUTC)
                     .capacidadWaitPorDefecto(null) // null => usa cap. de bodega del aeropuerto
                     .sedes(sedes)
-                    // TODO: URGENTE AGREGAR ESTO .estadoAnterior(solucionAnterior,presenteUTC)
+                    .arribosLibres(enVuelo)           // <— vuelos ya despegados
+                    .reservasWaitIniciales(reservas)  // <— ocupa bodega por pickup 2h
+                    // .stockInicial(si_tienes)
                     .build();
 
             VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, mapa).construir(params);
 
             SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
-            SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, ventana.presenteUTC());
+            SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
             VerificadorSLA.assertBasicos(seed, Duration.ofHours(46));
 
             // ALNS
@@ -124,15 +138,13 @@ public class Main {
             repairs.add(new RegretRepair(2, new ArrayList<>(sedes), mapa.getVuelosPorOrigen()));
 
             ALNS alns = new ALNS(teg, listaPedidos, destructions, repairs);
-            //System.out.println("Seed");
-            //ImpresorSolucion.imprimirEnConsola(seed);
+            // System.out.println("Seed");
+            // ImpresorSolucion.imprimirEnConsola(seed);
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
             System.out.println("ALNS");
             ImpresorSolucion.imprimirEnConsola(solucionOptima);
 
             solucionAnterior = solucionOptima;
-            if(i==1) break; // para demo
-            i++;
         }
 
     }

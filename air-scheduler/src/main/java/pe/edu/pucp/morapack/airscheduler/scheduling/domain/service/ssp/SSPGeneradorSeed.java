@@ -46,8 +46,8 @@ public class SSPGeneradorSeed {
     }
 
     /** (Compat) evitar usar este ctor: no sabe sedes ni stock. */
-    @Deprecated
-    public SSPGeneradorSeed() { this(Set.of(), Map.of()); }
+    //@Deprecated
+    //public SSPGeneradorSeed() { this(Set.of(), Map.of()); }
 
     public SolucionProgramacion generarSeed(VuelosTEG teg,
                                             List<Pedido> pedidosOrdenados,

@@ -69,10 +69,10 @@ public class CargarPedidos {
     }
 
     /********** NUEVO: ventana desde un inicio dado y duración en horas **********/
-    public VentanaPedidos ventanaDesde(Instant presenteUTC, long horasVentana) {
+    public VentanaPedidos acumuladoHasta(Instant presenteUTC) {
         if (!utcNormalizada)
             throw new IllegalStateException("Primero llama a normalizarUtc(aeropuertosMap).");
-        if (presenteUTC == null || horasVentana <= 0 || colaPedidos.isEmpty())
+        if (presenteUTC == null || colaPedidos.isEmpty())
             return new VentanaPedidos(null, List.of());
 
         List<Pedido> candidatos = new ArrayList<>();
@@ -134,40 +134,49 @@ public class CargarPedidos {
     }
 
     public void eliminarYActualizarCumplidosHasta(Instant presenteUTC, SolucionProgramacion solucionAnterior) {
-        // Obtener los pedidos completos hasta el presenteUTC
-        for (Map.Entry<Integer, PlanPedido> entry : solucionAnterior.getPlanPorPedido().entrySet()) {
-            int idPedido = entry.getKey();
-            PlanPedido plan = entry.getValue();
+        if (solucionAnterior == null || presenteUTC == null) return;
 
-            // Verificar si el pedido está completado hasta el presenteUTC
-            if (plan.estaCompleto() && plan.ultimaLlegada().isBefore(presenteUTC)) {
-                // Eliminar el pedido de la cola
-                colaPedidos.removeIf(p -> p.getIdPedido() == idPedido);
+        // índice rápido de planes por id
+        Map<Integer, PlanPedido> planes = solucionAnterior.getPlanPorPedido();
+        if (planes == null || planes.isEmpty()) return;
+
+        // Recorremos la cola y actualizamos/removemos en el acto
+        for (Iterator<Pedido> it = colaPedidos.iterator(); it.hasNext(); ) {
+            Pedido pedido = it.next();
+            PlanPedido plan = planes.get(pedido.getIdPedido());
+            if (plan == null || plan.getTramos() == null || plan.getTramos().isEmpty()) {
+                // No hubo asignaciones previas para este pedido: no tocamos su cantidad
+                continue;
+            }
+
+            // 1) Cantidad efectivamente ENTREGADA (llegada ≤ corte)
+            int entregado = plan.getTramos().stream()
+                    .filter(t -> t.getLlegadaUtc() != null && !t.getLlegadaUtc().isAfter(presenteUTC))
+                    .mapToInt(t -> t.getCantidad())
+                    .sum();
+
+            // 2) Cantidad EN VUELO (salió antes del corte y llega después del corte)
+            int enVuelo = plan.getTramos().stream()
+                    .filter(t -> t.getVuelo().getSalidaUtc() != null && t.getLlegadaUtc() != null)
+                    .filter(t -> t.getVuelo().getSalidaUtc().isBefore(presenteUTC) && t.getLlegadaUtc().isAfter(presenteUTC))
+                    .mapToInt(t -> t.getCantidad())
+                    .sum();
+
+            // 3) Futuro (salida ≥ corte) se IGNORA completamente (replanificable)
+
+            int demandaTotal = pedido.getCantidad();
+            int cubiertoIrrevocable = entregado + enVuelo;
+            int remanente = Math.max(0, demandaTotal - cubiertoIrrevocable);
+
+            if (remanente == 0) {
+                // Ya está completamente cubierto por lo irrevocable: sacarlo de la cola
+                it.remove();
             } else {
-                // Si el pedido está parcialmente cumplido, actualizar la cantidad restante en la cola
-                // Restar la cantidad entregada en esta iteración
-                int entregado = plan.totalAsignado();  // Total entregado hasta ahora
-                // Encontrar el pedido en la cola
-                Pedido pedido = encontrarPedidoEnCola(idPedido);
-                if (pedido != null) {
-                    int cantidadRestante = pedido.getCantidad() - entregado; // Restamos lo entregado
-                    pedido.setCantidad(cantidadRestante); // Actualizamos la cantidad en el pedido
-                    if (cantidadRestante==0){
-                        colaPedidos.removeIf(p -> p.getIdPedido() == idPedido);
-                    }
-                }
+                // Dejar solo el remanente para replanear
+                pedido.setCantidad(remanente);
             }
         }
     }
 
-    private Pedido encontrarPedidoEnCola(int idPedido) {
-        // Buscar el pedido correspondiente en la cola
-        for (Pedido pedido : colaPedidos) {
-            if (pedido.getIdPedido() == idPedido) {
-                return pedido;
-            }
-        }
-        return null;
-    }
 
 }

@@ -14,12 +14,13 @@ import java.util.List;
 @Builder
 public class PlanPedido {
     int idPedido;
-    String destinoIcao;
+    String destinoIcao;//TODO: cambiar nombre a aereopuertoDestino aeropuerto destino
     Instant creadoUtc;
     int demanda;
 
     @Singular
     List<TramoAsignado> tramos; // cada tramo llega al aeropuerto destino
+    //solución de un pedido
 
     public int totalAsignado() {
         return tramos.stream().mapToInt(TramoAsignado::getCantidad).sum();
