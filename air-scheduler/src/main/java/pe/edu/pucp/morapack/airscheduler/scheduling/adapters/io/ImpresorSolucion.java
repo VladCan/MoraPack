@@ -23,7 +23,8 @@ public final class ImpresorSolucion {
 
     private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_INSTANT;
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
-    private static final Duration VENTANA_2H = Duration.ofHours(2);
+    //private static final Duration VENTANA_2H = Duration.ofHours(2);
+    private static final Duration VENTANA_46H = Duration.ofHours(46);
     private static final Duration SLA_48H    = Duration.ofHours(48);
 
     // ===== API principal =====
@@ -78,7 +79,7 @@ public final class ImpresorSolucion {
         sb.append(String.format("Demanda total: %,d | Asignado: %,d%n", demandaTotal, asignadoTotal));
         sb.append(String.format("Capacidades OK: %s | Ventana 2h OK: %s | SLA 48h OK: %s%n",
                 sol.respetaCapacidadesVuelos() ? "sí" : "NO",
-                sol.respetaVentana2hTodos(VENTANA_2H) ? "sí" : "NO",
+                sol.respetaSLAConPickupTodos(VENTANA_46H) ? "sí" : "NO",
                 sol.respetaSLA48hTodos() ? "sí" : "NO"));
         sb.append("================================\n\n");
 
@@ -96,7 +97,7 @@ public final class ImpresorSolucion {
         for (var p : orden) {
             Instant a = p.primeraLlegada();
             Instant b = p.ultimaLlegada();
-            boolean ok2h = p.respetaVentana2h(VENTANA_2H);
+            boolean ok46h = p.respetaSLAConPickup(VENTANA_46H);
             boolean okSLA = p.respetaSLA(SLA_48H);
             String linea = String.format("%-6d %-6s %-20s %10d %10d %-5s %-20s %-20s %-5s %-7s%n",
                     p.getIdPedido(), safe(p.getDestinoIcao()),
@@ -104,7 +105,7 @@ public final class ImpresorSolucion {
                     p.getDemanda(), p.totalAsignado(),
                     p.estaCompleto() ? "sí" : "NO",
                     fmt(a), fmt(b),
-                    ok2h ? "sí" : "NO",
+                    ok46h ? "sí" : "NO",
                     okSLA ? "sí" : "NO");
             sb.append(linea);
 
@@ -149,7 +150,7 @@ public final class ImpresorSolucion {
 
     private static String csvPedidos(SolucionProgramacion sol) {
         StringBuilder sb = new StringBuilder();
-        sb.append("pedido_id,destino,creado_utc,demanda,asignado,completo,primera_llegada,ultima_llegada,ventana_2h_ok,sla_48h_ok\n");
+        sb.append("pedido_id,destino,creado_utc,demanda,asignado,completo,primera_llegada,ultima_llegada,ventana_46h_ok,sla_48h_ok\n");
         for (var p : sol.getPlanPorPedido().values().stream()
                 .sorted(Comparator.comparing(PlanPedido::getCreadoUtc).thenComparing(PlanPedido::getIdPedido))
                 .toList()) {
@@ -163,7 +164,7 @@ public final class ImpresorSolucion {
                     String.valueOf(p.estaCompleto()),
                     csv(fmt(p.primeraLlegada())),
                     csv(fmt(p.ultimaLlegada())),
-                    String.valueOf(p.respetaVentana2h(VENTANA_2H)),
+                    String.valueOf(p.respetaSLAConPickup(VENTANA_46H)),
                     String.valueOf(p.respetaSLA(SLA_48H))
             )).append('\n');
 

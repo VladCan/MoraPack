@@ -2,13 +2,15 @@ package pe.edu.pucp.morapack.airscheduler.orders.adapters.io;
 
 import lombok.Getter;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
 import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.EstadoPedido;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.PlanPedido;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
 
 @Getter
 public class CargarPedidos {
@@ -67,13 +69,11 @@ public class CargarPedidos {
     }
 
     /********** NUEVO: ventana desde un inicio dado y duración en horas **********/
-    public VentanaPedidos ventanaDesde(Instant relojUTC, long horasVentana) {
+    public VentanaPedidos ventanaDesde(Instant presenteUTC, long horasVentana) {
         if (!utcNormalizada)
             throw new IllegalStateException("Primero llama a normalizarUtc(aeropuertosMap).");
-        if (relojUTC == null || horasVentana <= 0 || colaPedidos.isEmpty())
+        if (presenteUTC == null || horasVentana <= 0 || colaPedidos.isEmpty())
             return new VentanaPedidos(null, List.of());
-
-        Instant presenteUTC = relojUTC.plus(Duration.ofHours(horasVentana));
 
         List<Pedido> candidatos = new ArrayList<>();
         for (Pedido p : colaPedidos) {
@@ -132,4 +132,42 @@ public class CargarPedidos {
     public boolean isEmpty() {
         return colaPedidos.isEmpty();
     }
+
+    public void eliminarYActualizarCumplidosHasta(Instant presenteUTC, SolucionProgramacion solucionAnterior) {
+        // Obtener los pedidos completos hasta el presenteUTC
+        for (Map.Entry<Integer, PlanPedido> entry : solucionAnterior.getPlanPorPedido().entrySet()) {
+            int idPedido = entry.getKey();
+            PlanPedido plan = entry.getValue();
+
+            // Verificar si el pedido está completado hasta el presenteUTC
+            if (plan.estaCompleto() && plan.ultimaLlegada().isBefore(presenteUTC)) {
+                // Eliminar el pedido de la cola
+                colaPedidos.removeIf(p -> p.getIdPedido() == idPedido);
+            } else {
+                // Si el pedido está parcialmente cumplido, actualizar la cantidad restante en la cola
+                // Restar la cantidad entregada en esta iteración
+                int entregado = plan.totalAsignado();  // Total entregado hasta ahora
+                // Encontrar el pedido en la cola
+                Pedido pedido = encontrarPedidoEnCola(idPedido);
+                if (pedido != null) {
+                    int cantidadRestante = pedido.getCantidad() - entregado; // Restamos lo entregado
+                    pedido.setCantidad(cantidadRestante); // Actualizamos la cantidad en el pedido
+                    if (cantidadRestante==0){
+                        colaPedidos.removeIf(p -> p.getIdPedido() == idPedido);
+                    }
+                }
+            }
+        }
+    }
+
+    private Pedido encontrarPedidoEnCola(int idPedido) {
+        // Buscar el pedido correspondiente en la cola
+        for (Pedido pedido : colaPedidos) {
+            if (pedido.getIdPedido() == idPedido) {
+                return pedido;
+            }
+        }
+        return null;
+    }
+
 }
