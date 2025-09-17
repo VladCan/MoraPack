@@ -6,25 +6,32 @@ import java.util.*;
 
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosMap;
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.ArriboExogeno;
+import pe.edu.pucp.morapack.airscheduler.flights.domain.model.OcupacionAlmacen;
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.Vuelo;
 import static pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.TEGEventBuilderHelpers.FechasTEG.*;
 
 public final class IndexadorEventos {
 
-    private IndexadorEventos() {}
+    private IndexadorEventos() {
+    }
 
-    /** Junta todos los instantes de evento por aeropuerto (salidas, llegadas, sedes y exógenos). */
+    /**
+     * Junta todos los instantes de evento por aeropuerto (salidas, llegadas, sedes
+     * y exógenos).
+     */
     public static Map<String, NavigableSet<Instant>> recolectarEventos(VuelosMap vuelosMap, TEGParametros p) {
         Map<String, NavigableSet<Instant>> eventos = new HashMap<>();
 
-        // Escanear salidas desde un día antes para capturar llegadas dentro de [inicio, fin)
+        // Escanear salidas desde un día antes para capturar llegadas dentro de [inicio,
+        // fin)
         Instant desdeSalidas = p.getInicioUtc().minus(1, ChronoUnit.DAYS);
 
         for (String origen : vuelosMap.origenes()) {
             for (Vuelo v : vuelosMap.vuelosDesde(origen)) {
                 for (Instant tSalida : instantesDiariosEnVentana(desdeSalidas, p.getFinUtc(), v.getHoraGMTOrigen())) {
                     Instant tLlegada = combinarFechaYHora(tSalida, v.getHoraGMTDestino());
-                    if (!tLlegada.isAfter(tSalida)) tLlegada = tLlegada.plus(1, ChronoUnit.DAYS);
+                    if (!tLlegada.isAfter(tSalida))
+                        tLlegada = tLlegada.plus(1, ChronoUnit.DAYS);
 
                     if (!tSalida.isBefore(p.getInicioUtc()) && tSalida.isBefore(p.getFinUtc())) {
                         addEvento(eventos, v.getOrigen(), tSalida);
@@ -38,7 +45,8 @@ public final class IndexadorEventos {
 
         // Asegurar evento "inicio" por sede (para enganchar Ω-sede)
         if (p.getSedes() != null) {
-            for (String sede : p.getSedes()) addEvento(eventos, sede, p.getInicioUtc());
+            for (String sede : p.getSedes())
+                addEvento(eventos, sede, p.getInicioUtc());
         }
 
         // Añadir instantes de arribos exógenos (para que existan nodos y WAITs)
@@ -46,9 +54,11 @@ public final class IndexadorEventos {
         if (exo != null && !exo.isEmpty()) {
             for (var e : exo.entrySet()) {
                 String ap = e.getKey();
-                if (ap == null) continue;
+                if (ap == null)
+                    continue;
                 for (ArriboExogeno ax : e.getValue()) {
-                    if (ax == null || ax.arriboUtc() == null) continue;
+                    if (ax == null || ax.arriboUtc() == null)
+                        continue;
                     Instant tArr = ax.arriboUtc();
                     if (!tArr.isBefore(p.getInicioUtc()) && tArr.isBefore(p.getFinUtc())) {
                         addEvento(eventos, ap, tArr);
@@ -56,7 +66,32 @@ public final class IndexadorEventos {
                 }
             }
         }
+        List<OcupacionAlmacen> resvs = p.getReservasWaitIniciales();
+        if (resvs != null && !resvs.isEmpty()) {
+            for (OcupacionAlmacen r : resvs) {
+                if (r == null || r.aeropuerto() == null)
+                    continue;
+                String ap = r.aeropuerto();
+                // desde y hasta dentro del [inicio, fin)
+                Instant d = r.desde();
+                Instant h = r.hasta();
+                if (d != null && !d.isBefore(p.getInicioUtc()) && d.isBefore(p.getFinUtc())) {
+                    addEvento(eventos, ap, d);
+                }
+                if (h != null && !h.isBefore(p.getInicioUtc()) && h.isBefore(p.getFinUtc())) {
+                    addEvento(eventos, ap, h);
+                }
+            }
+        }
 
+        // Eventos por stock inicial: asegura evento en inicio para el AP
+        Map<String, Integer> stock = p.getStockInicial();
+        if (stock != null && !stock.isEmpty()) {
+            for (String ap : stock.keySet()) {
+                if (ap != null)
+                    addEvento(eventos, ap, p.getInicioUtc());
+            }
+        }
         return eventos;
     }
 

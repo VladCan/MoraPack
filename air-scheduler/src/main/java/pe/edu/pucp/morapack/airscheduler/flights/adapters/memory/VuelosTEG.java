@@ -64,4 +64,44 @@ public final class VuelosTEG {
             for (VuelosEdge e : lst)
                 f.accept(e);
     }
+
+    // === Helpers para localizar/reducir capacidad en arcos WAIT ===
+
+    /** Devuelve el WAIT (a -> b) si existe, o null. */
+    public VuelosEdge buscarWait(AereopuertoNode a, AereopuertoNode b) {
+        List<VuelosEdge> lst = ady.get(a);
+        if (lst == null)
+            return null;
+        for (VuelosEdge e : lst) {
+            if (e.tipo() == VuelosEdge.Type.WAIT && Objects.equals(e.destino(), b)) {
+                return e;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Reduce capacidad del WAIT (a -> b) en 'delta'. Si es inmutable, reemplaza la
+     * arista.
+     */
+    public void reducirCapacidadWaitEntre(AereopuertoNode a, AereopuertoNode b, int delta) {
+        if (delta <= 0)
+            return;
+        List<VuelosEdge> lst = ady.get(a);
+        if (lst == null)
+            return;
+
+        for (int i = 0; i < lst.size(); i++) {
+            VuelosEdge e = lst.get(i);
+            if (e.tipo() == VuelosEdge.Type.WAIT && Objects.equals(e.destino(), b)) {
+                int capActual = e.capacidad(); // asume getter; ajusta si tu nombre difiere
+                int nuevaCap = Math.max(0, capActual - delta);
+
+                // Opción segura: recrear la arista WAIT con la nueva capacidad
+                VuelosEdge reemplazo = new VuelosEdge(a, b, VuelosEdge.Type.WAIT, nuevaCap, null);
+                lst.set(i, reemplazo);
+                return;
+            }
+        }
+    }
 }

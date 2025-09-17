@@ -1,13 +1,14 @@
 package pe.edu.pucp.morapack.airscheduler.scheduling.domain.model;
 
-
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Singular;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -31,7 +32,6 @@ public class SolucionProgramacion {
         this.cargaPorVuelo = otra.cargaPorVuelo; // si es mutable, deberías copiar también
     }
 
-
     public PlanPedido planDe(int idPedido) {
         return planPorPedido.get(idPedido);
     }
@@ -40,10 +40,12 @@ public class SolucionProgramacion {
         return cargaPorVuelo.getAsignado().entrySet().stream()
                 .allMatch(e -> e.getValue() <= cargaPorVuelo.capacidad(e.getKey()));
     }
-    //@Deprecated
-    //public boolean respetaVentana2hTodos(Duration ventana2h) {
-    //    return planPorPedido.values().stream().allMatch(p -> p.respetaVentana2h(ventana2h));
-    //}
+
+    // @Deprecated
+    // public boolean respetaVentana2hTodos(Duration ventana2h) {
+    // return planPorPedido.values().stream().allMatch(p ->
+    // p.respetaVentana2h(ventana2h));
+    // }
     public boolean respetaSLAConPickupTodos(Duration pickupTime) {
         // 46h de llegada para dar 2h de recogida y cumplir SLA 48h
         Duration maxLlegada = Duration.ofHours(46);
@@ -65,73 +67,117 @@ public class SolucionProgramacion {
                 .toList();
     }
 
+    // helpers para reporte
+    private static final java.time.format.DateTimeFormatter TS_SHORT = java.time.format.DateTimeFormatter
+            .ofPattern("dd MMM HH:mm'Z'", java.util.Locale.US)
+            .withZone(java.time.ZoneOffset.UTC);
+
+    private static String ts(java.time.Instant t) {
+        return (t == null ? "-" : TS_SHORT.format(t));
+    }
+
+    private static String safe(String s) {
+        return (s == null ? "-" : s);
+    }
+
+    private static String bar(int val, int tot, int width) {
+        if (tot <= 0)
+            return "[" + "=".repeat(width) + "]";
+        int fill = Math.min(width, (int) Math.round((double) val * width / tot));
+        return "[" + "#".repeat(fill) + ".".repeat(width - fill) + "]";
+    }
+
     public void imprimir(Instant reloj, String titulo) {
-        // Encabezado general
-        System.out.println("=".repeat(90));
-        System.out.println("[SOLUCIÓN] " + (titulo == null ? "" : titulo));
-        System.out.println("Corte en (reloj): " + reloj);
-        System.out.println("=".repeat(90));
+        System.out.println("=".repeat(110));
+        System.out.println("REPORTE AL CORTE".concat(titulo == null ? "" : " • " + titulo));
+        System.out.println("Corte (UTC): " + ts(reloj));
+        System.out.println("=".repeat(110));
 
-        // Contenedores por bloque
-        StringBuilder sbEntregados = new StringBuilder();
-        StringBuilder sbParciales  = new StringBuilder();
-        StringBuilder sbNoEntreg   = new StringBuilder();
+        int total = planPorPedido.size();
+        int sumDem = 0, sumEnt = 0;
+        int nFull = 0, nPartial = 0, nZero = 0;
 
-        // Cabecera común
-        String header = String.format("%-8s %-8s %10s %12s %12s %20s",
-                "Pedido", "Destino", "Demanda", "Entregado", "Restante", "Última llegada≤reloj");
-        String sep = "-".repeat(90);
+        record Row(int id, String dst, Instant creado, int dem, int ent, Instant ult) {
+        }
 
-        // Clasificar cada plan
-        for (PlanPedido p : planPorPedido.values()) {
-            int demanda = p.getDemanda();
-            int entregado = entregadoHasta(p, reloj);
-            int restante = Math.max(0, demanda - entregado);
-            Instant ultimaLlegadaHastaReloj = ultimaLlegadaHasta(p, reloj);
+        var pedidosOrden = planPorPedido.values().stream()
+                .sorted(Comparator.comparing(PlanPedido::getCreadoUtc).thenComparing(PlanPedido::getIdPedido))
+                .toList();
 
-            String fila = String.format("%-8d %-8s %10d %12d %12d %20s",
-                    p.getIdPedido(),
-                    p.getDestinoIcao(),
-                    demanda,
-                    entregado,
-                    restante,
-                    (ultimaLlegadaHastaReloj == null ? "-" : ultimaLlegadaHastaReloj.toString())
-            );
+        List<Row> rowsFull = new ArrayList<>();
+        List<Row> rowsPart = new ArrayList<>();
+        List<Row> rowsZero = new ArrayList<>();
 
-            if (entregado >= demanda) {
-                sbEntregados.append(fila).append('\n');
-            } else if (entregado > 0) {
-                sbParciales.append(fila).append('\n');
+        for (PlanPedido p : pedidosOrden) {
+            int dem = p.getDemanda();
+            int ent = entregadoHasta(p, reloj);
+            Instant ult = ultimaLlegadaHasta(p, reloj);
+
+            sumDem += dem;
+            sumEnt += ent;
+
+            Row r = new Row(p.getIdPedido(), p.getDestinoIcao(), p.getCreadoUtc(), dem, ent, ult);
+            if (ent >= dem) {
+                nFull++;
+                rowsFull.add(r);
+            } else if (ent > 0) {
+                nPartial++;
+                rowsPart.add(r);
             } else {
-                sbNoEntreg.append(fila).append('\n');
+                nZero++;
+                rowsZero.add(r);
             }
         }
 
-        // 1) BLOQUE: ENTREGADOS
-        System.out.println(">> PEDIDOS ENTREGADOS (cumplen 100% hasta el reloj)");
-        System.out.println(header);
+        double pct = (sumDem == 0 ? 0.0 : (100.0 * sumEnt / sumDem));
+        String sep = "-".repeat(110);
+        System.out.printf("Pedidos: %d  |  Entregados: %d  |  Parciales: %d  |  Pendientes: %d%n",
+                total, nFull, nPartial, nZero);
+        System.out.printf("Unidades entregadas≤T: %,d / %,d  (%.1f%%)%n", sumEnt, sumDem, pct);
         System.out.println(sep);
-        System.out.print(sbEntregados.length() == 0 ? "(sin registros)\n" : sbEntregados.toString());
-        System.out.println();
 
-        // 2) BLOQUE: PARCIALMENTE ENTREGADOS
-        System.out.println(">> PEDIDOS PARCIALMENTE ENTREGADOS (tienen llegadas pero no completan demanda)");
-        System.out.println(header);
-        System.out.println(sep);
-        System.out.print(sbParciales.length() == 0 ? "(sin registros)\n" : sbParciales.toString());
-        System.out.println();
+        String header = String.format(
+                "%-4s %-5s %-13s %8s %8s %8s %-13s  %s%n",
+                "ID", "DST", "CREADO", "DEMANDA", "ENTREG", "%AVANCE", "ÚLT≤T", "PROGRESO");
 
-        // 3) BLOQUE: NO ENTREGADOS
-        System.out.println(">> PEDIDOS NO ENTREGADOS (0 unidades entregadas hasta el reloj)");
-        System.out.println(header);
-        System.out.println(sep);
-        System.out.print(sbNoEntreg.length() == 0 ? "(sin registros)\n" : sbNoEntreg.toString());
-        System.out.println("=".repeat(90));
+        java.util.function.Consumer<Row> render = r -> {
+            double av = (r.dem == 0 ? 100.0 : (100.0 * r.ent / r.dem));
+            System.out.printf("%-4d %-5s %-13s %,8d %,8d %7.1f%% %-13s  %s%n",
+                    r.id, safe(r.dst), ts(r.creado), r.dem, r.ent, av, ts(r.ult),
+                    bar(r.ent, r.dem, 22));
+        };
+
+        System.out.println("\n>> ENTREGADOS (100% hasta el corte)  [" + nFull + "]");
+        System.out.println(header + sep);
+        if (rowsFull.isEmpty())
+            System.out.println("(sin registros)");
+        else
+            rowsFull.forEach(render);
+
+        System.out.println("\n>> PARCIALES (con llegadas pero incompletos)  [" + nPartial + "]");
+        System.out.println(header + sep);
+        if (rowsPart.isEmpty())
+            System.out.println("(sin registros)");
+        else {
+            rowsPart.sort(Comparator.<Row>comparingDouble(r -> (r.dem == 0 ? 1.0 : (r.ent * 1.0 / r.dem))).reversed()
+                    .thenComparing(r -> r.creado));
+            rowsPart.forEach(render);
+        }
+
+        System.out.println("\n>> PENDIENTES (0 entregado hasta el corte)  [" + nZero + "]");
+        System.out.println(header + sep);
+        if (rowsZero.isEmpty())
+            System.out.println("(sin registros)");
+        else
+            rowsZero.forEach(render);
+
+        System.out.println("=".repeat(110));
     }
 
     /** Suma de cantidades de tramos cuya llegada es <= reloj. */
     private int entregadoHasta(PlanPedido plan, Instant reloj) {
-        if (plan.getTramos() == null) return 0;
+        if (plan.getTramos() == null)
+            return 0;
         return plan.getTramos().stream()
                 .filter(t -> t.getLlegadaUtc() != null && !t.getLlegadaUtc().isAfter(reloj))
                 .mapToInt(TramoAsignado::getCantidad)
@@ -140,7 +186,8 @@ public class SolucionProgramacion {
 
     /** Última llegada (máxima) <= reloj; null si no hay llegadas hasta el reloj. */
     private Instant ultimaLlegadaHasta(PlanPedido plan, Instant reloj) {
-        if (plan.getTramos() == null) return null;
+        if (plan.getTramos() == null)
+            return null;
         return plan.getTramos().stream()
                 .map(TramoAsignado::getLlegadaUtc)
                 .filter(l -> l != null && !l.isAfter(reloj))

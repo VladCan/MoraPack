@@ -25,26 +25,30 @@ public final class TEGEventBuilder {
         }
 
         // 1) Indexar todos los instantes de evento por aeropuerto
-        Map<String, NavigableSet<Instant>> eventosPorAP =
-                IndexadorEventos.recolectarEventos(vuelosMap, p);
+        Map<String, NavigableSet<Instant>> eventosPorAP = IndexadorEventos.recolectarEventos(vuelosMap, p);
 
         // 2) Crear TEG
         VuelosTEG teg = new VuelosTEG();
 
         // 3) Nodos por aeropuerto
-        Map<String, List<AereopuertoNode>> nodosPorAP =
-                CreadorTEG.crearNodosEventos(teg, eventosPorAP, aeropuertosMap);
+        Map<String, List<AereopuertoNode>> nodosPorAP = CreadorTEG.crearNodosEventos(teg, eventosPorAP, aeropuertosMap);
 
         // 4) Ω-sedes → primer evento
         CreadorTEG.crearSupplySedes(teg, nodosPorAP, p.getSedes());
 
-        // 5) SUPPLY puntual de carga ya en vuelo
+        // 5) Stock inicial (consumible)
+        CreadorTEG.inyectarStockInicial(teg, nodosPorAP, p, aeropuertosMap);
+
+        // 6) SUPPLY puntual de carga ya en vuelo
         CreadorTEG.inyectarArribosLibres(teg, p, aeropuertosMap);
 
-        // 6) WAIT entre eventos contiguos por aeropuerto
+        // 7) WAIT
         CreadorTEG.crearWaits(teg, nodosPorAP, p, aeropuertosMap);
 
-        // 7) FLIGHT exactos para salidas en [inicio, fin)
+        // 8) Reservas de bodega (NO consumibles)
+        CreadorTEG.aplicarReservasWaitIniciales(teg, nodosPorAP, p);
+
+        // 9) FLIGHT
         CreadorTEG.crearFlights(teg, vuelosMap, p, aeropuertosMap);
 
         return teg;
