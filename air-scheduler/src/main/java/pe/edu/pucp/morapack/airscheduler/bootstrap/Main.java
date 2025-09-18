@@ -62,12 +62,12 @@ public class Main {
          * =======================
          */
         CargarPedidos pedidos = new CargarPedidos();
-        try (Scanner sc = ArchivoUtils.getScannerFromResource("pedidos.txt")) {
+        try (Scanner sc = ArchivoUtils.getScannerFromResource("pedidosProfe.txt")) {
             if (sc == null)
                 return;
             // Lectura “pura”: no tocar husos aquí
-            pedidos.leerDatos(sc);
-            //pedidos.leerDatosProfe(sc);
+            //pedidos.leerDatos(sc);
+            pedidos.leerDatosProfe(sc);
 
         }
 
@@ -79,6 +79,12 @@ public class Main {
         // Lleva cada pedido a UTC usando el GMT del destino
         pedidos.normalizarUtc(aeropuertosMap);
         // el while es para simular la llegada de pedidos en el tiempo
+
+        //revisión de datos guardados en pedidos
+
+        //pedidos.imprimrPedidos();
+        //System.exit(1);
+
 
         Instant reloj = pedidos.primerInstanteUTC();
         if (reloj == null)
@@ -103,7 +109,7 @@ public class Main {
             // solo copia los pedidos no desencola
             VentanaPedidos ventana = pedidos.acumuladoHasta(presenteUTC);// solo sacamos los pedidos de la
                                                                                       // ventana
-
+            //pedidos.imprimirVentanaDePedidos(ventana);
             List<Pedido> listaPedidos = ventana.pedidos();
             if (listaPedidos.isEmpty())
                 break;
@@ -138,15 +144,15 @@ public class Main {
             List<RepairOperator> reparadores = new ArrayList<>();
             reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
 
-            //ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC);
-            // System.out.println("Seed");
-            // ImpresorSolucion.imprimirEnConsola(seed);
-            //SolucionProgramacion solucionOptima = alns.ejecutar(seed);
-            //System.out.println("ALNS");
-            //ImpresorSolucion.imprimirEnConsola(solucionOptima);
-            ImpresorSolucion.imprimirEnConsola(seed);
-
-            solucionAnterior = seed;
+            ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC);
+            //System.out.println("Seed");
+            //ImpresorSolucion.imprimirEnConsola(seed);
+            SolucionProgramacion solucionOptima = alns.ejecutar(seed);
+            System.out.println("ALNS");
+            ImpresorSolucion.imprimirEnConsola(solucionOptima);
+            
+            //System.exit(1);
+            solucionAnterior = solucionOptima;
         }
 
     }

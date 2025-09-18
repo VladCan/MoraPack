@@ -60,7 +60,7 @@ public class Pedido {
     }
 
 
-    public void leerProfe(Scanner sc) {
+    public void leerProfe(Scanner sc, int id) {
         if (!sc.hasNextLine()) return;
 
         String linea = sc.nextLine().trim();
@@ -95,7 +95,7 @@ public class Pedido {
         fecha = LocalDateTime.of(yyyy, MM, dd, hh, mm, ss);
 
         // Generar un idPedido incremental si no viene en el archivo
-        idPedido++;
+        idPedido=id;
     }
 
 
