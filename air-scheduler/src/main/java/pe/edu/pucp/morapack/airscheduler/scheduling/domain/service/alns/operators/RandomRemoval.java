@@ -1,18 +1,8 @@
 package pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators;
-
-
-import java.util.*;
-
-import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.Solucion;
-import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.PlanPedido;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
 public class RandomRemoval implements DestructionOperator {
     private final int porcentaje;
@@ -24,15 +14,19 @@ public class RandomRemoval implements DestructionOperator {
 
     @Override
     public void destroy(SolucionProgramacion s) {
-        Map<Integer, PlanPedido> planes = s.getPlanPorPedido();
+        Map<Integer, PlanPedido> planes = s.asMap();  // << usar asMap()
         List<Integer> pedidos = new ArrayList<>(planes.keySet());
-        int n = pedidos.size() * porcentaje / 100;
+
+        if (pedidos.isEmpty()) return;
+
+        int n = Math.max(1, pedidos.size() * porcentaje / 100); // al menos 1
+        Collections.shuffle(pedidos, rnd); // evitar repetidos
 
         for (int i = 0; i < n; i++) {
-            int id = pedidos.get(rnd.nextInt(pedidos.size()));
+            int id = pedidos.get(i);
             PlanPedido plan = planes.get(id);
-            if (plan != null && plan.getTramos() != null) {
-                plan.getTramosMutable().clear(); // elimina los tramos asignados
+            if (plan != null) {
+                plan.limpiarTramos();
             }
         }
     }

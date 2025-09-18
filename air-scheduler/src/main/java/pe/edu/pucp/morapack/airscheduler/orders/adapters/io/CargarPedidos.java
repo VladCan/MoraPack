@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import lombok.Setter;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
 import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.EstadoPedido;
@@ -13,6 +14,7 @@ import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.PlanPedido;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
 
 @Getter
+@Setter
 public class CargarPedidos {
 
     private final Queue<Pedido> colaPedidos = new LinkedList<>();
@@ -38,6 +40,15 @@ public class CargarPedidos {
             agregar(pedido);
         }
     }
+
+    public void leerDatosProfe(Scanner sc) {
+        while (sc.hasNextLine()) {
+            Pedido pedido = new Pedido();
+            pedido.leerProfe(sc);
+            agregar(pedido);
+        }
+    }
+
 
     /**
      * Paso 2 (luego de leer): establece createdAtUtc en cada pedido

@@ -67,6 +67,8 @@ public class Main {
                 return;
             // Lectura “pura”: no tocar husos aquí
             pedidos.leerDatos(sc);
+            //pedidos.leerDatosProfe(sc);
+
         }
 
         /*
@@ -130,21 +132,21 @@ public class Main {
 
             // ALNS
 
-            List<DestructionOperator> destructions = new ArrayList<>();
-            destructions.add(new RandomRemoval(20));
-            destructions.add(new WorstRemoval(20));
+            List<DestructionOperator> destructores = new ArrayList<>();
+            destructores.add(new RandomRemoval(20));
+            destructores.add(new WorstRemoval(20));
+            List<RepairOperator> reparadores = new ArrayList<>();
+            reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
 
-            List<RepairOperator> repairs = new ArrayList<>();
-            repairs.add(new RegretRepair(2, new ArrayList<>(sedes), mapa.getVuelosPorOrigen()));
-
-            ALNS alns = new ALNS(teg, listaPedidos, destructions, repairs);
+            //ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC);
             // System.out.println("Seed");
             // ImpresorSolucion.imprimirEnConsola(seed);
-            SolucionProgramacion solucionOptima = alns.ejecutar(seed);
-            System.out.println("ALNS");
-            ImpresorSolucion.imprimirEnConsola(solucionOptima);
+            //SolucionProgramacion solucionOptima = alns.ejecutar(seed);
+            //System.out.println("ALNS");
+            //ImpresorSolucion.imprimirEnConsola(solucionOptima);
+            ImpresorSolucion.imprimirEnConsola(seed);
 
-            solucionAnterior = solucionOptima;
+            solucionAnterior = seed;
         }
 
     }

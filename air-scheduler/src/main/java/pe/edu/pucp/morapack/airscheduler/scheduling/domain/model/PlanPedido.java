@@ -22,6 +22,15 @@ public class PlanPedido {
     List<TramoAsignado> tramos; // cada tramo llega al aeropuerto destino
     //solución de un pedido
 
+    public PlanPedido(int idPedido, String destinoIcao, Instant creadoUtc, int demanda, List<TramoAsignado> tramos) {
+        this.idPedido = idPedido;
+        this.destinoIcao = destinoIcao;
+        this.creadoUtc = creadoUtc;
+        this.demanda = demanda;
+        //  siempre guardamos como lista mutable
+        this.tramos = (tramos == null) ? new ArrayList<>() : new ArrayList<>(tramos);
+    }
+
     public int totalAsignado() {
         return tramos.stream().mapToInt(TramoAsignado::getCantidad).sum();
     }
@@ -53,8 +62,14 @@ public class PlanPedido {
     }
 
     public List<TramoAsignado> getTramosMutable() {
-        return new ArrayList<>(tramos);
+        return tramos;
     }
+
+    public void limpiarTramos() {
+        tramos.clear();
+    }
+
+
     public boolean respetaSLAConPickup(Duration maxLlegadaDesdeCreacion) {
         Instant ult = ultimaLlegada();
         if (ult == null) return false; // no hay llegadas => no cumple
