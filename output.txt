@@ -1,1281 +1,1625 @@
 ALNS
 === SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 9  |  Completos: 8  |  Incompletos: 1
-Demanda total: 1,272  |  Asignado: 1,198  (94.2%)
+Pedidos: 26  |  Completos: 26  |  Incompletos: 0
+Demanda total: 41  |  Asignado: 108  (263.4%)
 Capacidades vuelos: OK  |  SLA llegada≤46h (todos): OK  |  SLA 48h (todos): OK
 ================================
 
 == PEDIDOS ==
 ID   DST   CREADO         DEMANDA    ASIGN  %ASIG 1a_LLEG       ÚLT_LLEG      ≤46h  SLA48  PROGRESO
 ----------------------------------------------------------------------------------------------------
-1    LATI  15 Sep 08:05Z      130      130 100.0% 15 Sep 19:34Z 15 Sep 19:34Z OK    OK     [################]
+1    SKBO  18 Sep 04:50Z        1        3 300.0% 18 Sep 00:11Z 18 Sep 00:28Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI LATI 15 Sep 16:39Z 15 Sep 19:34Z    130
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      1
+      SGAS SBBR 18 Sep 21:19Z 18 Sep 00:14Z      1
+      SBBR SKBO 18 Sep 18:53Z 18 Sep 00:28Z      1
 
-2    SUAA  15 Sep 08:53Z       84       84 100.0% 16 Sep 02:59Z 16 Sep 02:59Z OK    OK     [################]
+2    LDZA  18 Sep 05:11Z        1        4 400.0% 18 Sep 00:07Z 18 Sep 00:28Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SUAA 15 Sep 20:55Z 16 Sep 02:59Z     84
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      1
+      SGAS SBBR 18 Sep 21:19Z 18 Sep 00:14Z      1
+      SBBR SKBO 18 Sep 18:53Z 18 Sep 00:28Z      1
+      SKBO LDZA 18 Sep 10:56Z 18 Sep 00:07Z      1
 
-3    OPKC  15 Sep 09:28Z       50       50 100.0% 16 Sep 01:58Z 16 Sep 01:58Z OK    OK     [################]
+3    LOWW  18 Sep 05:27Z        1        1 100.0% 18 Sep 00:00Z 18 Sep 00:00Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI OPKC 15 Sep 16:19Z 16 Sep 01:58Z     50
+      UBBB LOWW 18 Sep 19:26Z 18 Sep 00:00Z      1
 
-4    VIDP  15 Sep 10:32Z       83       83 100.0% 16 Sep 00:34Z 16 Sep 00:34Z OK    OK     [################]
+4    OAKB  18 Sep 05:35Z        1        1 100.0% 18 Sep 00:32Z 18 Sep 00:32Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB VIDP 15 Sep 19:03Z 16 Sep 00:34Z     83
+      EBCI OAKB 18 Sep 16:40Z 18 Sep 00:32Z      1
 
-5    EHAM  15 Sep 11:00Z      165      165 100.0% 15 Sep 19:48Z 15 Sep 19:48Z OK    OK     [################]
+5    LATI  18 Sep 05:54Z        1        2 200.0% 18 Sep 00:20Z 18 Sep 00:20Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI EHAM 15 Sep 17:32Z 15 Sep 19:48Z    165
+      EBCI SLLP 18 Sep 10:35Z 18 Sep 00:20Z      1
+      SLLP LATI 18 Sep 09:36Z 18 Sep 00:20Z      1
 
-6    SVMI  15 Sep 11:26Z      242      242 100.0% 15 Sep 22:41Z 15 Sep 22:41Z OK    OK     [################]
+6    OPKC  18 Sep 06:15Z        1        2 200.0% 18 Sep 00:11Z 18 Sep 00:34Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SVMI 15 Sep 17:15Z 15 Sep 22:41Z    242
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      1
+      SGAS OPKC 18 Sep 04:28Z 18 Sep 00:34Z      1
 
-7    LATI  15 Sep 11:57Z      162      162 100.0% 15 Sep 19:34Z 15 Sep 19:34Z OK    OK     [################]
+7    OOMS  18 Sep 06:31Z        1        2 200.0% 18 Sep 00:05Z 18 Sep 00:32Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI LATI 15 Sep 16:39Z 15 Sep 19:34Z    162
+      EBCI OAKB 18 Sep 16:40Z 18 Sep 00:32Z      1
+      OAKB OOMS 18 Sep 20:03Z 18 Sep 00:05Z      1
 
-8    OOMS  15 Sep 13:00Z      107      107 100.0% 15 Sep 19:56Z 15 Sep 19:56Z OK    OK     [################]
+8    LDZA  18 Sep 06:42Z        7       28 400.0% 18 Sep 00:07Z 18 Sep 00:28Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OOMS 15 Sep 15:23Z 15 Sep 19:56Z    107
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      7
+      SGAS SBBR 18 Sep 21:19Z 18 Sep 00:14Z      7
+      SBBR SKBO 18 Sep 18:53Z 18 Sep 00:28Z      7
+      SKBO LDZA 18 Sep 10:56Z 18 Sep 00:07Z      7
 
-9    EHAM  15 Sep 13:32Z      249      175  70.3% 15 Sep 19:48Z 15 Sep 19:48Z OK    OK     [###########.....]
+9    OYSN  18 Sep 06:49Z        1        2 200.0% 18 Sep 00:04Z 18 Sep 00:06Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI EHAM 15 Sep 17:32Z 15 Sep 19:48Z    175
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+
+10   LOWW  18 Sep 07:09Z        1        1 100.0% 18 Sep 00:00Z 18 Sep 00:00Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB LOWW 18 Sep 19:26Z 18 Sep 00:00Z      1
+
+11   SUAA  18 Sep 07:30Z        2        6 300.0% 18 Sep 00:04Z 18 Sep 00:25Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB OERK 18 Sep 20:47Z 18 Sep 00:04Z      2
+      OERK OSDI 18 Sep 21:24Z 18 Sep 00:09Z      2
+      OSDI SUAA 18 Sep 07:09Z 18 Sep 00:25Z      2
+
+12   OSDI  18 Sep 07:43Z        1        2 200.0% 18 Sep 00:04Z 18 Sep 00:09Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB OERK 18 Sep 20:47Z 18 Sep 00:04Z      1
+      OERK OSDI 18 Sep 21:24Z 18 Sep 00:09Z      1
+
+13   VIDP  18 Sep 07:51Z        1        1 100.0% 18 Sep 00:34Z 18 Sep 00:34Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB VIDP 18 Sep 19:03Z 18 Sep 00:34Z      1
+
+14   VIDP  18 Sep 08:05Z        1        1 100.0% 18 Sep 00:34Z 18 Sep 00:34Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB VIDP 18 Sep 19:03Z 18 Sep 00:34Z      1
+
+15   LDZA  18 Sep 08:17Z        1        4 400.0% 18 Sep 00:07Z 18 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      1
+      SGAS SBBR 18 Sep 21:19Z 18 Sep 00:14Z      1
+      SBBR SKBO 18 Sep 18:53Z 18 Sep 00:28Z      1
+      SKBO LDZA 18 Sep 10:56Z 18 Sep 00:07Z      1
+
+16   VIDP  18 Sep 08:28Z        1        1 100.0% 18 Sep 00:34Z 18 Sep 00:34Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB VIDP 18 Sep 19:03Z 18 Sep 00:34Z      1
+
+17   SABE  18 Sep 08:40Z        1        1 100.0% 18 Sep 00:06Z 18 Sep 00:06Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+
+18   OYSN  18 Sep 08:48Z        1        2 200.0% 18 Sep 00:04Z 18 Sep 00:06Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+
+19   EDDI  18 Sep 08:57Z        1        4 400.0% 18 Sep 00:02Z 18 Sep 00:17Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+      OYSN OJAI 18 Sep 20:46Z 18 Sep 00:17Z      1
+      OJAI EDDI 18 Sep 19:20Z 18 Sep 00:02Z      1
+
+20   SBBR  18 Sep 09:13Z        2        4 200.0% 18 Sep 00:11Z 18 Sep 00:14Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      2
+      SGAS SBBR 18 Sep 21:19Z 18 Sep 00:14Z      2
+
+21   OYSN  18 Sep 09:34Z        1        2 200.0% 18 Sep 00:04Z 18 Sep 00:06Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+
+22   SBBR  18 Sep 09:53Z        2        4 200.0% 18 Sep 00:11Z 18 Sep 00:14Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      2
+      SGAS SBBR 18 Sep 21:19Z 18 Sep 00:14Z      2
+
+23   EDDI  18 Sep 10:09Z        6       24 400.0% 18 Sep 00:02Z 18 Sep 00:17Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      6
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      6
+      OYSN OJAI 18 Sep 20:46Z 18 Sep 00:17Z      6
+      OJAI EDDI 18 Sep 19:20Z 18 Sep 00:02Z      6
+
+24   SABE  18 Sep 10:20Z        2        2 100.0% 18 Sep 00:06Z 18 Sep 00:06Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      2
+
+25   SLLP  18 Sep 10:28Z        1        1 100.0% 18 Sep 00:20Z 18 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 18 Sep 10:35Z 18 Sep 00:20Z      1
+
+26   OJAI  18 Sep 10:44Z        1        3 300.0% 18 Sep 00:04Z 18 Sep 00:17Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+      OYSN OJAI 18 Sep 20:46Z 18 Sep 00:17Z      1
 
 == VUELOS UTILIZADOS ==
 ORI    DST    SALIDA        LLEGADA          CAPAC     ASIG    RESID
 ---------------------------------------------------------------------
-UBBB   OOMS   15 Sep 15:23Z 15 Sep 19:56Z      340      107      233
-EBCI   OPKC   15 Sep 16:19Z 16 Sep 01:58Z      300       50      250
-EBCI   LATI   15 Sep 16:39Z 15 Sep 19:34Z      360      292       68
-SPIM   SVMI   15 Sep 17:15Z 15 Sep 22:41Z      320      242       78
-EBCI   EHAM   15 Sep 17:32Z 15 Sep 19:48Z      340      340        0
-UBBB   VIDP   15 Sep 19:03Z 16 Sep 00:34Z      320       83      237
-SPIM   SUAA   15 Sep 20:55Z 16 Sep 02:59Z      340       84      256
+EBCI   SBBR   18 Sep 11:29Z 19 Sep 00:31Z      300        4      296
+SPIM   SABE   18 Sep 11:35Z 18 Sep 16:29Z      360        3      357
+SPIM   SUAA   18 Sep 12:09Z 18 Sep 18:13Z      300        2      298
+UBBB   OYSN   18 Sep 12:13Z 18 Sep 17:47Z      340        3      337
+UBBB   LOWW   18 Sep 12:24Z 18 Sep 17:58Z      340        2      338
+UBBB   EDDI   18 Sep 12:37Z 18 Sep 17:31Z      320        7      313
+UBBB   VIDP   18 Sep 12:49Z 18 Sep 17:20Z      320        3      317
+SPIM   SKBO   18 Sep 13:02Z 18 Sep 17:18Z      300        1      299
+UBBB   OJAI   18 Sep 13:17Z 18 Sep 17:24Z      300        1      299
+UBBB   LATI   18 Sep 13:29Z 18 Sep 18:46Z      360        1      359
+UBBB   OPKC   18 Sep 13:30Z 18 Sep 18:30Z      320        1      319
+EBCI   LDZA   18 Sep 13:40Z 18 Sep 16:59Z      360        9      351
+SPIM   SLLP   18 Sep 14:22Z 18 Sep 17:42Z      320        1      319
+UBBB   OSDI   18 Sep 14:43Z 18 Sep 17:34Z      360        1      359
+UBBB   OOMS   18 Sep 15:23Z 18 Sep 19:56Z      340        1      339
+UBBB   OAKB   18 Sep 16:21Z 18 Sep 20:37Z      320        1      319
 
 ==============================================================================================================
 REPORTE AL CORTE • reporteSimulacion.txt
-Corte (UTC): 15 Sep 20:05Z
+Corte (UTC): 18 Sep 16:50Z
 ==============================================================================================================
-Pedidos: 9  |  Entregados: 4  |  Parciales: 1  |  Pendientes: 4
-Unidades entregadas≤T: 739 / 1,272  (58.1%)
+Pedidos: 26  |  Entregados: 26  |  Parciales: 0  |  Pendientes: 0
+Unidades entregadas≤T: 108 / 41  (263.4%)
 --------------------------------------------------------------------------------------------------------------
 
->> ENTREGADOS (100% hasta el corte)  [4]
+>> ENTREGADOS (100% hasta el corte)  [26]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
-1    LATI  15 Sep 08:05Z      130      130   100.0% 15 Sep 19:34Z  [######################]
-5    EHAM  15 Sep 11:00Z      165      165   100.0% 15 Sep 19:48Z  [######################]
-7    LATI  15 Sep 11:57Z      162      162   100.0% 15 Sep 19:34Z  [######################]
-8    OOMS  15 Sep 13:00Z      107      107   100.0% 15 Sep 19:56Z  [######################]
-
->> PARCIALES (con llegadas pero incompletos)  [1]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-9    EHAM  15 Sep 13:32Z      249      175    70.3% 15 Sep 19:48Z  [###############.......]
-
->> PENDIENTES (0 entregado hasta el corte)  [4]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-2    SUAA  15 Sep 08:53Z       84        0     0.0% -              [......................]
-3    OPKC  15 Sep 09:28Z       50        0     0.0% -              [......................]
-4    VIDP  15 Sep 10:32Z       83        0     0.0% -              [......................]
-6    SVMI  15 Sep 11:26Z      242        0     0.0% -              [......................]
-==============================================================================================================
-ALNS
-=== SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 10  |  Completos: 9  |  Incompletos: 1
-Demanda total: 1,266  |  Asignado: 1,215  (96.0%)
-Capacidades vuelos: OK  |  SLA llegada≤46h (todos): OK  |  SLA 48h (todos): OK
-================================
-
-== PEDIDOS ==
-ID   DST   CREADO         DEMANDA    ASIGN  %ASIG 1a_LLEG       ÚLT_LLEG      ≤46h  SLA48  PROGRESO
-----------------------------------------------------------------------------------------------------
-2    SUAA  15 Sep 08:53Z       84       84 100.0% 16 Sep 02:59Z 16 Sep 02:59Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      SPIM SUAA 15 Sep 20:55Z 16 Sep 02:59Z     84
-
-9    EHAM  15 Sep 13:32Z       74       74 100.0% 16 Sep 02:11Z 16 Sep 02:11Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB EHAM 15 Sep 20:30Z 16 Sep 02:11Z     74
-
-10   SCEL  15 Sep 14:36Z       62       62 100.0% 16 Sep 05:38Z 16 Sep 05:38Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      SPIM SCEL 16 Sep 00:34Z 16 Sep 05:38Z     62
-
-11   LDZA  15 Sep 15:31Z      105      105 100.0% 16 Sep 06:02Z 16 Sep 06:02Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI LDZA 16 Sep 03:43Z 16 Sep 06:02Z    105
-
-12   EKCH  15 Sep 16:31Z       68       68 100.0% 16 Sep 03:58Z 16 Sep 03:58Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI EKCH 16 Sep 01:00Z 16 Sep 03:58Z     68
-
-13   LDZA  15 Sep 17:10Z      176      176 100.0% 16 Sep 06:02Z 16 Sep 06:02Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI LDZA 16 Sep 03:43Z 16 Sep 06:02Z    176
-
-14   OMDB  15 Sep 17:45Z      174      174 100.0% 16 Sep 06:23Z 16 Sep 06:23Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB OMDB 16 Sep 02:13Z 16 Sep 06:23Z    174
-
-15   OOMS  15 Sep 18:41Z      249      249 100.0% 16 Sep 00:43Z 16 Sep 00:43Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB OOMS 15 Sep 20:10Z 16 Sep 00:43Z    249
-
-16   OOMS  15 Sep 19:11Z      162      111  68.5% 16 Sep 00:43Z 16 Sep 00:43Z OK    OK     [###########.....]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB OOMS 15 Sep 20:10Z 16 Sep 00:43Z    111
-
-17   LOWW  15 Sep 20:05Z      112      112 100.0% 16 Sep 00:54Z 16 Sep 00:54Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI LOWW 15 Sep 21:46Z 16 Sep 00:54Z    112
-
-== VUELOS UTILIZADOS ==
-ORI    DST    SALIDA        LLEGADA          CAPAC     ASIG    RESID
----------------------------------------------------------------------
-UBBB   OOMS   15 Sep 20:10Z 16 Sep 00:43Z      360      360        0
-UBBB   EHAM   15 Sep 20:30Z 16 Sep 02:11Z      360       74      286
-SPIM   SUAA   15 Sep 20:55Z 16 Sep 02:59Z      340       84      256
-EBCI   LOWW   15 Sep 21:46Z 16 Sep 00:54Z      320      112      208
-SPIM   SCEL   16 Sep 00:34Z 16 Sep 05:38Z      300       62      238
-EBCI   EKCH   16 Sep 01:00Z 16 Sep 03:58Z      300       68      232
-UBBB   OMDB   16 Sep 02:13Z 16 Sep 06:23Z      360      174      186
-EBCI   LDZA   16 Sep 03:43Z 16 Sep 06:02Z      340      281       59
-
-==============================================================================================================
-REPORTE AL CORTE • reporteSimulacion.txt
-Corte (UTC): 16 Sep 02:05Z
-==============================================================================================================
-Pedidos: 10  |  Entregados: 2  |  Parciales: 1  |  Pendientes: 7
-Unidades entregadas≤T: 472 / 1,266  (37.3%)
---------------------------------------------------------------------------------------------------------------
-
->> ENTREGADOS (100% hasta el corte)  [2]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-15   OOMS  15 Sep 18:41Z      249      249   100.0% 16 Sep 00:43Z  [######################]
-17   LOWW  15 Sep 20:05Z      112      112   100.0% 16 Sep 00:54Z  [######################]
-
->> PARCIALES (con llegadas pero incompletos)  [1]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-16   OOMS  15 Sep 19:11Z      162      111    68.5% 16 Sep 00:43Z  [###############.......]
-
->> PENDIENTES (0 entregado hasta el corte)  [7]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-2    SUAA  15 Sep 08:53Z       84        0     0.0% -              [......................]
-9    EHAM  15 Sep 13:32Z       74        0     0.0% -              [......................]
-10   SCEL  15 Sep 14:36Z       62        0     0.0% -              [......................]
-11   LDZA  15 Sep 15:31Z      105        0     0.0% -              [......................]
-12   EKCH  15 Sep 16:31Z       68        0     0.0% -              [......................]
-13   LDZA  15 Sep 17:10Z      176        0     0.0% -              [......................]
-14   OMDB  15 Sep 17:45Z      174        0     0.0% -              [......................]
-==============================================================================================================
-ALNS
-=== SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 10  |  Completos: 10  |  Incompletos: 0
-Demanda total: 1,558  |  Asignado: 1,558  (100.0%)
-Capacidades vuelos: OK  |  SLA llegada≤46h (todos): OK  |  SLA 48h (todos): OK
-================================
-
-== PEDIDOS ==
-ID   DST   CREADO         DEMANDA    ASIGN  %ASIG 1a_LLEG       ÚLT_LLEG      ≤46h  SLA48  PROGRESO
-----------------------------------------------------------------------------------------------------
-11   LDZA  15 Sep 15:31Z      105      105 100.0% 16 Sep 06:02Z 16 Sep 06:02Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI LDZA 16 Sep 03:43Z 16 Sep 06:02Z    105
-
-13   LDZA  15 Sep 17:10Z      176      176 100.0% 16 Sep 06:02Z 16 Sep 06:02Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI LDZA 16 Sep 03:43Z 16 Sep 06:02Z    176
-
-14   OMDB  15 Sep 17:45Z      174      174 100.0% 16 Sep 06:23Z 16 Sep 06:23Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB OMDB 16 Sep 02:13Z 16 Sep 06:23Z    174
-
-16   OOMS  15 Sep 19:11Z       51       51 100.0% 16 Sep 07:31Z 16 Sep 07:31Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB OOMS 16 Sep 03:58Z 16 Sep 07:31Z     51
-
-18   LATI  15 Sep 20:51Z      168      168 100.0% 16 Sep 07:23Z 16 Sep 07:23Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI LATI 16 Sep 04:28Z 16 Sep 07:23Z    168
-
-19   LKPR  15 Sep 21:30Z      159      159 100.0% 16 Sep 05:16Z 16 Sep 05:16Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI LKPR 16 Sep 03:23Z 16 Sep 05:16Z    159
-
-20   EBCI  15 Sep 22:30Z      145      145 100.0% 16 Sep 14:35Z 16 Sep 14:35Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB EBCI 16 Sep 08:55Z 16 Sep 14:35Z    145
-
-21   SABE  15 Sep 23:28Z      208      208 100.0% 16 Sep 15:14Z 16 Sep 15:14Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      SPIM SABE 16 Sep 10:20Z 16 Sep 15:14Z    208
-
-22   SUAA  16 Sep 00:07Z      146      146 100.0% 16 Sep 18:13Z 16 Sep 18:13Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      SPIM SUAA 16 Sep 12:09Z 16 Sep 18:13Z    146
-
-23   OSDI  16 Sep 01:10Z      226      226 100.0% 16 Sep 12:49Z 16 Sep 12:49Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB OSDI 16 Sep 09:58Z 16 Sep 12:49Z    226
-
-== VUELOS UTILIZADOS ==
-ORI    DST    SALIDA        LLEGADA          CAPAC     ASIG    RESID
----------------------------------------------------------------------
-UBBB   OMDB   16 Sep 02:13Z 16 Sep 06:23Z      360      174      186
-EBCI   LKPR   16 Sep 03:23Z 16 Sep 05:16Z      300      159      141
-EBCI   LDZA   16 Sep 03:43Z 16 Sep 06:02Z      340      281       59
-UBBB   OOMS   16 Sep 03:58Z 16 Sep 07:31Z      360       51      309
-EBCI   LATI   16 Sep 04:28Z 16 Sep 07:23Z      340      168      172
-UBBB   EBCI   16 Sep 08:55Z 16 Sep 14:35Z      320      145      175
-UBBB   OSDI   16 Sep 09:58Z 16 Sep 12:49Z      360      226      134
-SPIM   SABE   16 Sep 10:20Z 16 Sep 15:14Z      300      208       92
-SPIM   SUAA   16 Sep 12:09Z 16 Sep 18:13Z      300      146      154
-
-==============================================================================================================
-REPORTE AL CORTE • reporteSimulacion.txt
-Corte (UTC): 16 Sep 08:05Z
-==============================================================================================================
-Pedidos: 10  |  Entregados: 6  |  Parciales: 0  |  Pendientes: 4
-Unidades entregadas≤T: 833 / 1,558  (53.5%)
---------------------------------------------------------------------------------------------------------------
-
->> ENTREGADOS (100% hasta el corte)  [6]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-11   LDZA  15 Sep 15:31Z      105      105   100.0% 16 Sep 06:02Z  [######################]
-13   LDZA  15 Sep 17:10Z      176      176   100.0% 16 Sep 06:02Z  [######################]
-14   OMDB  15 Sep 17:45Z      174      174   100.0% 16 Sep 06:23Z  [######################]
-16   OOMS  15 Sep 19:11Z       51       51   100.0% 16 Sep 07:31Z  [######################]
-18   LATI  15 Sep 20:51Z      168      168   100.0% 16 Sep 07:23Z  [######################]
-19   LKPR  15 Sep 21:30Z      159      159   100.0% 16 Sep 05:16Z  [######################]
+1    SKBO  18 Sep 04:50Z        1        3   300.0% 18 Sep 00:28Z  [######################]
+2    LDZA  18 Sep 05:11Z        1        4   400.0% 18 Sep 00:28Z  [######################]
+3    LOWW  18 Sep 05:27Z        1        1   100.0% 18 Sep 00:00Z  [######################]
+4    OAKB  18 Sep 05:35Z        1        1   100.0% 18 Sep 00:32Z  [######################]
+5    LATI  18 Sep 05:54Z        1        2   200.0% 18 Sep 00:20Z  [######################]
+6    OPKC  18 Sep 06:15Z        1        2   200.0% 18 Sep 00:34Z  [######################]
+7    OOMS  18 Sep 06:31Z        1        2   200.0% 18 Sep 00:32Z  [######################]
+8    LDZA  18 Sep 06:42Z        7       28   400.0% 18 Sep 00:28Z  [######################]
+9    OYSN  18 Sep 06:49Z        1        2   200.0% 18 Sep 00:06Z  [######################]
+10   LOWW  18 Sep 07:09Z        1        1   100.0% 18 Sep 00:00Z  [######################]
+11   SUAA  18 Sep 07:30Z        2        6   300.0% 18 Sep 00:25Z  [######################]
+12   OSDI  18 Sep 07:43Z        1        2   200.0% 18 Sep 00:09Z  [######################]
+13   VIDP  18 Sep 07:51Z        1        1   100.0% 18 Sep 00:34Z  [######################]
+14   VIDP  18 Sep 08:05Z        1        1   100.0% 18 Sep 00:34Z  [######################]
+15   LDZA  18 Sep 08:17Z        1        4   400.0% 18 Sep 00:28Z  [######################]
+16   VIDP  18 Sep 08:28Z        1        1   100.0% 18 Sep 00:34Z  [######################]
+17   SABE  18 Sep 08:40Z        1        1   100.0% 18 Sep 00:06Z  [######################]
+18   OYSN  18 Sep 08:48Z        1        2   200.0% 18 Sep 00:06Z  [######################]
+19   EDDI  18 Sep 08:57Z        1        4   400.0% 18 Sep 00:17Z  [######################]
+20   SBBR  18 Sep 09:13Z        2        4   200.0% 18 Sep 00:14Z  [######################]
+21   OYSN  18 Sep 09:34Z        1        2   200.0% 18 Sep 00:06Z  [######################]
+22   SBBR  18 Sep 09:53Z        2        4   200.0% 18 Sep 00:14Z  [######################]
+23   EDDI  18 Sep 10:09Z        6       24   400.0% 18 Sep 00:17Z  [######################]
+24   SABE  18 Sep 10:20Z        2        2   100.0% 18 Sep 00:06Z  [######################]
+25   SLLP  18 Sep 10:28Z        1        1   100.0% 18 Sep 00:20Z  [######################]
+26   OJAI  18 Sep 10:44Z        1        3   300.0% 18 Sep 00:17Z  [######################]
 
 >> PARCIALES (con llegadas pero incompletos)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
 (sin registros)
 
->> PENDIENTES (0 entregado hasta el corte)  [4]
+>> PENDIENTES (0 entregado hasta el corte)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
-20   EBCI  15 Sep 22:30Z      145        0     0.0% -              [......................]
-21   SABE  15 Sep 23:28Z      208        0     0.0% -              [......................]
-22   SUAA  16 Sep 00:07Z      146        0     0.0% -              [......................]
-23   OSDI  16 Sep 01:10Z      226        0     0.0% -              [......................]
+(sin registros)
 ==============================================================================================================
 ALNS
 === SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 13  |  Completos: 12  |  Incompletos: 1
-Demanda total: 2,383  |  Asignado: 2,335  (98.0%)
+Pedidos: 27  |  Completos: 27  |  Incompletos: 0
+Demanda total: 43  |  Asignado: 95  (220.9%)
 Capacidades vuelos: OK  |  SLA llegada≤46h (todos): OK  |  SLA 48h (todos): OK
 ================================
 
 == PEDIDOS ==
 ID   DST   CREADO         DEMANDA    ASIGN  %ASIG 1a_LLEG       ÚLT_LLEG      ≤46h  SLA48  PROGRESO
 ----------------------------------------------------------------------------------------------------
-20   EBCI  15 Sep 22:30Z      145      145 100.0% 16 Sep 14:35Z 16 Sep 14:35Z OK    OK     [################]
+27   EDDI  18 Sep 11:02Z        1        4 400.0% 18 Sep 00:02Z 18 Sep 00:17Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB EBCI 16 Sep 08:55Z 16 Sep 14:35Z    145
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+      OYSN OJAI 18 Sep 20:46Z 18 Sep 00:17Z      1
+      OJAI EDDI 18 Sep 19:20Z 18 Sep 00:02Z      1
 
-21   SABE  15 Sep 23:28Z      208      208 100.0% 16 Sep 15:14Z 16 Sep 15:14Z OK    OK     [################]
+28   SUAA  18 Sep 11:17Z        1        3 300.0% 18 Sep 00:04Z 18 Sep 00:25Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SABE 16 Sep 10:20Z 16 Sep 15:14Z    208
+      UBBB OERK 18 Sep 20:47Z 18 Sep 00:04Z      1
+      OERK OSDI 18 Sep 21:24Z 18 Sep 00:09Z      1
+      OSDI SUAA 18 Sep 07:09Z 18 Sep 00:25Z      1
 
-22   SUAA  16 Sep 00:07Z      146      146 100.0% 16 Sep 18:13Z 16 Sep 18:13Z OK    OK     [################]
+29   LBSF  18 Sep 11:31Z        1        3 300.0% 18 Sep 00:11Z 18 Sep 00:16Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SUAA 16 Sep 12:09Z 16 Sep 18:13Z    146
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      1
+      SGAS SBBR 18 Sep 21:19Z 18 Sep 00:14Z      1
+      SBBR LBSF 18 Sep 10:16Z 18 Sep 00:16Z      1
 
-23   OSDI  16 Sep 01:10Z      226      226 100.0% 16 Sep 12:49Z 16 Sep 12:49Z OK    OK     [################]
+30   LATI  18 Sep 11:45Z        2        4 200.0% 18 Sep 00:20Z 18 Sep 00:20Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OSDI 16 Sep 09:58Z 16 Sep 12:49Z    226
+      EBCI SLLP 18 Sep 10:35Z 18 Sep 00:20Z      2
+      SLLP LATI 18 Sep 09:36Z 18 Sep 00:20Z      2
 
-24   UMMS  16 Sep 02:06Z      224      224 100.0% 16 Sep 15:01Z 16 Sep 15:01Z OK    OK     [################]
+31   LATI  18 Sep 12:02Z        1        2 200.0% 18 Sep 00:20Z 18 Sep 00:20Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB UMMS 16 Sep 11:15Z 16 Sep 15:01Z    224
+      EBCI SLLP 18 Sep 10:35Z 18 Sep 00:20Z      1
+      SLLP LATI 18 Sep 09:36Z 18 Sep 00:20Z      1
 
-25   EKCH  16 Sep 02:49Z      167      167 100.0% 16 Sep 10:45Z 16 Sep 10:45Z OK    OK     [################]
+32   LDZA  18 Sep 12:15Z        1        4 400.0% 18 Sep 00:07Z 18 Sep 00:28Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI EKCH 16 Sep 08:47Z 16 Sep 10:45Z    167
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      1
+      SGAS SBBR 18 Sep 21:19Z 18 Sep 00:14Z      1
+      SBBR SKBO 18 Sep 18:53Z 18 Sep 00:28Z      1
+      SKBO LDZA 18 Sep 10:56Z 18 Sep 00:07Z      1
 
-26   VIDP  16 Sep 03:39Z      188      188 100.0% 16 Sep 17:20Z 16 Sep 17:20Z OK    OK     [################]
+33   EHAM  18 Sep 12:25Z        1        3 300.0% 18 Sep 00:04Z 18 Sep 00:11Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB VIDP 16 Sep 12:49Z 16 Sep 17:20Z    188
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+      OYSN EHAM 18 Sep 16:22Z 18 Sep 00:11Z      1
 
-27   OMDB  16 Sep 04:07Z      171      171 100.0% 16 Sep 16:27Z 16 Sep 16:27Z OK    OK     [################]
+34   EDDI  18 Sep 12:40Z        1        4 400.0% 18 Sep 00:02Z 18 Sep 00:17Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OMDB 16 Sep 12:17Z 16 Sep 16:27Z    171
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+      OYSN OJAI 18 Sep 20:46Z 18 Sep 00:17Z      1
+      OJAI EDDI 18 Sep 19:20Z 18 Sep 00:02Z      1
 
-28   SPIM  16 Sep 04:53Z      194      194 100.0% 17 Sep 01:00Z 17 Sep 01:00Z OK    OK     [################]
+35   OOMS  18 Sep 12:48Z        1        5 500.0% 18 Sep 00:02Z 18 Sep 00:17Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI SPIM 16 Sep 10:56Z 17 Sep 01:00Z    194
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+      OYSN OJAI 18 Sep 20:46Z 18 Sep 00:17Z      1
+      OJAI EDDI 18 Sep 19:20Z 18 Sep 00:02Z      1
+      EDDI OOMS 18 Sep 16:51Z 18 Sep 00:07Z      1
 
-29   UBBB  16 Sep 05:54Z      139      139 100.0% 16 Sep 18:12Z 16 Sep 18:12Z OK    OK     [################]
+36   OSDI  18 Sep 13:04Z        3        6 200.0% 18 Sep 00:04Z 18 Sep 00:09Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI UBBB 16 Sep 12:32Z 16 Sep 18:12Z    139
+      UBBB OERK 18 Sep 20:47Z 18 Sep 00:04Z      3
+      OERK OSDI 18 Sep 21:24Z 18 Sep 00:09Z      3
 
-30   LKPR  16 Sep 06:30Z      222      222 100.0% 16 Sep 13:19Z 16 Sep 13:19Z OK    OK     [################]
+37   EKCH  18 Sep 13:20Z        1        2 200.0% 18 Sep 00:06Z 18 Sep 00:33Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI LKPR 16 Sep 11:26Z 16 Sep 13:19Z    222
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE EKCH 18 Sep 08:34Z 18 Sep 00:33Z      1
 
-31   OSDI  16 Sep 07:02Z      182      134  73.6% 16 Sep 12:49Z 16 Sep 12:49Z OK    OK     [############....]
+38   LBSF  18 Sep 13:30Z        1        3 300.0% 18 Sep 00:11Z 18 Sep 00:16Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OSDI 16 Sep 09:58Z 16 Sep 12:49Z    134
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      1
+      SGAS SBBR 18 Sep 21:19Z 18 Sep 00:14Z      1
+      SBBR LBSF 18 Sep 10:16Z 18 Sep 00:16Z      1
 
-32   OYSN  16 Sep 07:48Z      171      171 100.0% 16 Sep 17:47Z 16 Sep 17:47Z OK    OK     [################]
+39   SGAS  18 Sep 13:46Z        2        2 100.0% 18 Sep 00:11Z 18 Sep 00:11Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OYSN 16 Sep 12:13Z 16 Sep 17:47Z    171
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      2
+
+40   OAKB  18 Sep 14:06Z        1        1 100.0% 18 Sep 00:32Z 18 Sep 00:32Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI OAKB 18 Sep 16:40Z 18 Sep 00:32Z      1
+
+41   LATI  18 Sep 14:19Z        6       12 200.0% 18 Sep 00:20Z 18 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 18 Sep 10:35Z 18 Sep 00:20Z      6
+      SLLP LATI 18 Sep 09:36Z 18 Sep 00:20Z      6
+
+42   OOMS  18 Sep 14:34Z        1        5 500.0% 18 Sep 00:02Z 18 Sep 00:17Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+      OYSN OJAI 18 Sep 20:46Z 18 Sep 00:17Z      1
+      OJAI EDDI 18 Sep 19:20Z 18 Sep 00:02Z      1
+      EDDI OOMS 18 Sep 16:51Z 18 Sep 00:07Z      1
+
+43   SGAS  18 Sep 14:43Z        5        5 100.0% 18 Sep 00:11Z 18 Sep 00:11Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      5
+
+44   OYSN  18 Sep 14:58Z        1        2 200.0% 18 Sep 00:04Z 18 Sep 00:06Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+
+45   SCEL  18 Sep 15:09Z        1        3 300.0% 18 Sep 00:04Z 18 Sep 00:09Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB OERK 18 Sep 20:47Z 18 Sep 00:04Z      1
+      OERK OSDI 18 Sep 21:24Z 18 Sep 00:09Z      1
+      OSDI SCEL 18 Sep 06:23Z 18 Sep 00:05Z      1
+
+46   LBSF  18 Sep 15:21Z        2        6 300.0% 18 Sep 00:11Z 18 Sep 00:16Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      2
+      SGAS SBBR 18 Sep 21:19Z 18 Sep 00:14Z      2
+      SBBR LBSF 18 Sep 10:16Z 18 Sep 00:16Z      2
+
+47   OAKB  18 Sep 15:32Z        1        1 100.0% 18 Sep 00:32Z 18 Sep 00:32Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI OAKB 18 Sep 16:40Z 18 Sep 00:32Z      1
+
+48   LKPR  18 Sep 15:41Z        1        1 100.0% 18 Sep 00:28Z 18 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      SPIM LKPR 18 Sep 09:31Z 18 Sep 00:28Z      1
+
+49   SABE  18 Sep 15:58Z        1        1 100.0% 18 Sep 00:06Z 18 Sep 00:06Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+
+50   OJAI  18 Sep 16:06Z        1        3 300.0% 18 Sep 00:04Z 18 Sep 00:17Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+      OYSN OJAI 18 Sep 20:46Z 18 Sep 00:17Z      1
+
+51   LOWW  18 Sep 16:16Z        1        1 100.0% 18 Sep 00:00Z 18 Sep 00:00Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB LOWW 18 Sep 19:26Z 18 Sep 00:00Z      1
+
+52   LATI  18 Sep 16:29Z        3        6 200.0% 18 Sep 00:20Z 18 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 18 Sep 10:35Z 18 Sep 00:20Z      3
+      SLLP LATI 18 Sep 09:36Z 18 Sep 00:20Z      3
+
+53   EHAM  18 Sep 16:50Z        1        3 300.0% 18 Sep 00:04Z 18 Sep 00:11Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+      OYSN EHAM 18 Sep 16:22Z 18 Sep 00:11Z      1
 
 == VUELOS UTILIZADOS ==
 ORI    DST    SALIDA        LLEGADA          CAPAC     ASIG    RESID
 ---------------------------------------------------------------------
-EBCI   EKCH   16 Sep 08:47Z 16 Sep 10:45Z      340      167      173
-UBBB   EBCI   16 Sep 08:55Z 16 Sep 14:35Z      320      145      175
-UBBB   OSDI   16 Sep 09:58Z 16 Sep 12:49Z      360      360        0
-SPIM   SABE   16 Sep 10:20Z 16 Sep 15:14Z      300      208       92
-EBCI   SPIM   16 Sep 10:56Z 17 Sep 01:00Z      320      194      126
-UBBB   UMMS   16 Sep 11:15Z 16 Sep 15:01Z      300      224       76
-EBCI   LKPR   16 Sep 11:26Z 16 Sep 13:19Z      300      222       78
-SPIM   SUAA   16 Sep 12:09Z 16 Sep 18:13Z      300      146      154
-UBBB   OYSN   16 Sep 12:13Z 16 Sep 17:47Z      340      171      169
-UBBB   OMDB   16 Sep 12:17Z 16 Sep 16:27Z      300      171      129
-EBCI   UBBB   16 Sep 12:32Z 16 Sep 18:12Z      340      139      201
-UBBB   VIDP   16 Sep 12:49Z 16 Sep 17:20Z      320      188      132
+UBBB   OYSN   18 Sep 17:06Z 18 Sep 22:40Z      320        1      319
+EBCI   SGAS   18 Sep 17:08Z 19 Sep 07:03Z      300        7      293
+UBBB   LBSF   18 Sep 17:28Z 18 Sep 21:19Z      320        4      316
+EBCI   EHAM   18 Sep 17:32Z 18 Sep 19:48Z      340        2      338
+UBBB   LKPR   18 Sep 17:57Z 18 Sep 22:43Z      320        1      319
+EBCI   EKCH   18 Sep 18:55Z 18 Sep 20:53Z      340        1      339
+EBCI   LDZA   18 Sep 19:17Z 18 Sep 22:36Z      360        1      359
+EBCI   EDDI   18 Sep 19:21Z 18 Sep 21:11Z      360        2      358
+UBBB   LOWW   18 Sep 19:26Z 19 Sep 00:00Z      300        1      299
+EBCI   OJAI   18 Sep 20:01Z 19 Sep 02:12Z      340        1      339
+SPIM   SABE   18 Sep 20:03Z 19 Sep 01:57Z      340        1      339
+UBBB   OOMS   18 Sep 20:10Z 19 Sep 00:43Z      360        2      358
+SPIM   SUAA   18 Sep 20:55Z 19 Sep 02:59Z      340        1      339
+UBBB   OSDI   18 Sep 22:00Z 19 Sep 01:51Z      340        3      337
+UBBB   OAKB   18 Sep 22:24Z 19 Sep 02:40Z      320        2      318
+EBCI   LATI   19 Sep 00:04Z 19 Sep 03:59Z      300       12      288
+SPIM   SCEL   19 Sep 00:34Z 19 Sep 05:38Z      300        1      299
 
 ==============================================================================================================
 REPORTE AL CORTE • reporteSimulacion.txt
-Corte (UTC): 16 Sep 14:05Z
+Corte (UTC): 18 Sep 22:50Z
 ==============================================================================================================
-Pedidos: 13  |  Entregados: 3  |  Parciales: 1  |  Pendientes: 9
-Unidades entregadas≤T: 749 / 2,383  (31.4%)
+Pedidos: 27  |  Entregados: 27  |  Parciales: 0  |  Pendientes: 0
+Unidades entregadas≤T: 95 / 43  (220.9%)
 --------------------------------------------------------------------------------------------------------------
 
->> ENTREGADOS (100% hasta el corte)  [3]
+>> ENTREGADOS (100% hasta el corte)  [27]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
-23   OSDI  16 Sep 01:10Z      226      226   100.0% 16 Sep 12:49Z  [######################]
-25   EKCH  16 Sep 02:49Z      167      167   100.0% 16 Sep 10:45Z  [######################]
-30   LKPR  16 Sep 06:30Z      222      222   100.0% 16 Sep 13:19Z  [######################]
-
->> PARCIALES (con llegadas pero incompletos)  [1]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-31   OSDI  16 Sep 07:02Z      182      134    73.6% 16 Sep 12:49Z  [################......]
-
->> PENDIENTES (0 entregado hasta el corte)  [9]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-20   EBCI  15 Sep 22:30Z      145        0     0.0% -              [......................]
-21   SABE  15 Sep 23:28Z      208        0     0.0% -              [......................]
-22   SUAA  16 Sep 00:07Z      146        0     0.0% -              [......................]
-24   UMMS  16 Sep 02:06Z      224        0     0.0% -              [......................]
-26   VIDP  16 Sep 03:39Z      188        0     0.0% -              [......................]
-27   OMDB  16 Sep 04:07Z      171        0     0.0% -              [......................]
-28   SPIM  16 Sep 04:53Z      194        0     0.0% -              [......................]
-29   UBBB  16 Sep 05:54Z      139        0     0.0% -              [......................]
-32   OYSN  16 Sep 07:48Z      171        0     0.0% -              [......................]
-==============================================================================================================
-ALNS
-=== SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 10  |  Completos: 10  |  Incompletos: 0
-Demanda total: 1,306  |  Asignado: 1,306  (100.0%)
-Capacidades vuelos: OK  |  SLA llegada≤46h (todos): OK  |  SLA 48h (todos): OK
-================================
-
-== PEDIDOS ==
-ID   DST   CREADO         DEMANDA    ASIGN  %ASIG 1a_LLEG       ÚLT_LLEG      ≤46h  SLA48  PROGRESO
-----------------------------------------------------------------------------------------------------
-31   OSDI  16 Sep 07:02Z       48       48 100.0% 16 Sep 17:34Z 16 Sep 17:34Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB OSDI 16 Sep 14:43Z 16 Sep 17:34Z     48
-
-33   LOWW  16 Sep 08:19Z      122      122 100.0% 17 Sep 00:00Z 17 Sep 00:00Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB LOWW 16 Sep 19:26Z 17 Sep 00:00Z    122
-
-34   LOWW  16 Sep 08:46Z      184      184 100.0% 17 Sep 00:00Z 17 Sep 00:54Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB LOWW 16 Sep 19:26Z 17 Sep 00:00Z    178
-      EBCI LOWW 16 Sep 21:46Z 17 Sep 00:54Z      6
-
-35   UBBB  16 Sep 09:21Z       56       56 100.0% 17 Sep 03:07Z 17 Sep 03:07Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI UBBB 16 Sep 21:27Z 17 Sep 03:07Z     56
-
-36   VIDP  16 Sep 10:02Z      191      191 100.0% 17 Sep 00:34Z 17 Sep 00:34Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB VIDP 16 Sep 19:03Z 17 Sep 00:34Z    191
-
-37   UBBB  16 Sep 10:34Z      188      188 100.0% 17 Sep 03:07Z 17 Sep 03:07Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI UBBB 16 Sep 21:27Z 17 Sep 03:07Z    188
-
-38   SLLP  16 Sep 11:11Z       61       61 100.0% 16 Sep 17:42Z 16 Sep 17:42Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      SPIM SLLP 16 Sep 14:22Z 16 Sep 17:42Z     61
-
-39   SEQM  16 Sep 12:11Z      120      120 100.0% 17 Sep 01:52Z 17 Sep 01:52Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      SPIM SEQM 16 Sep 22:11Z 17 Sep 01:52Z    120
-
-40   EDDI  16 Sep 12:42Z      250      250 100.0% 16 Sep 21:11Z 16 Sep 21:11Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI EDDI 16 Sep 19:21Z 16 Sep 21:11Z    250
-
-41   EKCH  16 Sep 13:42Z       86       86 100.0% 16 Sep 20:53Z 16 Sep 20:53Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI EKCH 16 Sep 18:55Z 16 Sep 20:53Z     86
-
-== VUELOS UTILIZADOS ==
-ORI    DST    SALIDA        LLEGADA          CAPAC     ASIG    RESID
----------------------------------------------------------------------
-SPIM   SLLP   16 Sep 14:22Z 16 Sep 17:42Z      320       61      259
-UBBB   OSDI   16 Sep 14:43Z 16 Sep 17:34Z      360       48      312
-EBCI   EKCH   16 Sep 18:55Z 16 Sep 20:53Z      340       86      254
-UBBB   VIDP   16 Sep 19:03Z 17 Sep 00:34Z      320      191      129
-EBCI   EDDI   16 Sep 19:21Z 16 Sep 21:11Z      360      250      110
-UBBB   LOWW   16 Sep 19:26Z 17 Sep 00:00Z      300      300        0
-EBCI   UBBB   16 Sep 21:27Z 17 Sep 03:07Z      300      244       56
-EBCI   LOWW   16 Sep 21:46Z 17 Sep 00:54Z      320        6      314
-SPIM   SEQM   16 Sep 22:11Z 17 Sep 01:52Z      300      120      180
-
-==============================================================================================================
-REPORTE AL CORTE • reporteSimulacion.txt
-Corte (UTC): 16 Sep 20:05Z
-==============================================================================================================
-Pedidos: 10  |  Entregados: 2  |  Parciales: 0  |  Pendientes: 8
-Unidades entregadas≤T: 109 / 1,306  (8.3%)
---------------------------------------------------------------------------------------------------------------
-
->> ENTREGADOS (100% hasta el corte)  [2]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-31   OSDI  16 Sep 07:02Z       48       48   100.0% 16 Sep 17:34Z  [######################]
-38   SLLP  16 Sep 11:11Z       61       61   100.0% 16 Sep 17:42Z  [######################]
+27   EDDI  18 Sep 11:02Z        1        4   400.0% 18 Sep 00:17Z  [######################]
+28   SUAA  18 Sep 11:17Z        1        3   300.0% 18 Sep 00:25Z  [######################]
+29   LBSF  18 Sep 11:31Z        1        3   300.0% 18 Sep 00:16Z  [######################]
+30   LATI  18 Sep 11:45Z        2        4   200.0% 18 Sep 00:20Z  [######################]
+31   LATI  18 Sep 12:02Z        1        2   200.0% 18 Sep 00:20Z  [######################]
+32   LDZA  18 Sep 12:15Z        1        4   400.0% 18 Sep 00:28Z  [######################]
+33   EHAM  18 Sep 12:25Z        1        3   300.0% 18 Sep 00:11Z  [######################]
+34   EDDI  18 Sep 12:40Z        1        4   400.0% 18 Sep 00:17Z  [######################]
+35   OOMS  18 Sep 12:48Z        1        5   500.0% 18 Sep 00:17Z  [######################]
+36   OSDI  18 Sep 13:04Z        3        6   200.0% 18 Sep 00:09Z  [######################]
+37   EKCH  18 Sep 13:20Z        1        2   200.0% 18 Sep 00:33Z  [######################]
+38   LBSF  18 Sep 13:30Z        1        3   300.0% 18 Sep 00:16Z  [######################]
+39   SGAS  18 Sep 13:46Z        2        2   100.0% 18 Sep 00:11Z  [######################]
+40   OAKB  18 Sep 14:06Z        1        1   100.0% 18 Sep 00:32Z  [######################]
+41   LATI  18 Sep 14:19Z        6       12   200.0% 18 Sep 00:20Z  [######################]
+42   OOMS  18 Sep 14:34Z        1        5   500.0% 18 Sep 00:17Z  [######################]
+43   SGAS  18 Sep 14:43Z        5        5   100.0% 18 Sep 00:11Z  [######################]
+44   OYSN  18 Sep 14:58Z        1        2   200.0% 18 Sep 00:06Z  [######################]
+45   SCEL  18 Sep 15:09Z        1        3   300.0% 18 Sep 00:09Z  [######################]
+46   LBSF  18 Sep 15:21Z        2        6   300.0% 18 Sep 00:16Z  [######################]
+47   OAKB  18 Sep 15:32Z        1        1   100.0% 18 Sep 00:32Z  [######################]
+48   LKPR  18 Sep 15:41Z        1        1   100.0% 18 Sep 00:28Z  [######################]
+49   SABE  18 Sep 15:58Z        1        1   100.0% 18 Sep 00:06Z  [######################]
+50   OJAI  18 Sep 16:06Z        1        3   300.0% 18 Sep 00:17Z  [######################]
+51   LOWW  18 Sep 16:16Z        1        1   100.0% 18 Sep 00:00Z  [######################]
+52   LATI  18 Sep 16:29Z        3        6   200.0% 18 Sep 00:20Z  [######################]
+53   EHAM  18 Sep 16:50Z        1        3   300.0% 18 Sep 00:11Z  [######################]
 
 >> PARCIALES (con llegadas pero incompletos)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
 (sin registros)
 
->> PENDIENTES (0 entregado hasta el corte)  [8]
+>> PENDIENTES (0 entregado hasta el corte)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
-33   LOWW  16 Sep 08:19Z      122        0     0.0% -              [......................]
-34   LOWW  16 Sep 08:46Z      184        0     0.0% -              [......................]
-35   UBBB  16 Sep 09:21Z       56        0     0.0% -              [......................]
-36   VIDP  16 Sep 10:02Z      191        0     0.0% -              [......................]
-37   UBBB  16 Sep 10:34Z      188        0     0.0% -              [......................]
-39   SEQM  16 Sep 12:11Z      120        0     0.0% -              [......................]
-40   EDDI  16 Sep 12:42Z      250        0     0.0% -              [......................]
-41   EKCH  16 Sep 13:42Z       86        0     0.0% -              [......................]
+(sin registros)
 ==============================================================================================================
 ALNS
 === SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 11  |  Completos: 11  |  Incompletos: 0
-Demanda total: 1,599  |  Asignado: 1,615  (101.0%)
+Pedidos: 24  |  Completos: 24  |  Incompletos: 0
+Demanda total: 49  |  Asignado: 113  (230.6%)
 Capacidades vuelos: OK  |  SLA llegada≤46h (todos): OK  |  SLA 48h (todos): OK
 ================================
 
 == PEDIDOS ==
 ID   DST   CREADO         DEMANDA    ASIGN  %ASIG 1a_LLEG       ÚLT_LLEG      ≤46h  SLA48  PROGRESO
 ----------------------------------------------------------------------------------------------------
-34   LOWW  16 Sep 08:46Z        6        6 100.0% 17 Sep 00:54Z 17 Sep 00:54Z OK    OK     [################]
+54   SCEL  18 Sep 17:04Z        1        2 200.0% 18 Sep 00:10Z 18 Sep 00:16Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI LOWW 16 Sep 21:46Z 17 Sep 00:54Z      6
+      SPIM OMDB 18 Sep 04:35Z 18 Sep 00:10Z      1
+      OMDB SCEL 18 Sep 04:50Z 18 Sep 00:16Z      1
 
-35   UBBB  16 Sep 09:21Z       56       56 100.0% 17 Sep 03:07Z 17 Sep 03:07Z OK    OK     [################]
+55   OOMS  18 Sep 17:19Z        1        5 500.0% 18 Sep 00:02Z 18 Sep 00:17Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI UBBB 16 Sep 21:27Z 17 Sep 03:07Z     56
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+      OYSN OJAI 18 Sep 20:46Z 18 Sep 00:17Z      1
+      OJAI EDDI 18 Sep 19:20Z 18 Sep 00:02Z      1
+      EDDI OOMS 18 Sep 16:51Z 18 Sep 00:07Z      1
 
-37   UBBB  16 Sep 10:34Z      188      188 100.0% 17 Sep 03:07Z 17 Sep 03:07Z OK    OK     [################]
+56   UMMS  18 Sep 17:41Z        5       10 200.0% 18 Sep 00:03Z 18 Sep 00:05Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI UBBB 16 Sep 21:27Z 17 Sep 03:07Z    188
+      EBCI SVMI 18 Sep 13:20Z 18 Sep 00:03Z      5
+      SVMI UMMS 18 Sep 11:17Z 18 Sep 00:05Z      5
 
-39   SEQM  16 Sep 12:11Z      120      120 100.0% 17 Sep 01:52Z 17 Sep 01:52Z OK    OK     [################]
+57   SGAS  18 Sep 17:54Z        1        1 100.0% 18 Sep 00:11Z 18 Sep 00:11Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SEQM 16 Sep 22:11Z 17 Sep 01:52Z    120
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      1
 
-42   OSDI  16 Sep 14:39Z      222      222 100.0% 17 Sep 01:51Z 17 Sep 01:51Z OK    OK     [################]
+58   SVMI  18 Sep 18:10Z        1        1 100.0% 18 Sep 00:03Z 18 Sep 00:03Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OSDI 16 Sep 22:00Z 17 Sep 01:51Z    222
+      EBCI SVMI 18 Sep 13:20Z 18 Sep 00:03Z      1
 
-43   UBBB  16 Sep 15:38Z       72       88 122.2% 17 Sep 00:04Z 17 Sep 05:05Z OK    OK     [################]
+59   OOMS  18 Sep 18:21Z        1        5 500.0% 18 Sep 00:02Z 18 Sep 00:17Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI UBBB 16 Sep 21:27Z 17 Sep 03:07Z     56
-      UBBB OERK 16 Sep 20:47Z 17 Sep 00:04Z     16
-      OERK UBBB 17 Sep 01:48Z 17 Sep 05:05Z     16
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+      OYSN OJAI 18 Sep 20:46Z 18 Sep 00:17Z      1
+      OJAI EDDI 18 Sep 19:20Z 18 Sep 00:02Z      1
+      EDDI OOMS 18 Sep 16:51Z 18 Sep 00:07Z      1
 
-44   EBCI  16 Sep 16:16Z       92       92 100.0% 17 Sep 04:50Z 17 Sep 04:50Z OK    OK     [################]
+60   LOWW  18 Sep 18:36Z        1        1 100.0% 18 Sep 00:00Z 18 Sep 00:00Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB EBCI 16 Sep 22:10Z 17 Sep 04:50Z     92
+      UBBB LOWW 18 Sep 19:26Z 18 Sep 00:00Z      1
 
-45   SUAA  16 Sep 17:05Z      169      169 100.0% 17 Sep 02:59Z 17 Sep 02:59Z OK    OK     [################]
+61   EDDI  18 Sep 18:57Z        7       28 400.0% 18 Sep 00:02Z 18 Sep 00:17Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SUAA 16 Sep 20:55Z 17 Sep 02:59Z    169
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      7
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      7
+      OYSN OJAI 18 Sep 20:46Z 18 Sep 00:17Z      7
+      OJAI EDDI 18 Sep 19:20Z 18 Sep 00:02Z      7
 
-46   OMDB  16 Sep 17:39Z      229      229 100.0% 17 Sep 06:23Z 17 Sep 06:23Z OK    OK     [################]
+62   OPKC  18 Sep 19:06Z        1        2 200.0% 18 Sep 00:11Z 18 Sep 00:34Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OMDB 17 Sep 02:13Z 17 Sep 06:23Z    229
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      1
+      SGAS OPKC 18 Sep 04:28Z 18 Sep 00:34Z      1
 
-47   OAKB  16 Sep 18:38Z      219      219 100.0% 17 Sep 02:40Z 17 Sep 02:40Z OK    OK     [################]
+63   LKPR  18 Sep 19:13Z        1        1 100.0% 18 Sep 00:28Z 18 Sep 00:28Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OAKB 16 Sep 22:24Z 17 Sep 02:40Z    219
+      SPIM LKPR 18 Sep 09:31Z 18 Sep 00:28Z      1
 
-48   OYSN  16 Sep 19:25Z      226      226 100.0% 17 Sep 03:59Z 17 Sep 03:59Z OK    OK     [################]
+64   SLLP  18 Sep 19:25Z        4        4 100.0% 18 Sep 00:20Z 18 Sep 00:20Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OYSN 16 Sep 22:25Z 17 Sep 03:59Z    226
+      EBCI SLLP 18 Sep 10:35Z 18 Sep 00:20Z      4
+
+65   OYSN  18 Sep 19:41Z        1        2 200.0% 18 Sep 00:04Z 18 Sep 00:06Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      1
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      1
+
+66   SVMI  18 Sep 19:57Z        1        1 100.0% 18 Sep 00:03Z 18 Sep 00:03Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SVMI 18 Sep 13:20Z 18 Sep 00:03Z      1
+
+67   LATI  18 Sep 20:12Z        2        4 200.0% 18 Sep 00:20Z 18 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 18 Sep 10:35Z 18 Sep 00:20Z      2
+      SLLP LATI 18 Sep 09:36Z 18 Sep 00:20Z      2
+
+68   SVMI  18 Sep 20:32Z        1        1 100.0% 18 Sep 00:03Z 18 Sep 00:03Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SVMI 18 Sep 13:20Z 18 Sep 00:03Z      1
+
+69   UBBB  18 Sep 20:39Z        2        6 300.0% 18 Sep 00:03Z 18 Sep 00:17Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SVMI 18 Sep 13:20Z 18 Sep 00:03Z      2
+      SVMI UMMS 18 Sep 11:17Z 18 Sep 00:05Z      2
+      UMMS UBBB 18 Sep 20:31Z 18 Sep 00:17Z      2
+
+70   SABE  18 Sep 20:57Z        5        5 100.0% 18 Sep 00:06Z 18 Sep 00:06Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      5
+
+71   SGAS  18 Sep 21:12Z        1        1 100.0% 18 Sep 00:11Z 18 Sep 00:11Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      1
+
+72   SBBR  18 Sep 21:33Z        1        2 200.0% 18 Sep 00:11Z 18 Sep 00:14Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      1
+      SGAS SBBR 18 Sep 21:19Z 18 Sep 00:14Z      1
+
+73   EHAM  18 Sep 21:50Z        6       18 300.0% 18 Sep 00:04Z 18 Sep 00:11Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 18 Sep 05:48Z 18 Sep 00:06Z      6
+      SABE OYSN 18 Sep 07:57Z 18 Sep 00:04Z      6
+      OYSN EHAM 18 Sep 16:22Z 18 Sep 00:11Z      6
+
+74   VIDP  18 Sep 22:00Z        1        1 100.0% 18 Sep 00:34Z 18 Sep 00:34Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB VIDP 18 Sep 19:03Z 18 Sep 00:34Z      1
+
+75   LDZA  18 Sep 22:13Z        2        8 400.0% 18 Sep 00:07Z 18 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 18 Sep 06:38Z 18 Sep 00:11Z      2
+      SGAS SBBR 18 Sep 21:19Z 18 Sep 00:14Z      2
+      SBBR SKBO 18 Sep 18:53Z 18 Sep 00:28Z      2
+      SKBO LDZA 18 Sep 10:56Z 18 Sep 00:07Z      2
+
+76   SEQM  18 Sep 22:28Z        1        2 200.0% 18 Sep 00:04Z 18 Sep 00:34Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB VIDP 18 Sep 19:03Z 18 Sep 00:34Z      1
+      VIDP SEQM 18 Sep 02:03Z 18 Sep 00:04Z      1
+
+77   OSDI  18 Sep 22:49Z        1        2 200.0% 18 Sep 00:04Z 18 Sep 00:09Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB OERK 18 Sep 20:47Z 18 Sep 00:04Z      1
+      OERK OSDI 18 Sep 21:24Z 18 Sep 00:09Z      1
 
 == VUELOS UTILIZADOS ==
 ORI    DST    SALIDA        LLEGADA          CAPAC     ASIG    RESID
 ---------------------------------------------------------------------
-UBBB   OERK   16 Sep 20:47Z 17 Sep 00:04Z      360       16      344
-SPIM   SUAA   16 Sep 20:55Z 17 Sep 02:59Z      340      169      171
-EBCI   UBBB   16 Sep 21:27Z 17 Sep 03:07Z      300      300        0
-EBCI   LOWW   16 Sep 21:46Z 17 Sep 00:54Z      320        6      314
-UBBB   OSDI   16 Sep 22:00Z 17 Sep 01:51Z      340      222      118
-UBBB   EBCI   16 Sep 22:10Z 17 Sep 04:50Z      340       92      248
-SPIM   SEQM   16 Sep 22:11Z 17 Sep 01:52Z      300      120      180
-UBBB   OAKB   16 Sep 22:24Z 17 Sep 02:40Z      320      219      101
-UBBB   OYSN   16 Sep 22:25Z 17 Sep 03:59Z      320      226       94
-OERK   UBBB   17 Sep 01:48Z 17 Sep 05:05Z      300       16      284
-UBBB   OMDB   17 Sep 02:13Z 17 Sep 06:23Z      360      229      131
+SPIM   SABE   18 Sep 23:02Z 19 Sep 04:56Z      340        5      335
+SPIM   SLLP   18 Sep 23:05Z 19 Sep 02:25Z      320        4      316
+SPIM   SBBR   18 Sep 23:19Z 19 Sep 05:24Z      340        1      339
+EBCI   LOWW   18 Sep 23:56Z 19 Sep 02:04Z      360        1      359
+EBCI   OSDI   19 Sep 00:03Z 19 Sep 06:06Z      320        1      319
+EBCI   LATI   19 Sep 00:04Z 19 Sep 03:59Z      300        2      298
+UBBB   VIDP   19 Sep 00:12Z 19 Sep 05:43Z      300        1      299
+UBBB   UMMS   19 Sep 00:26Z 19 Sep 04:12Z      300        5      295
+SPIM   SCEL   19 Sep 00:34Z 19 Sep 05:38Z      300        1      299
+UBBB   OPKC   19 Sep 01:16Z 19 Sep 06:16Z      340        1      339
+EBCI   OYSN   19 Sep 01:39Z 19 Sep 09:18Z      300        1      299
+EBCI   UBBB   19 Sep 01:45Z 19 Sep 07:25Z      360        2      358
+EBCI   EHAM   19 Sep 01:48Z 19 Sep 03:04Z      360        6      354
+SPIM   SEQM   19 Sep 02:09Z 19 Sep 05:50Z      320        1      319
+SPIM   SGAS   19 Sep 02:32Z 19 Sep 07:44Z      360        2      358
+EBCI   EDDI   19 Sep 02:41Z 19 Sep 04:31Z      360        7      353
+EBCI   LKPR   19 Sep 03:23Z 19 Sep 05:16Z      300        1      299
+EBCI   LDZA   19 Sep 03:43Z 19 Sep 06:02Z      340        2      338
+UBBB   OOMS   19 Sep 03:58Z 19 Sep 07:31Z      360        2      358
+SPIM   SVMI   19 Sep 10:24Z 19 Sep 15:50Z      320        3      317
 
 ==============================================================================================================
 REPORTE AL CORTE • reporteSimulacion.txt
-Corte (UTC): 17 Sep 02:05Z
+Corte (UTC): 19 Sep 04:50Z
 ==============================================================================================================
-Pedidos: 11  |  Entregados: 3  |  Parciales: 1  |  Pendientes: 7
-Unidades entregadas≤T: 364 / 1,599  (22.8%)
+Pedidos: 24  |  Entregados: 24  |  Parciales: 0  |  Pendientes: 0
+Unidades entregadas≤T: 113 / 49  (230.6%)
 --------------------------------------------------------------------------------------------------------------
 
->> ENTREGADOS (100% hasta el corte)  [3]
+>> ENTREGADOS (100% hasta el corte)  [24]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
-34   LOWW  16 Sep 08:46Z        6        6   100.0% 17 Sep 00:54Z  [######################]
-39   SEQM  16 Sep 12:11Z      120      120   100.0% 17 Sep 01:52Z  [######################]
-42   OSDI  16 Sep 14:39Z      222      222   100.0% 17 Sep 01:51Z  [######################]
-
->> PARCIALES (con llegadas pero incompletos)  [1]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-43   UBBB  16 Sep 15:38Z       72       16    22.2% 17 Sep 00:04Z  [#####.................]
-
->> PENDIENTES (0 entregado hasta el corte)  [7]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-35   UBBB  16 Sep 09:21Z       56        0     0.0% -              [......................]
-37   UBBB  16 Sep 10:34Z      188        0     0.0% -              [......................]
-44   EBCI  16 Sep 16:16Z       92        0     0.0% -              [......................]
-45   SUAA  16 Sep 17:05Z      169        0     0.0% -              [......................]
-46   OMDB  16 Sep 17:39Z      229        0     0.0% -              [......................]
-47   OAKB  16 Sep 18:38Z      219        0     0.0% -              [......................]
-48   OYSN  16 Sep 19:25Z      226        0     0.0% -              [......................]
-==============================================================================================================
-ALNS
-=== SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 10  |  Completos: 10  |  Incompletos: 0
-Demanda total: 1,529  |  Asignado: 1,529  (100.0%)
-Capacidades vuelos: OK  |  SLA llegada≤46h (todos): OK  |  SLA 48h (todos): OK
-================================
-
-== PEDIDOS ==
-ID   DST   CREADO         DEMANDA    ASIGN  %ASIG 1a_LLEG       ÚLT_LLEG      ≤46h  SLA48  PROGRESO
-----------------------------------------------------------------------------------------------------
-46   OMDB  16 Sep 17:39Z      229      229 100.0% 17 Sep 06:23Z 17 Sep 06:23Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB OMDB 17 Sep 02:13Z 17 Sep 06:23Z    229
-
-49   OERK  16 Sep 20:23Z      198      198 100.0% 17 Sep 09:35Z 17 Sep 09:35Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI OERK 17 Sep 02:46Z 17 Sep 09:35Z    198
-
-50   OJAI  16 Sep 20:57Z      155      155 100.0% 17 Sep 08:06Z 17 Sep 08:06Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI OJAI 17 Sep 02:55Z 17 Sep 08:06Z    155
-
-51   EDDI  16 Sep 21:40Z       63       63 100.0% 17 Sep 04:31Z 17 Sep 04:31Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI EDDI 17 Sep 02:41Z 17 Sep 04:31Z     63
-
-52   LOWW  16 Sep 22:06Z      107      107 100.0% 17 Sep 08:18Z 17 Sep 08:18Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI LOWW 17 Sep 05:10Z 17 Sep 08:18Z    107
-
-53   LBSF  16 Sep 22:53Z       65       65 100.0% 17 Sep 11:34Z 17 Sep 11:34Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB LBSF 17 Sep 07:43Z 17 Sep 11:34Z     65
-
-54   OJAI  16 Sep 23:31Z      145      145 100.0% 17 Sep 08:06Z 17 Sep 08:06Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI OJAI 17 Sep 02:55Z 17 Sep 08:06Z    145
-
-55   SEQM  16 Sep 23:54Z      166      166 100.0% 17 Sep 05:50Z 17 Sep 05:50Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      SPIM SEQM 17 Sep 02:09Z 17 Sep 05:50Z    166
-
-56   OAKB  17 Sep 00:51Z      220      220 100.0% 17 Sep 11:53Z 17 Sep 11:53Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB OAKB 17 Sep 07:37Z 17 Sep 11:53Z    220
-
-57   LKPR  17 Sep 01:29Z      181      181 100.0% 17 Sep 05:16Z 17 Sep 05:16Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI LKPR 17 Sep 03:23Z 17 Sep 05:16Z    181
-
-== VUELOS UTILIZADOS ==
-ORI    DST    SALIDA        LLEGADA          CAPAC     ASIG    RESID
----------------------------------------------------------------------
-SPIM   SEQM   17 Sep 02:09Z 17 Sep 05:50Z      320      166      154
-UBBB   OMDB   17 Sep 02:13Z 17 Sep 06:23Z      360      229      131
-EBCI   EDDI   17 Sep 02:41Z 17 Sep 04:31Z      360       63      297
-EBCI   OERK   17 Sep 02:46Z 17 Sep 09:35Z      340      198      142
-EBCI   OJAI   17 Sep 02:55Z 17 Sep 08:06Z      340      300       40
-EBCI   LKPR   17 Sep 03:23Z 17 Sep 05:16Z      300      181      119
-EBCI   LOWW   17 Sep 05:10Z 17 Sep 08:18Z      320      107      213
-UBBB   OAKB   17 Sep 07:37Z 17 Sep 11:53Z      300      220       80
-UBBB   LBSF   17 Sep 07:43Z 17 Sep 11:34Z      360       65      295
-
-==============================================================================================================
-REPORTE AL CORTE • reporteSimulacion.txt
-Corte (UTC): 17 Sep 08:05Z
-==============================================================================================================
-Pedidos: 10  |  Entregados: 4  |  Parciales: 0  |  Pendientes: 6
-Unidades entregadas≤T: 639 / 1,529  (41.8%)
---------------------------------------------------------------------------------------------------------------
-
->> ENTREGADOS (100% hasta el corte)  [4]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-46   OMDB  16 Sep 17:39Z      229      229   100.0% 17 Sep 06:23Z  [######################]
-51   EDDI  16 Sep 21:40Z       63       63   100.0% 17 Sep 04:31Z  [######################]
-55   SEQM  16 Sep 23:54Z      166      166   100.0% 17 Sep 05:50Z  [######################]
-57   LKPR  17 Sep 01:29Z      181      181   100.0% 17 Sep 05:16Z  [######################]
+54   SCEL  18 Sep 17:04Z        1        2   200.0% 18 Sep 00:16Z  [######################]
+55   OOMS  18 Sep 17:19Z        1        5   500.0% 18 Sep 00:17Z  [######################]
+56   UMMS  18 Sep 17:41Z        5       10   200.0% 18 Sep 00:05Z  [######################]
+57   SGAS  18 Sep 17:54Z        1        1   100.0% 18 Sep 00:11Z  [######################]
+58   SVMI  18 Sep 18:10Z        1        1   100.0% 18 Sep 00:03Z  [######################]
+59   OOMS  18 Sep 18:21Z        1        5   500.0% 18 Sep 00:17Z  [######################]
+60   LOWW  18 Sep 18:36Z        1        1   100.0% 18 Sep 00:00Z  [######################]
+61   EDDI  18 Sep 18:57Z        7       28   400.0% 18 Sep 00:17Z  [######################]
+62   OPKC  18 Sep 19:06Z        1        2   200.0% 18 Sep 00:34Z  [######################]
+63   LKPR  18 Sep 19:13Z        1        1   100.0% 18 Sep 00:28Z  [######################]
+64   SLLP  18 Sep 19:25Z        4        4   100.0% 18 Sep 00:20Z  [######################]
+65   OYSN  18 Sep 19:41Z        1        2   200.0% 18 Sep 00:06Z  [######################]
+66   SVMI  18 Sep 19:57Z        1        1   100.0% 18 Sep 00:03Z  [######################]
+67   LATI  18 Sep 20:12Z        2        4   200.0% 18 Sep 00:20Z  [######################]
+68   SVMI  18 Sep 20:32Z        1        1   100.0% 18 Sep 00:03Z  [######################]
+69   UBBB  18 Sep 20:39Z        2        6   300.0% 18 Sep 00:17Z  [######################]
+70   SABE  18 Sep 20:57Z        5        5   100.0% 18 Sep 00:06Z  [######################]
+71   SGAS  18 Sep 21:12Z        1        1   100.0% 18 Sep 00:11Z  [######################]
+72   SBBR  18 Sep 21:33Z        1        2   200.0% 18 Sep 00:14Z  [######################]
+73   EHAM  18 Sep 21:50Z        6       18   300.0% 18 Sep 00:11Z  [######################]
+74   VIDP  18 Sep 22:00Z        1        1   100.0% 18 Sep 00:34Z  [######################]
+75   LDZA  18 Sep 22:13Z        2        8   400.0% 18 Sep 00:28Z  [######################]
+76   SEQM  18 Sep 22:28Z        1        2   200.0% 18 Sep 00:34Z  [######################]
+77   OSDI  18 Sep 22:49Z        1        2   200.0% 18 Sep 00:09Z  [######################]
 
 >> PARCIALES (con llegadas pero incompletos)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
 (sin registros)
 
->> PENDIENTES (0 entregado hasta el corte)  [6]
+>> PENDIENTES (0 entregado hasta el corte)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
-49   OERK  16 Sep 20:23Z      198        0     0.0% -              [......................]
-50   OJAI  16 Sep 20:57Z      155        0     0.0% -              [......................]
-52   LOWW  16 Sep 22:06Z      107        0     0.0% -              [......................]
-53   LBSF  16 Sep 22:53Z       65        0     0.0% -              [......................]
-54   OJAI  16 Sep 23:31Z      145        0     0.0% -              [......................]
-56   OAKB  17 Sep 00:51Z      220        0     0.0% -              [......................]
+(sin registros)
 ==============================================================================================================
 ALNS
 === SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 8  |  Completos: 8  |  Incompletos: 0
-Demanda total: 1,093  |  Asignado: 1,093  (100.0%)
+Pedidos: 24  |  Completos: 24  |  Incompletos: 0
+Demanda total: 45  |  Asignado: 66  (146.7%)
 Capacidades vuelos: OK  |  SLA llegada≤46h (todos): OK  |  SLA 48h (todos): OK
 ================================
 
 == PEDIDOS ==
 ID   DST   CREADO         DEMANDA    ASIGN  %ASIG 1a_LLEG       ÚLT_LLEG      ≤46h  SLA48  PROGRESO
 ----------------------------------------------------------------------------------------------------
-58   EHAM  17 Sep 02:12Z       93       93 100.0% 17 Sep 14:12Z 17 Sep 14:12Z OK    OK     [################]
+78   OMDB  18 Sep 22:57Z        1        1 100.0% 18 Sep 00:10Z 18 Sep 00:10Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI EHAM 17 Sep 12:56Z 17 Sep 14:12Z     93
+      SPIM OMDB 18 Sep 04:35Z 18 Sep 00:10Z      1
 
-59   SVMI  17 Sep 02:57Z      223      223 100.0% 17 Sep 15:50Z 17 Sep 15:50Z OK    OK     [################]
+79   OSDI  18 Sep 23:16Z        1        2 200.0% 18 Sep 00:04Z 18 Sep 00:09Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SVMI 17 Sep 10:24Z 17 Sep 15:50Z    223
+      UBBB OERK 18 Sep 20:47Z 18 Sep 00:04Z      1
+      OERK OSDI 18 Sep 21:24Z 18 Sep 00:09Z      1
 
-60   OOMS  17 Sep 04:00Z      135      135 100.0% 17 Sep 16:42Z 17 Sep 16:42Z OK    OK     [################]
+80   SVMI  18 Sep 23:36Z        1        1 100.0% 18 Sep 00:03Z 18 Sep 00:03Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI OOMS 17 Sep 08:45Z 17 Sep 16:42Z    135
+      EBCI SVMI 18 Sep 13:20Z 18 Sep 00:03Z      1
 
-61   LOWW  17 Sep 04:53Z       83       83 100.0% 17 Sep 13:30Z 17 Sep 13:30Z OK    OK     [################]
+81   UBBB  18 Sep 23:45Z        1        3 300.0% 18 Sep 00:03Z 18 Sep 00:17Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI LOWW 17 Sep 10:22Z 17 Sep 13:30Z     83
+      EBCI SVMI 18 Sep 13:20Z 18 Sep 00:03Z      1
+      SVMI UMMS 18 Sep 11:17Z 18 Sep 00:05Z      1
+      UMMS UBBB 18 Sep 20:31Z 18 Sep 00:17Z      1
 
-62   OMDB  17 Sep 05:18Z       65       65 100.0% 17 Sep 16:27Z 17 Sep 16:27Z OK    OK     [################]
+82   SLLP  19 Sep 00:06Z       14       14 100.0% 19 Sep 00:20Z 19 Sep 00:20Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OMDB 17 Sep 12:17Z 17 Sep 16:27Z     65
+      EBCI SLLP 19 Sep 10:35Z 19 Sep 00:20Z     14
 
-63   LOWW  17 Sep 05:51Z      177      177 100.0% 17 Sep 13:30Z 17 Sep 13:30Z OK    OK     [################]
+83   UBBB  19 Sep 00:20Z        1        3 300.0% 19 Sep 00:03Z 19 Sep 00:17Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI LOWW 17 Sep 10:22Z 17 Sep 13:30Z    177
+      EBCI SVMI 19 Sep 13:20Z 19 Sep 00:03Z      1
+      SVMI UMMS 19 Sep 11:17Z 19 Sep 00:05Z      1
+      UMMS UBBB 19 Sep 20:31Z 19 Sep 00:17Z      1
 
-64   OYSN  17 Sep 06:29Z      133      133 100.0% 17 Sep 17:47Z 17 Sep 17:47Z OK    OK     [################]
+84   SABE  19 Sep 00:38Z        1        1 100.0% 19 Sep 00:06Z 19 Sep 00:06Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OYSN 17 Sep 12:13Z 17 Sep 17:47Z    133
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z      1
 
-65   OSDI  17 Sep 07:29Z      184      184 100.0% 17 Sep 12:49Z 17 Sep 12:49Z OK    OK     [################]
+85   LKPR  19 Sep 00:53Z        1        1 100.0% 19 Sep 00:28Z 19 Sep 00:28Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OSDI 17 Sep 09:58Z 17 Sep 12:49Z    184
+      SPIM LKPR 19 Sep 09:31Z 19 Sep 00:28Z      1
+
+86   OPKC  19 Sep 01:14Z        1        2 200.0% 19 Sep 00:11Z 19 Sep 00:34Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      1
+      SGAS OPKC 19 Sep 04:28Z 19 Sep 00:34Z      1
+
+87   SLLP  19 Sep 01:24Z        1        1 100.0% 19 Sep 00:20Z 19 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 19 Sep 10:35Z 19 Sep 00:20Z      1
+
+88   EHAM  19 Sep 01:34Z        1        3 300.0% 19 Sep 00:04Z 19 Sep 00:11Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z      1
+      SABE OYSN 19 Sep 07:57Z 19 Sep 00:04Z      1
+      OYSN EHAM 19 Sep 16:22Z 19 Sep 00:11Z      1
+
+89   OERK  19 Sep 01:47Z        1        1 100.0% 19 Sep 00:04Z 19 Sep 00:04Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB OERK 19 Sep 20:47Z 19 Sep 00:04Z      1
+
+90   OERK  19 Sep 01:58Z        1        1 100.0% 19 Sep 00:04Z 19 Sep 00:04Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB OERK 19 Sep 20:47Z 19 Sep 00:04Z      1
+
+91   LATI  19 Sep 02:06Z        1        2 200.0% 19 Sep 00:20Z 19 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 19 Sep 10:35Z 19 Sep 00:20Z      1
+      SLLP LATI 19 Sep 09:36Z 19 Sep 00:20Z      1
+
+92   LKPR  19 Sep 02:18Z        1        1 100.0% 19 Sep 00:28Z 19 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      SPIM LKPR 19 Sep 09:31Z 19 Sep 00:28Z      1
+
+93   OMDB  19 Sep 02:37Z        1        1 100.0% 19 Sep 00:10Z 19 Sep 00:10Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      SPIM OMDB 19 Sep 04:35Z 19 Sep 00:10Z      1
+
+94   SLLP  19 Sep 02:49Z        9        9 100.0% 19 Sep 00:20Z 19 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 19 Sep 10:35Z 19 Sep 00:20Z      9
+
+95   SCEL  19 Sep 03:10Z        1        2 200.0% 19 Sep 00:10Z 19 Sep 00:16Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      SPIM OMDB 19 Sep 04:35Z 19 Sep 00:10Z      1
+      OMDB SCEL 19 Sep 04:50Z 19 Sep 00:16Z      1
+
+96   OJAI  19 Sep 03:26Z        1        3 300.0% 19 Sep 00:04Z 19 Sep 00:17Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z      1
+      SABE OYSN 19 Sep 07:57Z 19 Sep 00:04Z      1
+      OYSN OJAI 19 Sep 20:46Z 19 Sep 00:17Z      1
+
+97   SPIM  19 Sep 03:45Z        1        3 300.0% 19 Sep 00:01Z 19 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 19 Sep 10:35Z 19 Sep 00:20Z      1
+      SLLP LATI 19 Sep 09:36Z 19 Sep 00:20Z      1
+      LATI SPIM 19 Sep 08:42Z 19 Sep 00:01Z      1
+
+98   LDZA  19 Sep 03:54Z        1        4 400.0% 19 Sep 00:07Z 19 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      1
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z      1
+      SBBR SKBO 19 Sep 18:53Z 19 Sep 00:28Z      1
+      SKBO LDZA 19 Sep 10:56Z 19 Sep 00:07Z      1
+
+99   LATI  19 Sep 04:12Z        1        2 200.0% 19 Sep 00:20Z 19 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 19 Sep 10:35Z 19 Sep 00:20Z      1
+      SLLP LATI 19 Sep 09:36Z 19 Sep 00:20Z      1
+
+100  UMMS  19 Sep 04:27Z        1        2 200.0% 19 Sep 00:03Z 19 Sep 00:05Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SVMI 19 Sep 13:20Z 19 Sep 00:03Z      1
+      SVMI UMMS 19 Sep 11:17Z 19 Sep 00:05Z      1
+
+101  EHAM  19 Sep 04:43Z        1        3 300.0% 19 Sep 00:04Z 19 Sep 00:11Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z      1
+      SABE OYSN 19 Sep 07:57Z 19 Sep 00:04Z      1
+      OYSN EHAM 19 Sep 16:22Z 19 Sep 00:11Z      1
 
 == VUELOS UTILIZADOS ==
 ORI    DST    SALIDA        LLEGADA          CAPAC     ASIG    RESID
 ---------------------------------------------------------------------
-EBCI   OOMS   17 Sep 08:45Z 17 Sep 16:42Z      340      135      205
-UBBB   OSDI   17 Sep 09:58Z 17 Sep 12:49Z      360      184      176
-EBCI   LOWW   17 Sep 10:22Z 17 Sep 13:30Z      320      260       60
-SPIM   SVMI   17 Sep 10:24Z 17 Sep 15:50Z      320      223       97
-UBBB   OYSN   17 Sep 12:13Z 17 Sep 17:47Z      340      133      207
-UBBB   OMDB   17 Sep 12:17Z 17 Sep 16:27Z      300       65      235
-EBCI   EHAM   17 Sep 12:56Z 17 Sep 14:12Z      320       93      227
+EBCI   UMMS   19 Sep 04:51Z 19 Sep 08:58Z      320        1      319
+UBBB   OMDB   19 Sep 05:01Z 19 Sep 09:11Z      300        2      298
+EBCI   EHAM   19 Sep 05:13Z 19 Sep 07:29Z      340        2      338
+SPIM   SLLP   19 Sep 05:21Z 19 Sep 08:41Z      300       24      276
+EBCI   SPIM   19 Sep 05:36Z 19 Sep 20:40Z      340        1      339
+EBCI   OJAI   19 Sep 05:45Z 19 Sep 11:56Z      300        1      299
+UBBB   LDZA   19 Sep 06:01Z 19 Sep 11:33Z      300        1      299
+UBBB   LATI   19 Sep 06:44Z 19 Sep 11:01Z      300        2      298
+EBCI   LKPR   19 Sep 07:10Z 19 Sep 09:03Z      300        2      298
+UBBB   OPKC   19 Sep 07:27Z 19 Sep 12:27Z      320        1      319
+SPIM   SCEL   19 Sep 08:11Z 19 Sep 13:15Z      340        1      339
+EBCI   OERK   19 Sep 09:56Z 19 Sep 16:45Z      320        2      318
+UBBB   OSDI   19 Sep 09:58Z 19 Sep 12:49Z      360        1      359
+SPIM   SABE   19 Sep 10:20Z 19 Sep 15:14Z      300        1      299
+SPIM   SVMI   19 Sep 10:24Z 19 Sep 15:50Z      320        1      319
+EBCI   UBBB   19 Sep 12:32Z 19 Sep 18:12Z      340        2      338
 
 ==============================================================================================================
 REPORTE AL CORTE • reporteSimulacion.txt
-Corte (UTC): 17 Sep 14:05Z
+Corte (UTC): 19 Sep 10:50Z
 ==============================================================================================================
-Pedidos: 8  |  Entregados: 3  |  Parciales: 0  |  Pendientes: 5
-Unidades entregadas≤T: 444 / 1,093  (40.6%)
+Pedidos: 24  |  Entregados: 24  |  Parciales: 0  |  Pendientes: 0
+Unidades entregadas≤T: 66 / 45  (146.7%)
 --------------------------------------------------------------------------------------------------------------
 
->> ENTREGADOS (100% hasta el corte)  [3]
+>> ENTREGADOS (100% hasta el corte)  [24]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
-61   LOWW  17 Sep 04:53Z       83       83   100.0% 17 Sep 13:30Z  [######################]
-63   LOWW  17 Sep 05:51Z      177      177   100.0% 17 Sep 13:30Z  [######################]
-65   OSDI  17 Sep 07:29Z      184      184   100.0% 17 Sep 12:49Z  [######################]
+78   OMDB  18 Sep 22:57Z        1        1   100.0% 18 Sep 00:10Z  [######################]
+79   OSDI  18 Sep 23:16Z        1        2   200.0% 18 Sep 00:09Z  [######################]
+80   SVMI  18 Sep 23:36Z        1        1   100.0% 18 Sep 00:03Z  [######################]
+81   UBBB  18 Sep 23:45Z        1        3   300.0% 18 Sep 00:17Z  [######################]
+82   SLLP  19 Sep 00:06Z       14       14   100.0% 19 Sep 00:20Z  [######################]
+83   UBBB  19 Sep 00:20Z        1        3   300.0% 19 Sep 00:17Z  [######################]
+84   SABE  19 Sep 00:38Z        1        1   100.0% 19 Sep 00:06Z  [######################]
+85   LKPR  19 Sep 00:53Z        1        1   100.0% 19 Sep 00:28Z  [######################]
+86   OPKC  19 Sep 01:14Z        1        2   200.0% 19 Sep 00:34Z  [######################]
+87   SLLP  19 Sep 01:24Z        1        1   100.0% 19 Sep 00:20Z  [######################]
+88   EHAM  19 Sep 01:34Z        1        3   300.0% 19 Sep 00:11Z  [######################]
+89   OERK  19 Sep 01:47Z        1        1   100.0% 19 Sep 00:04Z  [######################]
+90   OERK  19 Sep 01:58Z        1        1   100.0% 19 Sep 00:04Z  [######################]
+91   LATI  19 Sep 02:06Z        1        2   200.0% 19 Sep 00:20Z  [######################]
+92   LKPR  19 Sep 02:18Z        1        1   100.0% 19 Sep 00:28Z  [######################]
+93   OMDB  19 Sep 02:37Z        1        1   100.0% 19 Sep 00:10Z  [######################]
+94   SLLP  19 Sep 02:49Z        9        9   100.0% 19 Sep 00:20Z  [######################]
+95   SCEL  19 Sep 03:10Z        1        2   200.0% 19 Sep 00:16Z  [######################]
+96   OJAI  19 Sep 03:26Z        1        3   300.0% 19 Sep 00:17Z  [######################]
+97   SPIM  19 Sep 03:45Z        1        3   300.0% 19 Sep 00:20Z  [######################]
+98   LDZA  19 Sep 03:54Z        1        4   400.0% 19 Sep 00:28Z  [######################]
+99   LATI  19 Sep 04:12Z        1        2   200.0% 19 Sep 00:20Z  [######################]
+100  UMMS  19 Sep 04:27Z        1        2   200.0% 19 Sep 00:05Z  [######################]
+101  EHAM  19 Sep 04:43Z        1        3   300.0% 19 Sep 00:11Z  [######################]
 
 >> PARCIALES (con llegadas pero incompletos)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
 (sin registros)
 
->> PENDIENTES (0 entregado hasta el corte)  [5]
+>> PENDIENTES (0 entregado hasta el corte)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
-58   EHAM  17 Sep 02:12Z       93        0     0.0% -              [......................]
-59   SVMI  17 Sep 02:57Z      223        0     0.0% -              [......................]
-60   OOMS  17 Sep 04:00Z      135        0     0.0% -              [......................]
-62   OMDB  17 Sep 05:18Z       65        0     0.0% -              [......................]
-64   OYSN  17 Sep 06:29Z      133        0     0.0% -              [......................]
+(sin registros)
 ==============================================================================================================
 ALNS
 === SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 7  |  Completos: 7  |  Incompletos: 0
-Demanda total: 927  |  Asignado: 927  (100.0%)
+Pedidos: 23  |  Completos: 23  |  Incompletos: 0
+Demanda total: 51  |  Asignado: 134  (262.7%)
 Capacidades vuelos: OK  |  SLA llegada≤46h (todos): OK  |  SLA 48h (todos): OK
 ================================
 
 == PEDIDOS ==
 ID   DST   CREADO         DEMANDA    ASIGN  %ASIG 1a_LLEG       ÚLT_LLEG      ≤46h  SLA48  PROGRESO
 ----------------------------------------------------------------------------------------------------
-66   SVMI  17 Sep 08:31Z      148      148 100.0% 17 Sep 22:41Z 17 Sep 22:41Z OK    OK     [################]
+102  EBCI  19 Sep 05:02Z        1        4 400.0% 19 Sep 00:09Z 19 Sep 00:16Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SVMI 17 Sep 17:15Z 17 Sep 22:41Z    148
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      1
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z      1
+      SBBR LBSF 19 Sep 10:16Z 19 Sep 00:16Z      1
+      LBSF EBCI 19 Sep 20:00Z 19 Sep 00:09Z      1
 
-67   SLLP  17 Sep 09:27Z      119      119 100.0% 17 Sep 17:42Z 17 Sep 17:42Z OK    OK     [################]
+103  SEQM  19 Sep 05:24Z        1        2 200.0% 19 Sep 00:04Z 19 Sep 00:34Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SLLP 17 Sep 14:22Z 17 Sep 17:42Z    119
+      UBBB VIDP 19 Sep 19:03Z 19 Sep 00:34Z      1
+      VIDP SEQM 19 Sep 02:03Z 19 Sep 00:04Z      1
 
-68   OAKB  17 Sep 10:09Z      210      210 100.0% 17 Sep 20:37Z 17 Sep 20:37Z OK    OK     [################]
+104  SABE  19 Sep 05:33Z        3        3 100.0% 19 Sep 00:06Z 19 Sep 00:06Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OAKB 17 Sep 16:21Z 17 Sep 20:37Z    210
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z      3
 
-69   EBCI  17 Sep 11:03Z      146      146 100.0% 17 Sep 20:06Z 17 Sep 20:06Z OK    OK     [################]
+105  LOWW  19 Sep 05:54Z        1        1 100.0% 19 Sep 00:00Z 19 Sep 00:00Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB EBCI 17 Sep 14:26Z 17 Sep 20:06Z    146
+      UBBB LOWW 19 Sep 19:26Z 19 Sep 00:00Z      1
 
-70   OPKC  17 Sep 12:07Z       61       61 100.0% 18 Sep 01:58Z 18 Sep 01:58Z OK    OK     [################]
+106  LKPR  19 Sep 06:08Z        1        1 100.0% 19 Sep 00:28Z 19 Sep 00:28Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI OPKC 17 Sep 16:19Z 18 Sep 01:58Z     61
+      SPIM LKPR 19 Sep 09:31Z 19 Sep 00:28Z      1
 
-71   LOWW  17 Sep 12:57Z      107      107 100.0% 18 Sep 00:00Z 18 Sep 00:00Z OK    OK     [################]
+107  SCEL  19 Sep 06:23Z       13       39 300.0% 19 Sep 00:04Z 19 Sep 00:09Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB LOWW 17 Sep 19:26Z 18 Sep 00:00Z    107
+      UBBB OERK 19 Sep 20:47Z 19 Sep 00:04Z     13
+      OERK OSDI 19 Sep 21:24Z 19 Sep 00:09Z     13
+      OSDI SCEL 19 Sep 06:23Z 19 Sep 00:05Z     13
 
-72   OSDI  17 Sep 13:49Z      136      136 100.0% 17 Sep 17:34Z 17 Sep 17:34Z OK    OK     [################]
+108  OPKC  19 Sep 06:38Z        1        2 200.0% 19 Sep 00:11Z 19 Sep 00:34Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OSDI 17 Sep 14:43Z 17 Sep 17:34Z    136
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      1
+      SGAS OPKC 19 Sep 04:28Z 19 Sep 00:34Z      1
+
+109  LDZA  19 Sep 06:57Z        5       20 400.0% 19 Sep 00:07Z 19 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      5
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z      5
+      SBBR SKBO 19 Sep 18:53Z 19 Sep 00:28Z      5
+      SKBO LDZA 19 Sep 10:56Z 19 Sep 00:07Z      5
+
+110  SCEL  19 Sep 07:11Z        1        3 300.0% 19 Sep 00:04Z 19 Sep 00:09Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB OERK 19 Sep 20:47Z 19 Sep 00:04Z      1
+      OERK OSDI 19 Sep 21:24Z 19 Sep 00:09Z      1
+      OSDI SCEL 19 Sep 06:23Z 19 Sep 00:05Z      1
+
+111  SUAA  19 Sep 07:23Z        1        3 300.0% 19 Sep 00:04Z 19 Sep 00:25Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB OERK 19 Sep 20:47Z 19 Sep 00:04Z      1
+      OERK OSDI 19 Sep 21:24Z 19 Sep 00:09Z      1
+      OSDI SUAA 19 Sep 07:09Z 19 Sep 00:25Z      1
+
+112  LKPR  19 Sep 07:41Z        1        1 100.0% 19 Sep 00:28Z 19 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      SPIM LKPR 19 Sep 09:31Z 19 Sep 00:28Z      1
+
+113  EBCI  19 Sep 07:54Z        1        4 400.0% 19 Sep 00:09Z 19 Sep 00:16Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      1
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z      1
+      SBBR LBSF 19 Sep 10:16Z 19 Sep 00:16Z      1
+      LBSF EBCI 19 Sep 20:00Z 19 Sep 00:09Z      1
+
+114  SABE  19 Sep 08:09Z        1        1 100.0% 19 Sep 00:06Z 19 Sep 00:06Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z      1
+
+115  SKBO  19 Sep 08:28Z        1        3 300.0% 19 Sep 00:11Z 19 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      1
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z      1
+      SBBR SKBO 19 Sep 18:53Z 19 Sep 00:28Z      1
+
+116  EDDI  19 Sep 08:38Z        1        4 400.0% 19 Sep 00:02Z 19 Sep 00:17Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z      1
+      SABE OYSN 19 Sep 07:57Z 19 Sep 00:04Z      1
+      OYSN OJAI 19 Sep 20:46Z 19 Sep 00:17Z      1
+      OJAI EDDI 19 Sep 19:20Z 19 Sep 00:02Z      1
+
+117  OYSN  19 Sep 08:46Z        1        2 200.0% 19 Sep 00:04Z 19 Sep 00:06Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z      1
+      SABE OYSN 19 Sep 07:57Z 19 Sep 00:04Z      1
+
+118  SBBR  19 Sep 09:05Z        2        4 200.0% 19 Sep 00:11Z 19 Sep 00:14Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      2
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z      2
+
+119  UBBB  19 Sep 09:26Z        1        3 300.0% 19 Sep 00:03Z 19 Sep 00:17Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SVMI 19 Sep 13:20Z 19 Sep 00:03Z      1
+      SVMI UMMS 19 Sep 11:17Z 19 Sep 00:05Z      1
+      UMMS UBBB 19 Sep 20:31Z 19 Sep 00:17Z      1
+
+120  LDZA  19 Sep 09:47Z        2        8 400.0% 19 Sep 00:07Z 19 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      2
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z      2
+      SBBR SKBO 19 Sep 18:53Z 19 Sep 00:28Z      2
+      SKBO LDZA 19 Sep 10:56Z 19 Sep 00:07Z      2
+
+121  EHAM  19 Sep 10:01Z        5       15 300.0% 19 Sep 00:04Z 19 Sep 00:11Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z      5
+      SABE OYSN 19 Sep 07:57Z 19 Sep 00:04Z      5
+      OYSN EHAM 19 Sep 16:22Z 19 Sep 00:11Z      5
+
+122  EBCI  19 Sep 10:22Z        1        4 400.0% 19 Sep 00:09Z 19 Sep 00:16Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      1
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z      1
+      SBBR LBSF 19 Sep 10:16Z 19 Sep 00:16Z      1
+      LBSF EBCI 19 Sep 20:00Z 19 Sep 00:09Z      1
+
+123  OSDI  19 Sep 10:34Z        1        2 200.0% 19 Sep 00:04Z 19 Sep 00:09Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB OERK 19 Sep 20:47Z 19 Sep 00:04Z      1
+      OERK OSDI 19 Sep 21:24Z 19 Sep 00:09Z      1
+
+124  SGAS  19 Sep 10:42Z        5        5 100.0% 19 Sep 00:11Z 19 Sep 00:11Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      5
 
 == VUELOS UTILIZADOS ==
 ORI    DST    SALIDA        LLEGADA          CAPAC     ASIG    RESID
 ---------------------------------------------------------------------
-SPIM   SLLP   17 Sep 14:22Z 17 Sep 17:42Z      320      119      201
-UBBB   EBCI   17 Sep 14:26Z 17 Sep 20:06Z      360      146      214
-UBBB   OSDI   17 Sep 14:43Z 17 Sep 17:34Z      360      136      224
-EBCI   OPKC   17 Sep 16:19Z 18 Sep 01:58Z      300       61      239
-UBBB   OAKB   17 Sep 16:21Z 17 Sep 20:37Z      320      210      110
-SPIM   SVMI   17 Sep 17:15Z 17 Sep 22:41Z      320      148      172
-UBBB   LOWW   17 Sep 19:26Z 18 Sep 00:00Z      300      107      193
+EBCI   LKPR   19 Sep 11:26Z 19 Sep 13:19Z      300        2      298
+EBCI   SBBR   19 Sep 11:29Z 20 Sep 00:31Z      300        2      298
+SPIM   SABE   19 Sep 11:35Z 19 Sep 16:29Z      360        4      356
+SPIM   SUAA   19 Sep 12:09Z 19 Sep 18:13Z      300        1      299
+UBBB   OYSN   19 Sep 12:13Z 19 Sep 17:47Z      340        1      339
+UBBB   LOWW   19 Sep 12:24Z 19 Sep 17:58Z      340        1      339
+EBCI   UBBB   19 Sep 12:32Z 19 Sep 18:12Z      340        1      339
+UBBB   EDDI   19 Sep 12:37Z 19 Sep 17:31Z      320        1      319
+EBCI   EHAM   19 Sep 12:56Z 19 Sep 14:12Z      320        5      315
+SPIM   SKBO   19 Sep 13:02Z 19 Sep 17:18Z      300        1      299
+SPIM   SEQM   19 Sep 13:10Z 19 Sep 16:51Z      300        1      299
+UBBB   OPKC   19 Sep 13:30Z 19 Sep 18:30Z      320        1      319
+EBCI   LDZA   19 Sep 13:40Z 19 Sep 16:59Z      360        7      353
+SPIM   SCEL   19 Sep 13:59Z 19 Sep 18:03Z      340       14      326
+UBBB   EBCI   19 Sep 14:26Z 19 Sep 20:06Z      360        3      357
+UBBB   OSDI   19 Sep 14:43Z 19 Sep 17:34Z      360        1      359
+EBCI   SGAS   19 Sep 15:51Z 20 Sep 05:46Z      300        5      295
 
 ==============================================================================================================
 REPORTE AL CORTE • reporteSimulacion.txt
-Corte (UTC): 17 Sep 20:05Z
+Corte (UTC): 19 Sep 16:50Z
 ==============================================================================================================
-Pedidos: 7  |  Entregados: 2  |  Parciales: 0  |  Pendientes: 5
-Unidades entregadas≤T: 255 / 927  (27.5%)
+Pedidos: 23  |  Entregados: 23  |  Parciales: 0  |  Pendientes: 0
+Unidades entregadas≤T: 134 / 51  (262.7%)
 --------------------------------------------------------------------------------------------------------------
 
->> ENTREGADOS (100% hasta el corte)  [2]
+>> ENTREGADOS (100% hasta el corte)  [23]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
-67   SLLP  17 Sep 09:27Z      119      119   100.0% 17 Sep 17:42Z  [######################]
-72   OSDI  17 Sep 13:49Z      136      136   100.0% 17 Sep 17:34Z  [######################]
+102  EBCI  19 Sep 05:02Z        1        4   400.0% 19 Sep 00:16Z  [######################]
+103  SEQM  19 Sep 05:24Z        1        2   200.0% 19 Sep 00:34Z  [######################]
+104  SABE  19 Sep 05:33Z        3        3   100.0% 19 Sep 00:06Z  [######################]
+105  LOWW  19 Sep 05:54Z        1        1   100.0% 19 Sep 00:00Z  [######################]
+106  LKPR  19 Sep 06:08Z        1        1   100.0% 19 Sep 00:28Z  [######################]
+107  SCEL  19 Sep 06:23Z       13       39   300.0% 19 Sep 00:09Z  [######################]
+108  OPKC  19 Sep 06:38Z        1        2   200.0% 19 Sep 00:34Z  [######################]
+109  LDZA  19 Sep 06:57Z        5       20   400.0% 19 Sep 00:28Z  [######################]
+110  SCEL  19 Sep 07:11Z        1        3   300.0% 19 Sep 00:09Z  [######################]
+111  SUAA  19 Sep 07:23Z        1        3   300.0% 19 Sep 00:25Z  [######################]
+112  LKPR  19 Sep 07:41Z        1        1   100.0% 19 Sep 00:28Z  [######################]
+113  EBCI  19 Sep 07:54Z        1        4   400.0% 19 Sep 00:16Z  [######################]
+114  SABE  19 Sep 08:09Z        1        1   100.0% 19 Sep 00:06Z  [######################]
+115  SKBO  19 Sep 08:28Z        1        3   300.0% 19 Sep 00:28Z  [######################]
+116  EDDI  19 Sep 08:38Z        1        4   400.0% 19 Sep 00:17Z  [######################]
+117  OYSN  19 Sep 08:46Z        1        2   200.0% 19 Sep 00:06Z  [######################]
+118  SBBR  19 Sep 09:05Z        2        4   200.0% 19 Sep 00:14Z  [######################]
+119  UBBB  19 Sep 09:26Z        1        3   300.0% 19 Sep 00:17Z  [######################]
+120  LDZA  19 Sep 09:47Z        2        8   400.0% 19 Sep 00:28Z  [######################]
+121  EHAM  19 Sep 10:01Z        5       15   300.0% 19 Sep 00:11Z  [######################]
+122  EBCI  19 Sep 10:22Z        1        4   400.0% 19 Sep 00:16Z  [######################]
+123  OSDI  19 Sep 10:34Z        1        2   200.0% 19 Sep 00:09Z  [######################]
+124  SGAS  19 Sep 10:42Z        5        5   100.0% 19 Sep 00:11Z  [######################]
 
 >> PARCIALES (con llegadas pero incompletos)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
 (sin registros)
 
->> PENDIENTES (0 entregado hasta el corte)  [5]
+>> PENDIENTES (0 entregado hasta el corte)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
-66   SVMI  17 Sep 08:31Z      148        0     0.0% -              [......................]
-68   OAKB  17 Sep 10:09Z      210        0     0.0% -              [......................]
-69   EBCI  17 Sep 11:03Z      146        0     0.0% -              [......................]
-70   OPKC  17 Sep 12:07Z       61        0     0.0% -              [......................]
-71   LOWW  17 Sep 12:57Z      107        0     0.0% -              [......................]
+(sin registros)
 ==============================================================================================================
 ALNS
 === SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 9  |  Completos: 9  |  Incompletos: 0
-Demanda total: 1,314  |  Asignado: 1,314  (100.0%)
+Pedidos: 25  |  Completos: 25  |  Incompletos: 0
+Demanda total: 148  |  Asignado: 246  (166.2%)
 Capacidades vuelos: OK  |  SLA llegada≤46h (todos): OK  |  SLA 48h (todos): OK
 ================================
 
 == PEDIDOS ==
 ID   DST   CREADO         DEMANDA    ASIGN  %ASIG 1a_LLEG       ÚLT_LLEG      ≤46h  SLA48  PROGRESO
 ----------------------------------------------------------------------------------------------------
-73   SKBO  17 Sep 14:30Z      124      124 100.0% 18 Sep 03:25Z 18 Sep 03:25Z OK    OK     [################]
+125  SVMI  19 Sep 11:02Z        1        1 100.0% 19 Sep 00:03Z 19 Sep 00:03Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SKBO 17 Sep 23:09Z 18 Sep 03:25Z    124
+      EBCI SVMI 19 Sep 13:20Z 19 Sep 00:03Z      1
 
-74   SGAS  17 Sep 15:17Z      191      191 100.0% 18 Sep 07:44Z 18 Sep 07:44Z OK    OK     [################]
+126  OPKC  19 Sep 11:13Z        1        2 200.0% 19 Sep 00:11Z 19 Sep 00:34Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SGAS 18 Sep 02:32Z 18 Sep 07:44Z    191
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      1
+      SGAS OPKC 19 Sep 04:28Z 19 Sep 00:34Z      1
 
-75   EKCH  17 Sep 15:57Z      158      158 100.0% 18 Sep 03:58Z 18 Sep 03:58Z OK    OK     [################]
+127  LATI  19 Sep 11:30Z        5       10 200.0% 19 Sep 00:20Z 19 Sep 00:20Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI EKCH 18 Sep 01:00Z 18 Sep 03:58Z    158
+      EBCI SLLP 19 Sep 10:35Z 19 Sep 00:20Z      5
+      SLLP LATI 19 Sep 09:36Z 19 Sep 00:20Z      5
 
-76   LDZA  17 Sep 16:54Z      123      123 100.0% 18 Sep 06:02Z 18 Sep 06:02Z OK    OK     [################]
+128  EKCH  19 Sep 11:45Z        1        2 200.0% 19 Sep 00:06Z 19 Sep 00:33Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI LDZA 18 Sep 03:43Z 18 Sep 06:02Z    123
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z      1
+      SABE EKCH 19 Sep 08:34Z 19 Sep 00:33Z      1
 
-77   EHAM  17 Sep 17:20Z      116      116 100.0% 18 Sep 02:11Z 18 Sep 02:11Z OK    OK     [################]
+129  OERK  19 Sep 12:02Z       14       14 100.0% 19 Sep 00:04Z 19 Sep 00:04Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB EHAM 17 Sep 20:30Z 18 Sep 02:11Z    116
+      UBBB OERK 19 Sep 20:47Z 19 Sep 00:04Z     14
 
-78   SKBO  17 Sep 17:42Z       54       54 100.0% 18 Sep 03:25Z 18 Sep 03:25Z OK    OK     [################]
+130  SKBO  19 Sep 12:11Z       10       30 300.0% 19 Sep 00:11Z 19 Sep 00:28Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SKBO 17 Sep 23:09Z 18 Sep 03:25Z     54
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z     10
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z     10
+      SBBR SKBO 19 Sep 18:53Z 19 Sep 00:28Z     10
 
-79   SLLP  17 Sep 18:06Z      207      207 100.0% 18 Sep 00:29Z 18 Sep 00:29Z OK    OK     [################]
+131  UMMS  19 Sep 12:28Z       11       22 200.0% 19 Sep 00:03Z 19 Sep 00:05Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SLLP 17 Sep 21:09Z 18 Sep 00:29Z    207
+      EBCI SVMI 19 Sep 13:20Z 19 Sep 00:03Z     11
+      SVMI UMMS 19 Sep 11:17Z 19 Sep 00:05Z     11
 
-80   OERK  17 Sep 18:49Z      170      170 100.0% 18 Sep 00:04Z 18 Sep 00:04Z OK    OK     [################]
+132  UMMS  19 Sep 12:45Z       14       28 200.0% 19 Sep 00:03Z 19 Sep 00:05Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OERK 17 Sep 20:47Z 18 Sep 00:04Z    170
+      EBCI SVMI 19 Sep 13:20Z 19 Sep 00:03Z     14
+      SVMI UMMS 19 Sep 11:17Z 19 Sep 00:05Z     14
 
-81   LKPR  17 Sep 19:24Z      171      171 100.0% 18 Sep 05:16Z 18 Sep 05:16Z OK    OK     [################]
+133  VIDP  19 Sep 13:02Z        3        3 100.0% 19 Sep 00:34Z 19 Sep 00:34Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI LKPR 18 Sep 03:23Z 18 Sep 05:16Z    171
+      UBBB VIDP 19 Sep 19:03Z 19 Sep 00:34Z      3
+
+134  SGAS  19 Sep 13:11Z        1        1 100.0% 19 Sep 00:11Z 19 Sep 00:11Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      1
+
+135  UBBB  19 Sep 13:20Z        1        3 300.0% 19 Sep 00:03Z 19 Sep 00:17Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SVMI 19 Sep 13:20Z 19 Sep 00:03Z      1
+      SVMI UMMS 19 Sep 11:17Z 19 Sep 00:05Z      1
+      UMMS UBBB 19 Sep 20:31Z 19 Sep 00:17Z      1
+
+136  OMDB  19 Sep 13:37Z        1        1 100.0% 19 Sep 00:10Z 19 Sep 00:10Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      SPIM OMDB 19 Sep 04:35Z 19 Sep 00:10Z      1
+
+137  LKPR  19 Sep 13:59Z        1        1 100.0% 19 Sep 00:28Z 19 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      SPIM LKPR 19 Sep 09:31Z 19 Sep 00:28Z      1
+
+138  SEQM  19 Sep 14:19Z        1        2 200.0% 19 Sep 00:04Z 19 Sep 00:34Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB VIDP 19 Sep 19:03Z 19 Sep 00:34Z      1
+      VIDP SEQM 19 Sep 02:03Z 19 Sep 00:04Z      1
+
+139  SLLP  19 Sep 14:27Z        1        1 100.0% 19 Sep 00:20Z 19 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 19 Sep 10:35Z 19 Sep 00:20Z      1
+
+140  OPKC  19 Sep 14:40Z        5       10 200.0% 19 Sep 00:11Z 19 Sep 00:34Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      5
+      SGAS OPKC 19 Sep 04:28Z 19 Sep 00:34Z      5
+
+141  SABE  19 Sep 14:53Z       20       20 100.0% 19 Sep 00:06Z 19 Sep 00:06Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z     20
+
+142  OAKB  19 Sep 15:10Z        1        1 100.0% 19 Sep 00:32Z 19 Sep 00:32Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI OAKB 19 Sep 16:40Z 19 Sep 00:32Z      1
+
+143  LDZA  19 Sep 15:28Z        1        4 400.0% 19 Sep 00:07Z 19 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      1
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z      1
+      SBBR SKBO 19 Sep 18:53Z 19 Sep 00:28Z      1
+      SKBO LDZA 19 Sep 10:56Z 19 Sep 00:07Z      1
+
+144  EHAM  19 Sep 15:50Z        2        6 300.0% 19 Sep 00:04Z 19 Sep 00:11Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z      2
+      SABE OYSN 19 Sep 07:57Z 19 Sep 00:04Z      2
+      OYSN EHAM 19 Sep 16:22Z 19 Sep 00:11Z      2
+
+145  SPIM  19 Sep 16:03Z        1        3 300.0% 19 Sep 00:01Z 19 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 19 Sep 10:35Z 19 Sep 00:20Z      1
+      SLLP LATI 19 Sep 09:36Z 19 Sep 00:20Z      1
+      LATI SPIM 19 Sep 08:42Z 19 Sep 00:01Z      1
+
+146  VIDP  19 Sep 16:14Z       25       25 100.0% 19 Sep 00:34Z 19 Sep 00:34Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB VIDP 19 Sep 19:03Z 19 Sep 00:34Z     25
+
+147  LATI  19 Sep 16:22Z       25       50 200.0% 19 Sep 00:20Z 19 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 19 Sep 10:35Z 19 Sep 00:20Z     25
+      SLLP LATI 19 Sep 09:36Z 19 Sep 00:20Z     25
+
+148  LDZA  19 Sep 16:39Z        1        4 400.0% 19 Sep 00:07Z 19 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      1
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z      1
+      SBBR SKBO 19 Sep 18:53Z 19 Sep 00:28Z      1
+      SKBO LDZA 19 Sep 10:56Z 19 Sep 00:07Z      1
+
+149  SBBR  19 Sep 16:50Z        1        2 200.0% 19 Sep 00:11Z 19 Sep 00:14Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      1
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z      1
 
 == VUELOS UTILIZADOS ==
 ORI    DST    SALIDA        LLEGADA          CAPAC     ASIG    RESID
 ---------------------------------------------------------------------
-UBBB   EHAM   17 Sep 20:30Z 18 Sep 02:11Z      360      116      244
-UBBB   OERK   17 Sep 20:47Z 18 Sep 00:04Z      360      170      190
-SPIM   SLLP   17 Sep 21:09Z 18 Sep 00:29Z      300      207       93
-SPIM   SKBO   17 Sep 23:09Z 18 Sep 03:25Z      340      178      162
-EBCI   EKCH   18 Sep 01:00Z 18 Sep 03:58Z      300      158      142
-SPIM   SGAS   18 Sep 02:32Z 18 Sep 07:44Z      360      191      169
-EBCI   LKPR   18 Sep 03:23Z 18 Sep 05:16Z      300      171      129
-EBCI   LDZA   18 Sep 03:43Z 18 Sep 06:02Z      340      123      217
+EBCI   SGAS   19 Sep 17:08Z 20 Sep 07:03Z      300        1      299
+SPIM   SVMI   19 Sep 17:15Z 19 Sep 22:41Z      320        1      319
+UBBB   OMDB   19 Sep 17:15Z 19 Sep 21:25Z      320        1      319
+EBCI   EHAM   19 Sep 17:32Z 19 Sep 19:48Z      340        2      338
+UBBB   LKPR   19 Sep 17:57Z 19 Sep 22:43Z      320        1      319
+EBCI   EKCH   19 Sep 18:55Z 19 Sep 20:53Z      340        1      339
+UBBB   VIDP   19 Sep 19:03Z 20 Sep 00:34Z      320       28      292
+EBCI   LDZA   19 Sep 19:17Z 19 Sep 22:36Z      360        2      358
+SPIM   SABE   19 Sep 20:03Z 20 Sep 01:57Z      340       20      320
+EBCI   SPIM   19 Sep 20:18Z 20 Sep 11:22Z      360        1      359
+UBBB   OERK   19 Sep 20:47Z 20 Sep 00:04Z      360       14      346
+SPIM   SLLP   19 Sep 21:09Z 20 Sep 00:29Z      300        1      299
+EBCI   UMMS   19 Sep 21:13Z 20 Sep 01:20Z      340       25      315
+EBCI   UBBB   19 Sep 21:27Z 20 Sep 03:07Z      300        1      299
+UBBB   OPKC   19 Sep 21:53Z 20 Sep 02:53Z      340        6      334
+SPIM   SEQM   19 Sep 22:11Z 20 Sep 01:52Z      300        1      299
+UBBB   OAKB   19 Sep 22:24Z 20 Sep 02:40Z      320        1      319
+SPIM   SKBO   19 Sep 23:09Z 20 Sep 03:25Z      340       10      330
+SPIM   SBBR   19 Sep 23:19Z 20 Sep 05:24Z      340        1      339
+EBCI   LATI   20 Sep 00:04Z 20 Sep 03:59Z      300       30      270
 
 ==============================================================================================================
 REPORTE AL CORTE • reporteSimulacion.txt
-Corte (UTC): 18 Sep 02:05Z
+Corte (UTC): 19 Sep 22:50Z
 ==============================================================================================================
-Pedidos: 9  |  Entregados: 2  |  Parciales: 0  |  Pendientes: 7
-Unidades entregadas≤T: 377 / 1,314  (28.7%)
+Pedidos: 25  |  Entregados: 25  |  Parciales: 0  |  Pendientes: 0
+Unidades entregadas≤T: 246 / 148  (166.2%)
 --------------------------------------------------------------------------------------------------------------
 
->> ENTREGADOS (100% hasta el corte)  [2]
+>> ENTREGADOS (100% hasta el corte)  [25]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
-79   SLLP  17 Sep 18:06Z      207      207   100.0% 18 Sep 00:29Z  [######################]
-80   OERK  17 Sep 18:49Z      170      170   100.0% 18 Sep 00:04Z  [######################]
+125  SVMI  19 Sep 11:02Z        1        1   100.0% 19 Sep 00:03Z  [######################]
+126  OPKC  19 Sep 11:13Z        1        2   200.0% 19 Sep 00:34Z  [######################]
+127  LATI  19 Sep 11:30Z        5       10   200.0% 19 Sep 00:20Z  [######################]
+128  EKCH  19 Sep 11:45Z        1        2   200.0% 19 Sep 00:33Z  [######################]
+129  OERK  19 Sep 12:02Z       14       14   100.0% 19 Sep 00:04Z  [######################]
+130  SKBO  19 Sep 12:11Z       10       30   300.0% 19 Sep 00:28Z  [######################]
+131  UMMS  19 Sep 12:28Z       11       22   200.0% 19 Sep 00:05Z  [######################]
+132  UMMS  19 Sep 12:45Z       14       28   200.0% 19 Sep 00:05Z  [######################]
+133  VIDP  19 Sep 13:02Z        3        3   100.0% 19 Sep 00:34Z  [######################]
+134  SGAS  19 Sep 13:11Z        1        1   100.0% 19 Sep 00:11Z  [######################]
+135  UBBB  19 Sep 13:20Z        1        3   300.0% 19 Sep 00:17Z  [######################]
+136  OMDB  19 Sep 13:37Z        1        1   100.0% 19 Sep 00:10Z  [######################]
+137  LKPR  19 Sep 13:59Z        1        1   100.0% 19 Sep 00:28Z  [######################]
+138  SEQM  19 Sep 14:19Z        1        2   200.0% 19 Sep 00:34Z  [######################]
+139  SLLP  19 Sep 14:27Z        1        1   100.0% 19 Sep 00:20Z  [######################]
+140  OPKC  19 Sep 14:40Z        5       10   200.0% 19 Sep 00:34Z  [######################]
+141  SABE  19 Sep 14:53Z       20       20   100.0% 19 Sep 00:06Z  [######################]
+142  OAKB  19 Sep 15:10Z        1        1   100.0% 19 Sep 00:32Z  [######################]
+143  LDZA  19 Sep 15:28Z        1        4   400.0% 19 Sep 00:28Z  [######################]
+144  EHAM  19 Sep 15:50Z        2        6   300.0% 19 Sep 00:11Z  [######################]
+145  SPIM  19 Sep 16:03Z        1        3   300.0% 19 Sep 00:20Z  [######################]
+146  VIDP  19 Sep 16:14Z       25       25   100.0% 19 Sep 00:34Z  [######################]
+147  LATI  19 Sep 16:22Z       25       50   200.0% 19 Sep 00:20Z  [######################]
+148  LDZA  19 Sep 16:39Z        1        4   400.0% 19 Sep 00:28Z  [######################]
+149  SBBR  19 Sep 16:50Z        1        2   200.0% 19 Sep 00:14Z  [######################]
 
 >> PARCIALES (con llegadas pero incompletos)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
 (sin registros)
 
->> PENDIENTES (0 entregado hasta el corte)  [7]
+>> PENDIENTES (0 entregado hasta el corte)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
-73   SKBO  17 Sep 14:30Z      124        0     0.0% -              [......................]
-74   SGAS  17 Sep 15:17Z      191        0     0.0% -              [......................]
-75   EKCH  17 Sep 15:57Z      158        0     0.0% -              [......................]
-76   LDZA  17 Sep 16:54Z      123        0     0.0% -              [......................]
-77   EHAM  17 Sep 17:20Z      116        0     0.0% -              [......................]
-78   SKBO  17 Sep 17:42Z       54        0     0.0% -              [......................]
-81   LKPR  17 Sep 19:24Z      171        0     0.0% -              [......................]
+(sin registros)
 ==============================================================================================================
 ALNS
 === SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 11  |  Completos: 10  |  Incompletos: 1
-Demanda total: 1,663  |  Asignado: 1,651  (99.3%)
+Pedidos: 26  |  Completos: 26  |  Incompletos: 0
+Demanda total: 120  |  Asignado: 187  (155.8%)
 Capacidades vuelos: OK  |  SLA llegada≤46h (todos): OK  |  SLA 48h (todos): OK
 ================================
 
 == PEDIDOS ==
 ID   DST   CREADO         DEMANDA    ASIGN  %ASIG 1a_LLEG       ÚLT_LLEG      ≤46h  SLA48  PROGRESO
 ----------------------------------------------------------------------------------------------------
-74   SGAS  17 Sep 15:17Z      191      191 100.0% 18 Sep 07:44Z 18 Sep 07:44Z OK    OK     [################]
+150  SEQM  19 Sep 17:07Z        1        2 200.0% 19 Sep 00:04Z 19 Sep 00:34Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SGAS 18 Sep 02:32Z 18 Sep 07:44Z    191
+      UBBB VIDP 19 Sep 19:03Z 19 Sep 00:34Z      1
+      VIDP SEQM 19 Sep 02:03Z 19 Sep 00:04Z      1
 
-76   LDZA  17 Sep 16:54Z      123      123 100.0% 18 Sep 06:02Z 18 Sep 06:02Z OK    OK     [################]
+151  OMDB  19 Sep 17:25Z        1        1 100.0% 19 Sep 00:10Z 19 Sep 00:10Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI LDZA 18 Sep 03:43Z 18 Sep 06:02Z    123
+      SPIM OMDB 19 Sep 04:35Z 19 Sep 00:10Z      1
 
-81   LKPR  17 Sep 19:24Z      171      171 100.0% 18 Sep 05:16Z 18 Sep 05:16Z OK    OK     [################]
+152  OMDB  19 Sep 17:39Z        1        1 100.0% 19 Sep 00:10Z 19 Sep 00:10Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI LKPR 18 Sep 03:23Z 18 Sep 05:16Z    171
+      SPIM OMDB 19 Sep 04:35Z 19 Sep 00:10Z      1
 
-82   UMMS  17 Sep 20:25Z      150      150 100.0% 18 Sep 07:58Z 18 Sep 07:58Z OK    OK     [################]
+153  OYSN  19 Sep 17:52Z        1        2 200.0% 19 Sep 00:04Z 19 Sep 00:06Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI UMMS 18 Sep 03:51Z 18 Sep 07:58Z    150
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z      1
+      SABE OYSN 19 Sep 07:57Z 19 Sep 00:04Z      1
 
-83   EKCH  17 Sep 21:09Z       63       63 100.0% 18 Sep 08:55Z 18 Sep 08:55Z OK    OK     [################]
+154  LKPR  19 Sep 18:12Z        1        1 100.0% 19 Sep 00:28Z 19 Sep 00:28Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB EKCH 18 Sep 02:50Z 18 Sep 08:55Z     63
+      SPIM LKPR 19 Sep 09:31Z 19 Sep 00:28Z      1
 
-84   SEQM  17 Sep 22:07Z      111      111 100.0% 18 Sep 05:50Z 18 Sep 05:50Z OK    OK     [################]
+155  OMDB  19 Sep 18:30Z       22       22 100.0% 19 Sep 00:10Z 19 Sep 00:10Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SEQM 18 Sep 02:09Z 18 Sep 05:50Z    111
+      SPIM OMDB 19 Sep 04:35Z 19 Sep 00:10Z     22
 
-85   LKPR  17 Sep 22:51Z      141      129  91.5% 18 Sep 05:16Z 18 Sep 05:16Z OK    OK     [###############.]
+156  LATI  19 Sep 18:42Z        1        2 200.0% 19 Sep 00:20Z 19 Sep 00:20Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI LKPR 18 Sep 03:23Z 18 Sep 05:16Z    129
+      EBCI SLLP 19 Sep 10:35Z 19 Sep 00:20Z      1
+      SLLP LATI 19 Sep 09:36Z 19 Sep 00:20Z      1
 
-86   SLLP  17 Sep 23:51Z      117      117 100.0% 18 Sep 08:41Z 18 Sep 08:41Z OK    OK     [################]
+157  EDDI  19 Sep 18:51Z        1        4 400.0% 19 Sep 00:02Z 19 Sep 00:17Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SLLP 18 Sep 05:21Z 18 Sep 08:41Z    117
+      UBBB SABE 19 Sep 05:48Z 19 Sep 00:06Z      1
+      SABE OYSN 19 Sep 07:57Z 19 Sep 00:04Z      1
+      OYSN OJAI 19 Sep 20:46Z 19 Sep 00:17Z      1
+      OJAI EDDI 19 Sep 19:20Z 19 Sep 00:02Z      1
 
-87   EDDI  18 Sep 00:26Z      220      220 100.0% 18 Sep 04:31Z 18 Sep 04:31Z OK    OK     [################]
+158  OERK  19 Sep 19:05Z        1        1 100.0% 19 Sep 00:04Z 19 Sep 00:04Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      EBCI EDDI 18 Sep 02:41Z 18 Sep 04:31Z    220
+      UBBB OERK 19 Sep 20:47Z 19 Sep 00:04Z      1
 
-88   SGAS  18 Sep 01:01Z      165      165 100.0% 18 Sep 07:44Z 18 Sep 07:44Z OK    OK     [################]
+159  OMDB  19 Sep 19:20Z        1        1 100.0% 19 Sep 00:10Z 19 Sep 00:10Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      SPIM SGAS 18 Sep 02:32Z 18 Sep 07:44Z    165
+      SPIM OMDB 19 Sep 04:35Z 19 Sep 00:10Z      1
 
-89   OYSN  18 Sep 01:58Z      211      211 100.0% 18 Sep 10:09Z 18 Sep 10:09Z OK    OK     [################]
+160  OMDB  19 Sep 19:37Z        8        8 100.0% 19 Sep 00:10Z 19 Sep 00:10Z OK    OK     [################]
       ORI  DST  SALE          LLEGA           ASIG
       ---------------------------------------------
-      UBBB OYSN 18 Sep 05:35Z 18 Sep 10:09Z    211
+      SPIM OMDB 19 Sep 04:35Z 19 Sep 00:10Z      8
+
+161  SLLP  19 Sep 19:56Z       21       21 100.0% 19 Sep 00:20Z 19 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 19 Sep 10:35Z 19 Sep 00:20Z     21
+
+162  LOWW  19 Sep 20:09Z        5        5 100.0% 19 Sep 00:00Z 19 Sep 00:00Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB LOWW 19 Sep 19:26Z 19 Sep 00:00Z      5
+
+163  SUAA  19 Sep 20:25Z        3        9 300.0% 19 Sep 00:04Z 19 Sep 00:25Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB OERK 19 Sep 20:47Z 19 Sep 00:04Z      3
+      OERK OSDI 19 Sep 21:24Z 19 Sep 00:09Z      3
+      OSDI SUAA 19 Sep 07:09Z 19 Sep 00:25Z      3
+
+164  LATI  19 Sep 20:36Z        1        2 200.0% 19 Sep 00:20Z 19 Sep 00:20Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SLLP 19 Sep 10:35Z 19 Sep 00:20Z      1
+      SLLP LATI 19 Sep 09:36Z 19 Sep 00:20Z      1
+
+165  UBBB  19 Sep 20:45Z        1        3 300.0% 19 Sep 00:03Z 19 Sep 00:17Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SVMI 19 Sep 13:20Z 19 Sep 00:03Z      1
+      SVMI UMMS 19 Sep 11:17Z 19 Sep 00:05Z      1
+      UMMS UBBB 19 Sep 20:31Z 19 Sep 00:17Z      1
+
+166  OOMS  19 Sep 20:57Z        1        2 200.0% 19 Sep 00:05Z 19 Sep 00:32Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI OAKB 19 Sep 16:40Z 19 Sep 00:32Z      1
+      OAKB OOMS 19 Sep 20:03Z 19 Sep 00:05Z      1
+
+167  LKPR  19 Sep 21:06Z        4        4 100.0% 19 Sep 00:28Z 19 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      SPIM LKPR 19 Sep 09:31Z 19 Sep 00:28Z      4
+
+168  LDZA  19 Sep 21:19Z        1        4 400.0% 19 Sep 00:07Z 19 Sep 00:28Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      1
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z      1
+      SBBR SKBO 19 Sep 18:53Z 19 Sep 00:28Z      1
+      SKBO LDZA 19 Sep 10:56Z 19 Sep 00:07Z      1
+
+169  SEQM  19 Sep 21:28Z        4        8 200.0% 19 Sep 00:04Z 19 Sep 00:34Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB VIDP 19 Sep 19:03Z 19 Sep 00:34Z      4
+      VIDP SEQM 19 Sep 02:03Z 19 Sep 00:04Z      4
+
+170  SGAS  19 Sep 21:45Z       15       15 100.0% 19 Sep 00:11Z 19 Sep 00:11Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z     15
+
+171  OSDI  19 Sep 22:03Z        2        4 200.0% 19 Sep 00:04Z 19 Sep 00:09Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB OERK 19 Sep 20:47Z 19 Sep 00:04Z      2
+      OERK OSDI 19 Sep 21:24Z 19 Sep 00:09Z      2
+
+172  UMMS  19 Sep 22:15Z        1        2 200.0% 19 Sep 00:03Z 19 Sep 00:05Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      EBCI SVMI 19 Sep 13:20Z 19 Sep 00:03Z      1
+      SVMI UMMS 19 Sep 11:17Z 19 Sep 00:05Z      1
+
+173  EBCI  19 Sep 22:24Z        7       28 400.0% 19 Sep 00:09Z 19 Sep 00:16Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB SGAS 19 Sep 06:38Z 19 Sep 00:11Z      7
+      SGAS SBBR 19 Sep 21:19Z 19 Sep 00:14Z      7
+      SBBR LBSF 19 Sep 10:16Z 19 Sep 00:16Z      7
+      LBSF EBCI 19 Sep 20:00Z 19 Sep 00:09Z      7
+
+174  SCEL  19 Sep 22:37Z        5       15 300.0% 19 Sep 00:04Z 19 Sep 00:09Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB OERK 19 Sep 20:47Z 19 Sep 00:04Z      5
+      OERK OSDI 19 Sep 21:24Z 19 Sep 00:09Z      5
+      OSDI SCEL 19 Sep 06:23Z 19 Sep 00:05Z      5
+
+175  SEQM  19 Sep 22:45Z       10       20 200.0% 19 Sep 00:04Z 19 Sep 00:34Z OK    OK     [################]
+      ORI  DST  SALE          LLEGA           ASIG
+      ---------------------------------------------
+      UBBB VIDP 19 Sep 19:03Z 19 Sep 00:34Z     10
+      VIDP SEQM 19 Sep 02:03Z 19 Sep 00:04Z     10
 
 == VUELOS UTILIZADOS ==
 ORI    DST    SALIDA        LLEGADA          CAPAC     ASIG    RESID
 ---------------------------------------------------------------------
-SPIM   SEQM   18 Sep 02:09Z 18 Sep 05:50Z      320      111      209
-SPIM   SGAS   18 Sep 02:32Z 18 Sep 07:44Z      360      356        4
-EBCI   EDDI   18 Sep 02:41Z 18 Sep 04:31Z      360      220      140
-UBBB   EKCH   18 Sep 02:50Z 18 Sep 08:55Z      320       63      257
-EBCI   LKPR   18 Sep 03:23Z 18 Sep 05:16Z      300      300        0
-EBCI   LDZA   18 Sep 03:43Z 18 Sep 06:02Z      340      123      217
-EBCI   UMMS   18 Sep 03:51Z 18 Sep 07:58Z      300      150      150
-SPIM   SLLP   18 Sep 05:21Z 18 Sep 08:41Z      300      117      183
-UBBB   OYSN   18 Sep 05:35Z 18 Sep 10:09Z      360      211      149
+SPIM   SUAA   19 Sep 22:51Z 20 Sep 04:55Z      360        3      357
+SPIM   SLLP   19 Sep 23:05Z 20 Sep 02:25Z      320       21      299
+EBCI   LOWW   19 Sep 23:56Z 20 Sep 02:04Z      360        5      355
+EBCI   OSDI   20 Sep 00:03Z 20 Sep 06:06Z      320        2      318
+EBCI   LATI   20 Sep 00:04Z 20 Sep 03:59Z      300        2      298
+UBBB   UMMS   20 Sep 00:26Z 20 Sep 04:12Z      300        1      299
+SPIM   SCEL   20 Sep 00:34Z 20 Sep 05:38Z      300        5      295
+EBCI   OYSN   20 Sep 01:39Z 20 Sep 09:18Z      300        1      299
+EBCI   UBBB   20 Sep 01:45Z 20 Sep 07:25Z      360        1      359
+SPIM   SEQM   20 Sep 02:09Z 20 Sep 05:50Z      320       15      305
+UBBB   OMDB   20 Sep 02:13Z 20 Sep 06:23Z      360       33      327
+SPIM   SGAS   20 Sep 02:32Z 20 Sep 07:44Z      360       15      345
+EBCI   EDDI   20 Sep 02:41Z 20 Sep 04:31Z      360        1      359
+EBCI   OERK   20 Sep 02:46Z 20 Sep 09:35Z      340        1      339
+EBCI   LKPR   20 Sep 03:23Z 20 Sep 05:16Z      300        5      295
+EBCI   LDZA   20 Sep 03:43Z 20 Sep 06:02Z      340        1      339
+UBBB   OOMS   20 Sep 03:58Z 20 Sep 07:31Z      360        1      359
+UBBB   EBCI   20 Sep 08:55Z 20 Sep 14:35Z      320        7      313
 
 ==============================================================================================================
 REPORTE AL CORTE • reporteSimulacion.txt
-Corte (UTC): 18 Sep 08:05Z
+Corte (UTC): 20 Sep 04:50Z
 ==============================================================================================================
-Pedidos: 11  |  Entregados: 7  |  Parciales: 1  |  Pendientes: 3
-Unidades entregadas≤T: 1,260 / 1,663  (75.8%)
+Pedidos: 26  |  Entregados: 26  |  Parciales: 0  |  Pendientes: 0
+Unidades entregadas≤T: 187 / 120  (155.8%)
 --------------------------------------------------------------------------------------------------------------
 
->> ENTREGADOS (100% hasta el corte)  [7]
+>> ENTREGADOS (100% hasta el corte)  [26]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
-74   SGAS  17 Sep 15:17Z      191      191   100.0% 18 Sep 07:44Z  [######################]
-76   LDZA  17 Sep 16:54Z      123      123   100.0% 18 Sep 06:02Z  [######################]
-81   LKPR  17 Sep 19:24Z      171      171   100.0% 18 Sep 05:16Z  [######################]
-82   UMMS  17 Sep 20:25Z      150      150   100.0% 18 Sep 07:58Z  [######################]
-84   SEQM  17 Sep 22:07Z      111      111   100.0% 18 Sep 05:50Z  [######################]
-87   EDDI  18 Sep 00:26Z      220      220   100.0% 18 Sep 04:31Z  [######################]
-88   SGAS  18 Sep 01:01Z      165      165   100.0% 18 Sep 07:44Z  [######################]
-
->> PARCIALES (con llegadas pero incompletos)  [1]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-85   LKPR  17 Sep 22:51Z      141      129    91.5% 18 Sep 05:16Z  [####################..]
-
->> PENDIENTES (0 entregado hasta el corte)  [3]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-83   EKCH  17 Sep 21:09Z       63        0     0.0% -              [......................]
-86   SLLP  17 Sep 23:51Z      117        0     0.0% -              [......................]
-89   OYSN  18 Sep 01:58Z      211        0     0.0% -              [......................]
-==============================================================================================================
-ALNS
-=== SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 8  |  Completos: 8  |  Incompletos: 0
-Demanda total: 1,016  |  Asignado: 1,016  (100.0%)
-Capacidades vuelos: OK  |  SLA llegada≤46h (todos): OK  |  SLA 48h (todos): OK
-================================
-
-== PEDIDOS ==
-ID   DST   CREADO         DEMANDA    ASIGN  %ASIG 1a_LLEG       ÚLT_LLEG      ≤46h  SLA48  PROGRESO
-----------------------------------------------------------------------------------------------------
-85   LKPR  17 Sep 22:51Z       12       12 100.0% 18 Sep 13:19Z 18 Sep 13:19Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI LKPR 18 Sep 11:26Z 18 Sep 13:19Z     12
-
-90   SKBO  18 Sep 02:38Z      158      158 100.0% 18 Sep 13:51Z 18 Sep 13:51Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      SPIM SKBO 18 Sep 09:35Z 18 Sep 13:51Z    158
-
-91   OERK  18 Sep 03:25Z      167      167 100.0% 18 Sep 16:45Z 18 Sep 16:45Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI OERK 18 Sep 09:56Z 18 Sep 16:45Z    167
-
-92   SCEL  18 Sep 04:02Z       50       50 100.0% 18 Sep 13:15Z 18 Sep 13:15Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      SPIM SCEL 18 Sep 08:11Z 18 Sep 13:15Z     50
-
-93   OSDI  18 Sep 04:59Z       51       51 100.0% 18 Sep 12:49Z 18 Sep 12:49Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB OSDI 18 Sep 09:58Z 18 Sep 12:49Z     51
-
-94   EDDI  18 Sep 06:04Z      197      197 100.0% 18 Sep 10:27Z 18 Sep 10:27Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI EDDI 18 Sep 08:37Z 18 Sep 10:27Z    197
-
-95   OJAI  18 Sep 07:08Z      189      189 100.0% 18 Sep 17:24Z 18 Sep 17:24Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB OJAI 18 Sep 13:17Z 18 Sep 17:24Z    189
-
-96   LOWW  18 Sep 07:42Z      192      192 100.0% 18 Sep 13:30Z 18 Sep 13:30Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI LOWW 18 Sep 10:22Z 18 Sep 13:30Z    192
-
-== VUELOS UTILIZADOS ==
-ORI    DST    SALIDA        LLEGADA          CAPAC     ASIG    RESID
----------------------------------------------------------------------
-SPIM   SCEL   18 Sep 08:11Z 18 Sep 13:15Z      340       50      290
-EBCI   EDDI   18 Sep 08:37Z 18 Sep 10:27Z      300      197      103
-SPIM   SKBO   18 Sep 09:35Z 18 Sep 13:51Z      340      158      182
-EBCI   OERK   18 Sep 09:56Z 18 Sep 16:45Z      320      167      153
-UBBB   OSDI   18 Sep 09:58Z 18 Sep 12:49Z      360       51      309
-EBCI   LOWW   18 Sep 10:22Z 18 Sep 13:30Z      320      192      128
-EBCI   LKPR   18 Sep 11:26Z 18 Sep 13:19Z      300       12      288
-UBBB   OJAI   18 Sep 13:17Z 18 Sep 17:24Z      300      189      111
-
-==============================================================================================================
-REPORTE AL CORTE • reporteSimulacion.txt
-Corte (UTC): 18 Sep 14:05Z
-==============================================================================================================
-Pedidos: 8  |  Entregados: 6  |  Parciales: 0  |  Pendientes: 2
-Unidades entregadas≤T: 660 / 1,016  (65.0%)
---------------------------------------------------------------------------------------------------------------
-
->> ENTREGADOS (100% hasta el corte)  [6]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-85   LKPR  17 Sep 22:51Z       12       12   100.0% 18 Sep 13:19Z  [######################]
-90   SKBO  18 Sep 02:38Z      158      158   100.0% 18 Sep 13:51Z  [######################]
-92   SCEL  18 Sep 04:02Z       50       50   100.0% 18 Sep 13:15Z  [######################]
-93   OSDI  18 Sep 04:59Z       51       51   100.0% 18 Sep 12:49Z  [######################]
-94   EDDI  18 Sep 06:04Z      197      197   100.0% 18 Sep 10:27Z  [######################]
-96   LOWW  18 Sep 07:42Z      192      192   100.0% 18 Sep 13:30Z  [######################]
+150  SEQM  19 Sep 17:07Z        1        2   200.0% 19 Sep 00:34Z  [######################]
+151  OMDB  19 Sep 17:25Z        1        1   100.0% 19 Sep 00:10Z  [######################]
+152  OMDB  19 Sep 17:39Z        1        1   100.0% 19 Sep 00:10Z  [######################]
+153  OYSN  19 Sep 17:52Z        1        2   200.0% 19 Sep 00:06Z  [######################]
+154  LKPR  19 Sep 18:12Z        1        1   100.0% 19 Sep 00:28Z  [######################]
+155  OMDB  19 Sep 18:30Z       22       22   100.0% 19 Sep 00:10Z  [######################]
+156  LATI  19 Sep 18:42Z        1        2   200.0% 19 Sep 00:20Z  [######################]
+157  EDDI  19 Sep 18:51Z        1        4   400.0% 19 Sep 00:17Z  [######################]
+158  OERK  19 Sep 19:05Z        1        1   100.0% 19 Sep 00:04Z  [######################]
+159  OMDB  19 Sep 19:20Z        1        1   100.0% 19 Sep 00:10Z  [######################]
+160  OMDB  19 Sep 19:37Z        8        8   100.0% 19 Sep 00:10Z  [######################]
+161  SLLP  19 Sep 19:56Z       21       21   100.0% 19 Sep 00:20Z  [######################]
+162  LOWW  19 Sep 20:09Z        5        5   100.0% 19 Sep 00:00Z  [######################]
+163  SUAA  19 Sep 20:25Z        3        9   300.0% 19 Sep 00:25Z  [######################]
+164  LATI  19 Sep 20:36Z        1        2   200.0% 19 Sep 00:20Z  [######################]
+165  UBBB  19 Sep 20:45Z        1        3   300.0% 19 Sep 00:17Z  [######################]
+166  OOMS  19 Sep 20:57Z        1        2   200.0% 19 Sep 00:32Z  [######################]
+167  LKPR  19 Sep 21:06Z        4        4   100.0% 19 Sep 00:28Z  [######################]
+168  LDZA  19 Sep 21:19Z        1        4   400.0% 19 Sep 00:28Z  [######################]
+169  SEQM  19 Sep 21:28Z        4        8   200.0% 19 Sep 00:34Z  [######################]
+170  SGAS  19 Sep 21:45Z       15       15   100.0% 19 Sep 00:11Z  [######################]
+171  OSDI  19 Sep 22:03Z        2        4   200.0% 19 Sep 00:09Z  [######################]
+172  UMMS  19 Sep 22:15Z        1        2   200.0% 19 Sep 00:05Z  [######################]
+173  EBCI  19 Sep 22:24Z        7       28   400.0% 19 Sep 00:16Z  [######################]
+174  SCEL  19 Sep 22:37Z        5       15   300.0% 19 Sep 00:09Z  [######################]
+175  SEQM  19 Sep 22:45Z       10       20   200.0% 19 Sep 00:34Z  [######################]
 
 >> PARCIALES (con llegadas pero incompletos)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
 (sin registros)
 
->> PENDIENTES (0 entregado hasta el corte)  [2]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-91   OERK  18 Sep 03:25Z      167        0     0.0% -              [......................]
-95   OJAI  18 Sep 07:08Z      189        0     0.0% -              [......................]
-==============================================================================================================
-ALNS
-=== SOLUCIÓN DE PROGRAMACIÓN ===
-Pedidos: 4  |  Completos: 4  |  Incompletos: 0
-Demanda total: 472  |  Asignado: 472  (100.0%)
-Capacidades vuelos: OK  |  SLA llegada≤46h (todos): OK  |  SLA 48h (todos): OK
-================================
-
-== PEDIDOS ==
-ID   DST   CREADO         DEMANDA    ASIGN  %ASIG 1a_LLEG       ÚLT_LLEG      ≤46h  SLA48  PROGRESO
-----------------------------------------------------------------------------------------------------
-97   OPKC  18 Sep 08:42Z      240      240 100.0% 19 Sep 01:58Z 19 Sep 01:58Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI OPKC 18 Sep 16:19Z 19 Sep 01:58Z    240
-
-98   EDDI  18 Sep 09:16Z       94       94 100.0% 18 Sep 21:11Z 18 Sep 21:11Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      EBCI EDDI 18 Sep 19:21Z 18 Sep 21:11Z     94
-
-99   SVMI  18 Sep 10:10Z       64       64 100.0% 18 Sep 22:41Z 18 Sep 22:41Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      SPIM SVMI 18 Sep 17:15Z 18 Sep 22:41Z     64
-
-100  OSDI  18 Sep 10:52Z       74       74 100.0% 18 Sep 17:34Z 18 Sep 17:34Z OK    OK     [################]
-      ORI  DST  SALE          LLEGA           ASIG
-      ---------------------------------------------
-      UBBB OSDI 18 Sep 14:43Z 18 Sep 17:34Z     74
-
-== VUELOS UTILIZADOS ==
-ORI    DST    SALIDA        LLEGADA          CAPAC     ASIG    RESID
----------------------------------------------------------------------
-UBBB   OSDI   18 Sep 14:43Z 18 Sep 17:34Z      360       74      286
-EBCI   OPKC   18 Sep 16:19Z 19 Sep 01:58Z      300      240       60
-SPIM   SVMI   18 Sep 17:15Z 18 Sep 22:41Z      320       64      256
-EBCI   EDDI   18 Sep 19:21Z 18 Sep 21:11Z      360       94      266
-
-==============================================================================================================
-REPORTE AL CORTE • reporteSimulacion.txt
-Corte (UTC): 18 Sep 20:05Z
-==============================================================================================================
-Pedidos: 4  |  Entregados: 1  |  Parciales: 0  |  Pendientes: 3
-Unidades entregadas≤T: 74 / 472  (15.7%)
---------------------------------------------------------------------------------------------------------------
-
->> ENTREGADOS (100% hasta el corte)  [1]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-100  OSDI  18 Sep 10:52Z       74       74   100.0% 18 Sep 17:34Z  [######################]
-
->> PARCIALES (con llegadas pero incompletos)  [0]
+>> PENDIENTES (0 entregado hasta el corte)  [0]
 ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
 --------------------------------------------------------------------------------------------------------------
 (sin registros)
-
->> PENDIENTES (0 entregado hasta el corte)  [3]
-ID   DST   CREADO         DEMANDA   ENTREG  %AVANCE ÚLT≤T          PROGRESO
---------------------------------------------------------------------------------------------------------------
-97   OPKC  18 Sep 08:42Z      240        0     0.0% -              [......................]
-98   EDDI  18 Sep 09:16Z       94        0     0.0% -              [......................]
-99   SVMI  18 Sep 10:10Z       64        0     0.0% -              [......................]
 ==============================================================================================================

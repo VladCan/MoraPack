@@ -22,7 +22,7 @@ public class GeneraP {
             "VIDP", "OSDI", "OERK", "OMDB", "OAKB", "OOMS", "OYSN", "OPKC", "UBBB", "OJAI"
     };
 
-    // Ahora la fecha es completa: yyyy-MM-dd-HH-mm-ss
+    // Formato final: yyyy-MM-dd-HH-mm-ss
     private static final DateTimeFormatter HORA_LOCAL =
             DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss");
 
@@ -41,7 +41,7 @@ public class GeneraP {
         Random random = new Random();
         List<String> pedidos = new ArrayList<>();
 
-        // Línea de tiempo global UTC
+        // ===== 1) Línea de tiempo global UTC (monótona) =====
         Instant base = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         Duration horizonte = Duration.ofHours(horasHorizonte);
         long avgStepSec = Math.max(1, horizonte.getSeconds() / Math.max(1, cantidadPedidos));
@@ -57,12 +57,12 @@ public class GeneraP {
             // Destino
             String destino = DESTINOS[random.nextInt(DESTINOS.length)];
 
-            // Avanzar el reloj global
+            // ===== 2) Avanzar el reloj global en UTC =====
             long step = avgStepSec + (random.nextLong(-jitterMax, jitterMax + 1));
             if (step < 1) step = 1;
-            t = t.plusSeconds(step);
+            t = t.plusSeconds(step); // siempre crece, asegura orden cronológico
 
-            // Hora local del destino
+            // ===== 3) Convertir a hora local recién aquí =====
             int gmt = Optional.ofNullable(aMap.obtener(destino))
                     .map(a -> a.getGMT())
                     .orElse(0);
@@ -83,7 +83,7 @@ public class GeneraP {
 
             String cantidadStr = String.format("%03d", cantidad);
 
-            // Formato final: yyyy-MM-dd-HH-mm-ss-dest-###-IdClien
+            // ===== 4) Formato final =====
             String linea = fechaLocal.format(HORA_LOCAL) + "-" +
                     destino + "-" +
                     cantidadStr + "-" +
@@ -92,8 +92,8 @@ public class GeneraP {
             pedidos.add(linea);
         }
 
-        // Ordenar pedidos por fecha antes de escribir
-        pedidos.sort(Comparator.naturalOrder());
+        // Ya no hace falta ordenar, porque la generación en UTC ya garantiza cronología
+        // pedidos.sort(Comparator.naturalOrder());
 
         try (FileWriter writer = new FileWriter(ruta.toFile(), StandardCharsets.UTF_8)) {
             for (String pedido : pedidos) {
