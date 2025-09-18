@@ -44,7 +44,11 @@ public class RegretRepair implements RepairOperator {
             if (rutas.isEmpty()) continue;
 
             // Ordenamos rutas por costo total (costo + tiempo)
+            //System.out.println("Antes de ordenar:");
+            //rutas.forEach(r -> System.out.println(r + " -> " + costoRuta(r)));
             rutas.sort(Comparator.comparingDouble(this::costoRuta));
+            //System.out.println("Después de ordenar:");
+            //rutas.forEach(r -> System.out.println(r + " -> " + costoRuta(r)));
 
             // Selección con regret (aunque aquí usamos la mejor)
             List<Vuelo> elegida;

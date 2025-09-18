@@ -64,6 +64,21 @@ public class Vuelo {
     }
 
     public double getCosto() {
-        return 0;
+        if (horaOrigen == null || horaDestino == null) return 0.0;
+
+        // Calcular duración en segundos
+        int duracionSegundos = horaDestino.toSecondOfDay() - horaOrigen.toSecondOfDay();
+        if (duracionSegundos < 0) duracionSegundos += 24 * 3600; // ajuste si cruza medianoche
+        double duracionHoras = duracionSegundos / 3600.0;
+
+        // Parámetros logísticos
+        double costoBase = 50.0;                     // costo mínimo fijo por operación
+        double penalizacionDuracion = duracionHoras * 20.0; // costo por hora de vuelo
+        double factorCapacidad = (capacidad > 0) ? (100.0 / capacidad) : 1.0; // penaliza baja capacidad
+
+        // Fórmula final
+        return costoBase + penalizacionDuracion * factorCapacidad;
     }
+
+
 }
