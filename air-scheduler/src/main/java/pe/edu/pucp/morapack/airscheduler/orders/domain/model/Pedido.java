@@ -2,6 +2,7 @@ package pe.edu.pucp.morapack.airscheduler.orders.domain.model;
 
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Scanner;
@@ -57,6 +58,48 @@ public class Pedido {
         fecha = LocalDateTime.parse(partes[3].trim());
         cantidad = Integer.parseInt(partes[4].trim());
     }
+
+
+    public void leerProfe(Scanner sc) {
+        if (!sc.hasNextLine()) return;
+
+        String linea = sc.nextLine().trim();
+        String[] partes = linea.split("-");
+
+        // Esperamos: yyyy-MM-dd-HH-mm-ss-dest-###-IdClien
+        if (partes.length != 9) {
+            throw new IllegalArgumentException("Formato inválido: " + linea);
+        }
+
+        // 1) Parsear fecha completa
+        int yyyy = Integer.parseInt(partes[0]);
+        int MM = Integer.parseInt(partes[1]);
+        int dd = Integer.parseInt(partes[2]);
+        int hh = Integer.parseInt(partes[3]);
+        int mm = Integer.parseInt(partes[4]);
+        int ss = Integer.parseInt(partes[5]);
+
+        destino = partes[6].trim();
+        cantidad = Integer.parseInt(partes[7]);   // ###
+
+        // El idCliente está después de la cantidad (separado por "-")
+        // pero puede que ya venga en la misma "partes[7]" si se generó mal
+        // mejor lo separamos bien usando substring final
+        String[] ultimos = linea.split("-");
+        if (ultimos.length < 9) {
+            throw new IllegalArgumentException("No se encontró IdCliente en: " + linea);
+        }
+        idCliente = Integer.parseInt(ultimos[8]);
+
+        // Construir la fecha completa
+        fecha = LocalDateTime.of(yyyy, MM, dd, hh, mm, ss);
+
+        // Generar un idPedido incremental si no viene en el archivo
+        idPedido++;
+    }
+
+
+
 
     public long getPlazoMaxMinutos(String continenteOrigen) {
         if (continenteOrigen.equals(continenteDestino)) {

@@ -1,6 +1,7 @@
 package pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns;
 
 
+import java.time.Instant;
 import java.util.*;
 
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
@@ -24,18 +25,19 @@ public class ALNS {
     private final VuelosTEG teg;
     private final List<Pedido> pedidos;
     private final Random rnd = new Random();
-
+    private  final Instant presenteUTC;
     //Parametros ALNS
-    private final int maxIter = 100000;
+    private final int maxIter = 100;
     private final double tasaCambio = 0.3;  // para probabilidades de aceptar peor solución
 
     public ALNS(VuelosTEG teg, List<Pedido> pedidos,
                 List<DestructionOperator> destructions,
-                List<RepairOperator> repairs) {
+                List<RepairOperator> repairs, Instant presenteUTC) {
         this.teg = teg;
         this.pedidos = pedidos;
         this.destructions = destructions;
         this.repairs = repairs;
+        this.presenteUTC = presenteUTC;
     }
     public SolucionProgramacion ejecutar(SolucionProgramacion solucionInicial) {
 
@@ -68,6 +70,7 @@ public class ALNS {
             // Actualizar mejor solución
             if (costoNueva < costoMejor) {
                 mejorSolucion = nuevaSol;
+                System.out.println("Cambio");
             }
 
             // Criterio de aceptación simple (mejor o igual, o con tasa de cambio)

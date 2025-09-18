@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
+import pe.edu.pucp.morapack.airscheduler.flights.domain.model.Vuelo;
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.VuelosEdge;
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.AereopuertoNode;
 
@@ -103,5 +104,19 @@ public final class VuelosTEG {
                 return;
             }
         }
+    }
+
+    public Map<String, List<Vuelo>> getVuelosPorOrigen() {
+        Map<String, List<Vuelo>> map = new HashMap<>();
+
+        paraCadaArco(e -> {
+            if (e.isFlight() && e.vuelo() != null) {
+                String origen = e.salida().getCodigoAP();
+                map.computeIfAbsent(origen, k -> new ArrayList<>())
+                        .add(e.vuelo());
+            }
+        });
+
+        return map;
     }
 }
