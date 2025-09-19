@@ -72,14 +72,14 @@ public class GeneraP {
             // ========================
             // Modelo logístico de demanda
             // ========================
-            double k = 999; // máximo
+            double k = 5000; // máximo
             double x0 = cantidadPedidos / 2.0; // punto medio
             double r = 0.01 + 0.02 * random.nextDouble(); // pendiente aleatoria
             int cantidad = (int) Math.round(k / (1 + Math.exp(-r * (i - x0))));
 
             // Ajustar a rango válido [1..999]
-            if (cantidad < 1) cantidad = 1;
-            if (cantidad > 999) cantidad = 999;
+            if (cantidad < 300) cantidad = 300;
+            if (cantidad > 5000) cantidad = 5000;
 
             String cantidadStr = String.format("%03d", cantidad);
 
