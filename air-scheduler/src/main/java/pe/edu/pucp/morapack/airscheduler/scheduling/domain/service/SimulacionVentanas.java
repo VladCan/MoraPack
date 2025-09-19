@@ -1,4 +1,3 @@
-// air-scheduler/src/main/java/pe/edu/pucp/morapack/airscheduler/scheduling/domain/service/SimulacionVentanas.java
 package pe.edu.pucp.morapack.airscheduler.scheduling.domain.service;
 
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
@@ -11,7 +10,6 @@ import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.scheduling.adapters.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.*;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.ssp.SSPGeneradorSeed;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -21,6 +19,7 @@ import java.util.*;
  * Simulación por ventanas de Δt horas.
  * - NO elimina pedidos al activarlos: solo cuando queden completamente entregados.
  * - Mantiene tramos comprometidos en vuelo entre ventanas y procesa sus arribos cuando correspondan.
+ * - Actualizado a modelo por RUTAS (PlanPedido.rutas -> RutaAsignada -> List<TramoAsignado>).
  */
 public final class SimulacionVentanas {
 
@@ -34,6 +33,8 @@ public final class SimulacionVentanas {
     private final Set<String> sedes;
     private final long horasVentana;
     private final long horizonteTegHoras;
+
+    // reservas “suaves” hasta el próximo corte (opcional, por si construyes TEG con esto)
     private final Map<String, Integer> stockReservadoProx = new HashMap<>();
     private final Map<VueloProgramadoId, Integer> capReservadaProx = new HashMap<>();
 
@@ -43,6 +44,7 @@ public final class SimulacionVentanas {
     public Map<VueloProgramadoId, Integer> capacidadReservadaHastaProximoCorte() {
         return Map.copyOf(capReservadaProx);
     }
+
     // --- Estado persistente de la simulación ---
     /** Pedidos activos hasta que se completen (id -> estado). */
     private final Map<Integer, EstadoPedido> activos = new LinkedHashMap<>();
@@ -65,7 +67,35 @@ public final class SimulacionVentanas {
         this.horizonteTegHoras = horizonteTegHoras;
     }
 
-    
+    /** Estado interno de un pedido activo. */
+    private static final class EstadoPedido {
+        private final int id;
+        private final String destino;
+        private final Instant creadoUtc;
+        private final int demandaTotal;
+        private int entregado;         // suma de llegadas al destino
+        private int reservadoEnVuelo;  // suma de tramos comprometidos aún no arribados
+
+        EstadoPedido(int id, String destino, Instant creadoUtc, int demanda) {
+            this.id = id; this.destino = destino; this.creadoUtc = creadoUtc; this.demandaTotal = demanda;
+        }
+        int remanenteParaPlan() {
+            int r = demandaTotal - entregado - reservadoEnVuelo;
+            return Math.max(0, r);
+        }
+        boolean completado() { return entregado >= demandaTotal; }
+
+        // getters/setters básicos
+        public int getId() { return id; }
+        public String getDestino() { return destino; }
+        public Instant getCreadoUtc() { return creadoUtc; }
+        public int getDemandatotal() { return demandaTotal; }
+        public int getEntregado() { return entregado; }
+        public void setEntregado(int e) { this.entregado = e; }
+        public int getReservadoEnVuelo() { return reservadoEnVuelo; }
+        public void setReservadoEnVuelo(int r) { this.reservadoEnVuelo = r; }
+    }
+
     /** Tramo comprometido (ya no se puede cambiar). */
     private record TramoComprometido(
             int pedidoId,
@@ -84,11 +114,10 @@ public final class SimulacionVentanas {
             procesarArribosEnVueloHasta(finVentana);
 
             // 1) “Activar” (NO eliminar) nuevos pedidos hasta finVentana
-            var nuevos = pedidos.listarHasta(finVentana);    // ✅ solo lista, no remueve
+            var nuevos =PedidosHasta(pedidos, finVentana);    // solo lista, no remueve
             for (Pedido p : nuevos) {
-                // Actívalos si aún no están activos (backlog)
                 activos.putIfAbsent(p.getIdPedido(), new EstadoPedido(
-                    p.getIdPedido(), p.getDestino(), p.getCreatedAtUtc(), cantidadPedido(p)
+                        p.getIdPedido(), p.getDestino(), p.getCreatedAtUtc(), cantidadPedido(p)
                 ));
             }
 
@@ -118,7 +147,7 @@ public final class SimulacionVentanas {
             }
 
             // 4) Ejecutar SSP con stockLibre (arribos ya ocurridos)
-            var ssp = new SSPGeneradorSeed(sedes, stockLibre);
+            var ssp = new pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.ssp.SSPGeneradorSeed(sedes, stockLibre);
             SolucionProgramacion seed = ssp.generarSeed(teg, aPlanificar, finVentana);
 
             // 5) Comprometer tramos con salida < finVentana y agregarlos a “enVuelo”
@@ -126,35 +155,44 @@ public final class SimulacionVentanas {
                 EstadoPedido ep = activos.get(plan.getIdPedido());
                 if (ep == null) continue;
 
-                for (TramoAsignado t : plan.getTramos()) {
-                    var id  = t.getVuelo();
-                    var sal = id.getSalidaUtc();
-                    var lle = id.getLlegadaUtc();
-                    if (!sal.isBefore(finVentana)) continue; // aún no despega, puede replanificarse la próxima
+                // ahora por RUTAS y luego por TRAMOS
+                if (plan.getRutas() == null) continue;
+                for (RutaAsignada ruta : plan.getRutas()) {
+                    if (ruta.getTramos() == null || ruta.getTramos().isEmpty()) continue;
 
-                    // Reservar en vuelo
-                    ep.setReservadoEnVuelo(ep.getReservadoEnVuelo() + t.getCantidad());
-                    enVuelo.add(new TramoComprometido(ep.getId(), id, t.getCantidad(), ep.getDestino()));
+                    for (TramoAsignado t : ruta.getTramos()) {
+                        var id  = t.getVuelo();
+                        var sal = id.getSalidaUtc();
+                        var lle = id.getLlegadaUtc();
+                        int cantidad = t.getCantidad();
 
-                    // Si alcanza a llegar en esta ventana, procesarlo de inmediato
-                    if (!lle.isAfter(finVentana)) {
-                        if (id.getDestino().equals(ep.getDestino())) {
-                            ep.setEntregado(ep.getEntregado() + t.getCantidad());
-                            entregadoPorPedido.merge(ep.getId(), t.getCantidad(), Integer::sum);
-                        } else {
-                            stockLibre.computeIfAbsent(id.getDestino(), k -> new ArrayList<>())
-                                      .add(new ArriboExogeno(lle, t.getCantidad()));
+                        if (!sal.isBefore(finVentana)) continue; // aún no despega, se puede replanificar
+
+                        // Reservar en vuelo
+                        ep.setReservadoEnVuelo(ep.getReservadoEnVuelo() + cantidad);
+                        enVuelo.add(new TramoComprometido(ep.getId(), id, cantidad, ep.getDestino()));
+
+                        // Si arriba dentro de esta ventana, procesar de inmediato
+                        if (!lle.isAfter(finVentana)) {
+                            if (id.getDestino().equals(ep.getDestino())) {
+                                ep.setEntregado(ep.getEntregado() + cantidad);
+                                entregadoPorPedido.merge(ep.getId(), cantidad, Integer::sum);
+                            } else {
+                                stockLibre.computeIfAbsent(id.getDestino(), k -> new ArrayList<>())
+                                          .add(new ArriboExogeno(lle, cantidad));
+                            }
+                            ep.setReservadoEnVuelo(ep.getReservadoEnVuelo() - cantidad);
+                            // quitar de enVuelo si corresponde
+                            enVuelo.removeIf(tc -> tc.pedidoId()==ep.getId() && tc.vueloId().equals(id));
                         }
-                        ep.setReservadoEnVuelo(ep.getReservadoEnVuelo() - t.getCantidad());
-                        // también quitar el tramo de “enVuelo”
                     }
                 }
             }
 
-            // Limpiar de enVuelo los tramos que llegaron ≤ finVentana (si alguno fue procesado justo arriba)
+            // Limpiar de enVuelo los tramos que llegaron ≤ finVentana
             enVuelo.removeIf(tc -> !tc.vueloId().getLlegadaUtc().isAfter(finVentana));
 
-            // 6) Eliminar SOLO pedidos completados (según tu requerimiento)
+            // 6) Eliminar SOLO pedidos completados
             activos.values().removeIf(EstadoPedido::completado);
 
             // 7) Mostrar / guardar (opcional)
@@ -169,6 +207,10 @@ public final class SimulacionVentanas {
     }
 
     // ---------------- utilitarios internos ----------------
+
+    private List<Pedido> PedidosHasta(CargarPedidos pedidos, Instant finVentana) {
+        return pedidos.listarHasta(finVentana);
+    }
 
     private void procesarArribosEnVueloHasta(Instant corte) {
         Iterator<TramoComprometido> it = enVuelo.iterator();
@@ -193,7 +235,7 @@ public final class SimulacionVentanas {
     }
 
     private Pedido wrapPedido(int id, String destino, Instant creado, int cantidad) {
-        // Wrapper simple compatible con SSP (getCantidad via reflexión si tu DTO no lo expone)
+        // Wrapper minimal compatible con SSP
         return new Pedido() {
             @Override public int getIdPedido() { return id; }
             @Override public String  getDestino()  { return destino; }
@@ -219,6 +261,11 @@ public final class SimulacionVentanas {
             }
         }
     }
+
+    /**
+     * Compromete tramos con salida < presente, procesa llegadas ≤ presente y
+     * calcula reservas hasta el próximo corte. Actualizado a RUTAS.
+     */
     public void comprometerYProcesar(SolucionProgramacion plan, Instant presenteUtc) {
         // limpiar reservas calculadas en la iteración anterior
         stockReservadoProx.clear();
@@ -230,34 +277,40 @@ public final class SimulacionVentanas {
             EstadoPedido ep = activos.get(pp.getIdPedido());
             if (ep == null) continue;
 
-            for (TramoAsignado t : pp.getTramos()) {
-                var id  = t.getVuelo();
-                var sal = id.getSalidaUtc();
-                var lle = id.getLlegadaUtc();
+            if (pp.getRutas() == null) continue;
+            for (RutaAsignada ruta : pp.getRutas()) {
+                if (ruta.getTramos() == null || ruta.getTramos().isEmpty()) continue;
 
-                if (sal.isBefore(presenteUtc)) {
-                    // 1) YA DESPEGA antes del presente: comprometer y, si llega ≤ presente, procesar arribo
-                    ep.setReservadoEnVuelo(ep.getReservadoEnVuelo() + t.getCantidad());
-                    enVuelo.add(new TramoComprometido(ep.getId(), id, t.getCantidad(), ep.getDestino()));
+                for (TramoAsignado t : ruta.getTramos()) {
+                    var id  = t.getVuelo();
+                    var sal = id.getSalidaUtc();
+                    var lle = id.getLlegadaUtc();
+                    int cantidad = t.getCantidad();
 
-                    if (!lle.isAfter(presenteUtc)) {
-                        if (id.getDestino().equals(ep.getDestino())) {
-                            ep.setEntregado(ep.getEntregado() + t.getCantidad());
-                            entregadoPorPedido.merge(ep.getId(), t.getCantidad(), Integer::sum);
-                        } else {
-                            stockLibre.computeIfAbsent(id.getDestino(), k -> new ArrayList<>())
-                                    .add(new ArriboExogeno(lle, t.getCantidad()));
+                    if (sal.isBefore(presenteUtc)) {
+                        // 1) YA DESPEGA antes del presente: comprometer y, si llega ≤ presente, procesar arribo
+                        ep.setReservadoEnVuelo(ep.getReservadoEnVuelo() + cantidad);
+                        enVuelo.add(new TramoComprometido(ep.getId(), id, cantidad, ep.getDestino()));
+
+                        if (!lle.isAfter(presenteUtc)) {
+                            if (id.getDestino().equals(ep.getDestino())) {
+                                ep.setEntregado(ep.getEntregado() + cantidad);
+                                entregadoPorPedido.merge(ep.getId(), cantidad, Integer::sum);
+                            } else {
+                                stockLibre.computeIfAbsent(id.getDestino(), k -> new ArrayList<>())
+                                          .add(new ArriboExogeno(lle, cantidad));
+                            }
+                            ep.setReservadoEnVuelo(ep.getReservadoEnVuelo() - cantidad);
+                            enVuelo.removeIf(tc -> tc.pedidoId()==ep.getId() && tc.vueloId().equals(id));
                         }
-                        ep.setReservadoEnVuelo(ep.getReservadoEnVuelo() - t.getCantidad());
-                        // quitar de enVuelo si corresponde
-                        enVuelo.removeIf(tc -> tc.pedidoId()==ep.getId() && tc.vueloId().equals(id));
+
+                    } else if (!sal.isAfter(proximoCorte)) {
+                        // 2) Sale entre (presente, próximo corte]: RESERVA para la siguiente ventana
+                        capReservadaProx.merge(id, cantidad, Integer::sum);
+                        stockReservadoProx.merge(id.getOrigen(), cantidad, Integer::sum);
                     }
-                } else if (!sal.isAfter(proximoCorte)) {
-                    // 2) Sale entre (presente, próximo corte]: RESERVA para la siguiente ventana
-                    capReservadaProx.merge(id, t.getCantidad(), Integer::sum);
-                    stockReservadoProx.merge(id.getOrigen(), t.getCantidad(), Integer::sum);
+                    // 3) Si sale después del próximo corte: no reservamos (se reoptimiza en la siguiente iteración)
                 }
-                // 3) Si sale después del próximo corte: no reservamos (se reoptimiza en la siguiente iteración)
             }
         }
 

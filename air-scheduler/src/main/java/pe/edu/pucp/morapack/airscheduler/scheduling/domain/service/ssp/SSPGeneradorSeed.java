@@ -25,14 +25,16 @@ import java.util.stream.Collectors;
  *  - Capacidad residual por vuelo.
  *  - Ventana de consolidación 2h (todas las llegadas del pedido dentro de 2h desde la primera).
  *  - SLA 48h (llegada final <= createdAt + 48h).
+ *
+ * *** ACTUALIZADO ***
+ *  - Ahora PlanPedido se llena con List<RutaAsignada> (cada ruta tiene su cantidad y sus tramos).
  */
 public class SSPGeneradorSeed {
 
     private static final int H_MAX = 5;                        // tope razonable de escalas para evitar explosión
     private final Set<String> sedes;                           // orígenes habilitados para multi-hop
     private final StockLibre stockLibre;                       // stock disponible por no-sede (arribos exógenos no comprometidos)
-    private final Duration ventanaConsolidacion = Duration.ofHours(2);
-    private final Duration slaMax = Duration.ofHours(48);
+    private final Duration slaLlegadaMax = Duration.ofHours(46);
 
     /** Construye con sedes y arribos libres (no comprometidos) por aeropuerto. */
     public SSPGeneradorSeed(Set<String> sedes, Map<String, List<ArriboExogeno>> arribosLibres) {
@@ -44,10 +46,6 @@ public class SSPGeneradorSeed {
     public SSPGeneradorSeed(Set<String> sedes) {
         this(sedes, Map.of());
     }
-
-    /** (Compat) evitar usar este ctor: no sabe sedes ni stock. */
-    //@Deprecated
-    //public SSPGeneradorSeed() { this(Set.of(), Map.of()); }
 
     public SolucionProgramacion generarSeed(VuelosTEG teg,
                                             List<Pedido> pedidosOrdenados,
@@ -66,16 +64,15 @@ public class SSPGeneradorSeed {
             String dest = p.getDestino();
             int demanda = cantidadPedido(p);
             int rem = demanda;
-            Instant limite = p.getCreatedAtUtc().plus(slaMax);
+            Instant limite = p.getCreatedAtUtc().plus(slaLlegadaMax);
 
-            List<TramoAsignado> tramos = new ArrayList<>();
+            // ahora acumulamos RUTAS, no una lista plana de tramos
+            List<RutaAsignada> rutasAsignadas = new ArrayList<>();
             Instant primeraLlegada = null; // ancla para la ventana 2h
 
             while (rem > 0) {
                 // Si ya hay primera llegada, restringimos el límite por consolidación
-                Instant limiteLlegada = (primeraLlegada == null)
-                        ? limite
-                        : min(limite, primeraLlegada.plus(ventanaConsolidacion));
+                Instant limiteLlegada = limite;
 
                 // 1) Encontrar la MEJOR ruta (mín #escalas, luego menor llegada) desde cualquier sede a dest
                 Ruta ruta = null;
@@ -93,8 +90,8 @@ public class SSPGeneradorSeed {
 
                 // 3) Determinar cantidad asignable: mínimo de residuales en la ruta
                 int capRuta = capacidadEnRuta(carga, ruta);
-                if (capRuta <= 0) { // ruta inútil, intenta otra (poco probable por filtros previos)
-                    // Evitamos bucle infinito
+                if (capRuta <= 0) {
+                    // ruta inútil, evitamos bucle
                     break;
                 }
 
@@ -107,7 +104,6 @@ public class SSPGeneradorSeed {
                     int disp = stockLibre.disponible(origenInicial, salidaInicial);
                     if (disp <= 0) {
                         // no hay stock; intenta otra ruta
-                        // Para evitar bucles, abortamos esta iteración
                         break;
                     }
                     q = Math.min(q, disp);
@@ -115,12 +111,13 @@ public class SSPGeneradorSeed {
                     stockLibre.consumir(origenInicial, salidaInicial, q);
                 }
 
-                // 5) Asignar q en todos los tramos
+                // 5) Asignar q en todos los tramos y construir la RutaAsignada
+                List<TramoAsignado> tramosRuta = new ArrayList<>(ruta.legs.size());
                 for (VueloFicha leg : ruta.legs) {
                     carga.asignar(leg.id, q);
-                    // registramos tramo con su llegada individual (útil para auditoría)
-                    tramos.add(new TramoAsignado(leg.id, q, leg.id.getLlegadaUtc()));
+                    tramosRuta.add(new TramoAsignado(leg.id, q, leg.id.getLlegadaUtc()));
                 }
+                rutasAsignadas.add(new RutaAsignada(q, tramosRuta));
 
                 // 6) Actualizar remanente y ventana 2h
                 rem -= q;
@@ -130,10 +127,10 @@ public class SSPGeneradorSeed {
 
             PlanPedido plan = PlanPedido.builder()
                     .idPedido(p.getIdPedido())
-                    .destinoIcao(dest)
+                    .aeropuertoDestino(dest)
                     .creadoUtc(p.getCreatedAtUtc())
                     .demanda(demanda)
-                    .tramos(tramos)
+                    .rutas(rutasAsignadas)   // <<<<<<<<<<<<<<<<<<<<<<<<<<<
                     .build();
 
             planPorPedido.put(p.getIdPedido(), plan);
@@ -246,7 +243,6 @@ public class SSPGeneradorSeed {
 
         for (VueloFicha vf : direct) {
             if (carga.residual(vf.id) <= 0) continue;
-            // requiere stock libre en origen si no es sede (la semántica de este método es justamente no-sede)
             return new Ruta(List.of(vf));
         }
         return null;

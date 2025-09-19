@@ -4,7 +4,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.TEGEventBuilder;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosMap;
@@ -20,8 +22,8 @@ import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.scheduling.adapters.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.VerificadorSLA;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.ALNS;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators.*;
+//import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.ALNS;
+//import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators.*;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.ssp.SSPGeneradorSeed;
 
 public class Main {
@@ -66,7 +68,7 @@ public class Main {
             if (sc == null)
                 return;
             // Lectura “pura”: no tocar husos aquí
-            //pedidos.leerDatos(sc);
+            // pedidos.leerDatos(sc);
             pedidos.leerDatosProfe(sc);
 
         }
@@ -80,16 +82,17 @@ public class Main {
         pedidos.normalizarUtc(aeropuertosMap);
         // el while es para simular la llegada de pedidos en el tiempo
 
-        //revisión de datos guardados en pedidos
+        // revisión de datos guardados en pedidos
 
-        //pedidos.imprimrPedidos();
-        //System.exit(1);
-
+        // pedidos.imprimrPedidos();
+        // System.exit(1);
 
         Instant reloj = pedidos.primerInstanteUTC();
         if (reloj == null)
             return;
 
+        limpiarArchivosPrevios();
+        
         SolucionProgramacion solucionAnterior = null;
         while (!pedidos.isEmpty()) {
             // reloj avanza 6 horas
@@ -103,13 +106,13 @@ public class Main {
             }
 
             if (solucionAnterior != null) {
-                solucionAnterior.imprimir(presenteUTC, "reporteSimulacion.txt");
+                solucionAnterior.imprimirEnArchivo(presenteUTC, "reporteSimulacion.txt");
             }
 
             // solo copia los pedidos no desencola
             VentanaPedidos ventana = pedidos.acumuladoHasta(presenteUTC);// solo sacamos los pedidos de la
-                                                                                      // ventana
-            //pedidos.imprimirVentanaDePedidos(ventana);
+                                                                         // ventana
+            // pedidos.imprimirVentanaDePedidos(ventana);
             List<Pedido> listaPedidos = ventana.pedidos();
             if (listaPedidos.isEmpty())
                 break;
@@ -125,8 +128,8 @@ public class Main {
                     .finUtc(finUTC)
                     .capacidadWaitPorDefecto(null) // null => usa cap. de bodega del aeropuerto
                     .sedes(sedes)
-                    .arribosLibres(enVuelo)           // <— vuelos ya despegados
-                    .reservasWaitIniciales(reservas)  // <— ocupa bodega por pickup 2h
+                    .arribosLibres(enVuelo) // <— vuelos ya despegados
+                    .reservasWaitIniciales(reservas) // <— ocupa bodega por pickup 2h
                     // .stockInicial(si_tienes)
                     .build();
 
@@ -134,26 +137,45 @@ public class Main {
 
             SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
+            ImpresorSolucion.imprimirEnArchivo(seed, "solucion.txt");
             VerificadorSLA.assertBasicos(seed, Duration.ofHours(46));
 
             // ALNS
 
-            List<DestructionOperator> destructores = new ArrayList<>();
-            destructores.add(new RandomRemoval(20));
-            destructores.add(new WorstRemoval(20));
-            List<RepairOperator> reparadores = new ArrayList<>();
-            reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
+            // List<DestructionOperator> destructores = new ArrayList<>();
+            // destructores.add(new RandomRemoval(20));
+            // destructores.add(new WorstRemoval(20));
+            // List<RepairOperator> reparadores = new ArrayList<>();
+            // reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
 
-            ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC);
-            //System.out.println("Seed");
-            //ImpresorSolucion.imprimirEnConsola(seed);
-            SolucionProgramacion solucionOptima = alns.ejecutar(seed);
-            System.out.println("ALNS");
-            ImpresorSolucion.imprimirEnConsola(solucionOptima);
-            
-            //System.exit(1);
-            solucionAnterior = solucionOptima;
+            // ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores,
+            // presenteUTC);
+            // SolucionProgramacion solucionOptima = alns.ejecutar(seed);
+            // System.out.println("ALNS");
+            // ImpresorSolucion.imprimirEnArchivo(solucionOptima);
+
+            // System.exit(1);
+            solucionAnterior = seed;
+            System.out.println("Ventana de tiempo planificada, " + presenteUTC);
         }
+        System.out.println("Simulación terminada!");
 
+    }
+
+    private static void limpiarArchivosPrevios() {
+        borrarSiExiste("reporteSimulacion.txt");
+        borrarSiExiste("solucion.txt");
+    }
+
+    private static void borrarSiExiste(String nombre) {
+        try {
+            Path p = Paths.get(nombre);
+            if (Files.exists(p)) {
+                Files.delete(p);
+                System.out.println("🗑️ Eliminado: " + p.toAbsolutePath());
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ No se pudo borrar " + nombre + ": " + e.getMessage());
+        }
     }
 }
