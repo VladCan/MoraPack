@@ -92,7 +92,7 @@ public class Main {
             return;
 
         limpiarArchivosPrevios();
-        
+
         SolucionProgramacion solucionAnterior = null;
         while (!pedidos.isEmpty()) {
             // reloj avanza 6 horas
@@ -158,8 +158,11 @@ public class Main {
             solucionAnterior = seed;
             System.out.println("Ventana de tiempo planificada, " + presenteUTC);
         }
-        System.out.println("Simulación terminada!");
-
+        System.out.println("─────────────────────────────────────────────");
+        System.out.println("📄 Reporte de simulación guardado en: reporteSimulacion.txt");
+        System.out.println("📄 Detalle de la solución guardado en: solucion.txt");
+        System.out.println("─────────────────────────────────────────────");
+        System.out.println("👉 Revisa estos archivos en el directorio del proyecto.");
     }
 
     private static void limpiarArchivosPrevios() {
