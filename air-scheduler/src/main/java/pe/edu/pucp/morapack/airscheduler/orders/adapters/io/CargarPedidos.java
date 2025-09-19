@@ -11,7 +11,9 @@ import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
 import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.EstadoPedido;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.PlanPedido;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.RutaAsignada;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.TramoAsignado;
 
 @Getter
 @Setter
@@ -159,53 +161,66 @@ public class CargarPedidos {
     }
 
     public void eliminarYActualizarCumplidosHasta(Instant presenteUTC, SolucionProgramacion solucionAnterior) {
-        if (solucionAnterior == null || presenteUTC == null)
-            return;
+        if (solucionAnterior == null || presenteUTC == null) return;
 
-        // índice rápido de planes por id
         Map<Integer, PlanPedido> planes = solucionAnterior.getPlanPorPedido();
-        if (planes == null || planes.isEmpty())
-            return;
+        if (planes == null || planes.isEmpty()) return;
 
-        // Recorremos la cola y actualizamos/removemos en el acto
         for (Iterator<Pedido> it = colaPedidos.iterator(); it.hasNext();) {
             Pedido pedido = it.next();
             PlanPedido plan = planes.get(pedido.getIdPedido());
-            if (plan == null || plan.getTramos() == null || plan.getTramos().isEmpty()) {
-                // No hubo asignaciones previas para este pedido: no tocamos su cantidad
+            if (plan == null || plan.getRutas() == null || plan.getRutas().isEmpty()) {
+                // sin asignaciones previas para este pedido
                 continue;
             }
 
-            // 1) Cantidad efectivamente ENTREGADA (llegada ≤ corte)
-            int entregado = plan.getTramos().stream()
-                    .filter(t -> t.getLlegadaUtc() != null && !t.getLlegadaUtc().isAfter(presenteUTC))
-                    .mapToInt(t -> t.getCantidad())
-                    .sum();
+            int entregado = 0;   // rutas ya 100% llegadas al destino ≤ corte
+            int enProgreso = 0;  // rutas que ya iniciaron (primer tramo despegó < corte) pero aún no llegaron
 
-            // 2) Cantidad EN VUELO (salió antes del corte y llega después del corte)
-            int enVuelo = plan.getTramos().stream()
-                    .filter(t -> t.getVuelo().getSalidaUtc() != null && t.getLlegadaUtc() != null)
-                    .filter(t -> t.getVuelo().getSalidaUtc().isBefore(presenteUTC)
-                            && t.getLlegadaUtc().isAfter(presenteUTC))
-                    .mapToInt(t -> t.getCantidad())
-                    .sum();
+            for (RutaAsignada ruta : plan.getRutas()) {
+                if (ruta == null || ruta.getTramos() == null || ruta.getTramos().isEmpty()) continue;
 
-            // 3) Futuro (salida ≥ corte) se IGNORA completamente (replanificable)
+                var tramos = ruta.getTramos();
+                // por convenio los tramos de una ruta están en orden cronológico origen→destino
+                TramoAsignado first = tramos.get(0);
+                TramoAsignado last  = tramos.get(tramos.size() - 1);
+
+                Instant salidaPrimera = (first.getVuelo()   != null) ? first.getVuelo().getSalidaUtc()  : null;
+                Instant llegadaFinal  = (last.getLlegadaUtc() != null) ? last.getLlegadaUtc()            : null;
+
+                int q = ruta.getCantidad(); // cantidad que viaja por ESTA ruta
+
+                // 1) Ruta completamente entregada hasta el corte
+                if (llegadaFinal != null && !llegadaFinal.isAfter(presenteUTC)) {
+                    entregado += q;
+                    continue;
+                }
+
+                // 2) Ruta ya iniciada (comprometida) pero no entregada aún:
+                //    primer tramo despegó antes del corte (aunque esté en vuelo o esperando conexión)
+                if (salidaPrimera != null && salidaPrimera.isBefore(presenteUTC)) {
+                    enProgreso += q;
+                }
+                // 3) Si primer tramo sale ≥ corte => futuro, no suma a irrevocable
+            }
 
             int demandaTotal = pedido.getCantidad();
-            int cubiertoIrrevocable = entregado + enVuelo;
+            int cubiertoIrrevocable = entregado + enProgreso;
             int remanente = Math.max(0, demandaTotal - cubiertoIrrevocable);
 
             if (remanente == 0) {
-                // Ya está completamente cubierto por lo irrevocable: sacarlo de la cola
+                // totalmente cubierto por lo ya entregado + en progreso
                 it.remove();
             } else {
-                // Dejar solo el remanente para replanear
+                // mantenemos en cola sólo lo replanificable
                 pedido.setCantidad(remanente);
             }
         }
     }
 
+
+
+    
     // Añade estos formatters dentro de la clase CargarPedidos (como campos
     // estáticos)
     private static final java.time.format.DateTimeFormatter FMT_LOCAL = java.time.format.DateTimeFormatter

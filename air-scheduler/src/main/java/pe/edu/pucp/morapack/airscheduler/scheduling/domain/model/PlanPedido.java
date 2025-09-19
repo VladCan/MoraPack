@@ -1,79 +1,79 @@
 package pe.edu.pucp.morapack.airscheduler.scheduling.domain.model;
 
 import lombok.Builder;
+import lombok.Getter;
 import lombok.Singular;
-import lombok.Value;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
-/** Plan consolidado de un pedido (posibles múltiples vuelos directos). */
-@Value
+/** Plan de un pedido dividido en múltiples rutas (cada ruta agrupa sus tramos y una cantidad). */
+@Getter
 @Builder
 public class PlanPedido {
-    int idPedido;
-    String destinoIcao;//TODO: cambiar nombre a aereopuertoDestino aeropuerto destino
-    Instant creadoUtc;
-    int demanda;
+    private final int idPedido;
+    private final String aeropuertoDestino;
+    private final Instant creadoUtc;
+    private final int demanda;
 
-    @Singular
-    List<TramoAsignado> tramos; // cada tramo llega al aeropuerto destino
-    //solución de un pedido
+    /** Conjunto de rutas por las que viajan “porciones” del pedido. */
+    @Singular("ruta")
+    private final List<RutaAsignada> rutas;
 
-    public PlanPedido(int idPedido, String destinoIcao, Instant creadoUtc, int demanda, List<TramoAsignado> tramos) {
-        this.idPedido = idPedido;
-        this.destinoIcao = destinoIcao;
-        this.creadoUtc = creadoUtc;
-        this.demanda = demanda;
-        //  siempre guardamos como lista mutable
-        this.tramos = (tramos == null) ? new ArrayList<>() : new ArrayList<>(tramos);
-    }
-
+    /** Cantidad total asignada (suma de cantidades de todas las rutas). */
     public int totalAsignado() {
-        return tramos.stream().mapToInt(TramoAsignado::getCantidad).sum();
+        return (rutas == null) ? 0 : rutas.stream().mapToInt(RutaAsignada::getCantidad).sum();
     }
 
+    /** ¿El pedido está completo? */
     public boolean estaCompleto() {
         return totalAsignado() >= demanda;
     }
 
+    /** Primera llegada global entre TODAS las rutas. */
     public Instant primeraLlegada() {
-        return tramos.stream().map(TramoAsignado::getLlegadaUtc)
-                .min(Instant::compareTo).orElse(null);
+        if (rutas == null || rutas.isEmpty()) return null;
+        return rutas.stream()
+                .map(RutaAsignada::primeraLlegada)
+                .filter(java.util.Objects::nonNull)
+                .min(Instant::compareTo)
+                .orElse(null);
     }
 
+    /** Última llegada global entre TODAS las rutas. */
     public Instant ultimaLlegada() {
-        return tramos.stream().map(TramoAsignado::getLlegadaUtc)
-                .max(Instant::compareTo).orElse(null);
+        if (rutas == null || rutas.isEmpty()) return null;
+        return rutas.stream()
+                .map(RutaAsignada::ultimaLlegada)
+                .filter(java.util.Objects::nonNull)
+                .max(Instant::compareTo)
+                .orElse(null);
     }
 
-    public boolean respetaVentana2h(Duration ventana2h) {
-        if (tramos.isEmpty()) return true; // nada asignado aún
-        var a = primeraLlegada();
-        var b = ultimaLlegada();
-        return a != null && b != null && !b.isAfter(a.plus(ventana2h));
-    }
-
+    /** SLA: la última llegada global debe estar dentro de creado + slaMax. */
     public boolean respetaSLA(Duration slaMax) {
-        var fin = ultimaLlegada();
+        Instant fin = ultimaLlegada();
         return fin == null || !fin.isAfter(creadoUtc.plus(slaMax));
     }
 
-    public List<TramoAsignado> getTramosMutable() {
-        return tramos;
-    }
-
-    public void limpiarTramos() {
-        tramos.clear();
-    }
-
-
+    /** SLA con pickup: la última llegada debe ocurrir antes de (creado + (SLA - pickupTime)). */
     public boolean respetaSLAConPickup(Duration maxLlegadaDesdeCreacion) {
         Instant ult = ultimaLlegada();
-        if (ult == null) return false; // no hay llegadas => no cumple
+        if (ult == null) return false;
         Instant limite = creadoUtc.plus(maxLlegadaDesdeCreacion);
         return !ult.isAfter(limite);
+    }
+
+    /** Acceso de solo lectura a rutas. */
+    public List<RutaAsignada> getRutas() {
+        return (rutas == null) ? List.of() : Collections.unmodifiableList(rutas);
+    }
+
+    /** Vista aplanada de tramos (compatibilidad con código previo que recorre “tramos”). */
+    public List<TramoAsignado> getTramosAplanados() {
+        if (rutas == null) return List.of();
+        return rutas.stream().flatMap(r -> r.getTramos().stream()).toList();
     }
 }
