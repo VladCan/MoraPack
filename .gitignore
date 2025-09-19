@@ -1,16 +1,9 @@
-# Compiled class file
+# =========================
+# Java
+# =========================
 *.class
-
-# Log file
 *.log
-
-# BlueJ files
 *.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
 *.jar
 *.war
 *.nar
@@ -19,6 +12,59 @@
 *.tar.gz
 *.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+# Virtual machine crash logs
 hs_err_pid*
 replay_pid*
+*.hprof
+
+# =========================
+# Maven
+# =========================
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# =========================
+# Gradle
+# =========================
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# =========================
+# IntelliJ IDEA
+# =========================
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# =========================
+# Eclipse
+# =========================
+.project
+.classpath
+.settings/
+bin/
+
+# =========================
+# VS Code
+# =========================
+.vscode/
+
+# =========================
+# OS-specific junk
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Otros temporales
+# =========================
+.mtj.tmp/
+
+# =========================
+# Reportes de simulación
+# =========================
+reporteSimulacion.txt
+solucion.txt
