@@ -139,7 +139,7 @@ public class Main {
 
             SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
-            ImpresorSolucion.imprimirEnArchivo(seed, "solucion.txt");
+            //ImpresorSolucion.imprimirEnArchivo(seed, "solucion.txt");
             VerificadorSLA.assertBasicos(seed, Duration.ofHours(46));
 
             // ALNS
@@ -155,6 +155,7 @@ public class Main {
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
             // System.out.println("ALNS");
             //ImpresorSolucion.imprimirEnArchivo(solucionOptima);
+            ImpresorSolucion.imprimirEnArchivo(solucionOptima, "solucion.txt");
             solucionAnterior=solucionOptima;
             // System.exit(1);
             //solucionAnterior = seed;

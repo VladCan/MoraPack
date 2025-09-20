@@ -4,13 +4,12 @@ import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgram
 
 import java.util.*;
 
+import lombok.RequiredArgsConstructor;
+
+@RequiredArgsConstructor
 public class RandomRemoval implements DestructionOperator {
     private final int porcentaje;
     private final Random rnd = new Random();
-
-    public RandomRemoval(int porcentaje) {
-        this.porcentaje = porcentaje;
-    }
 
     @Override
     public void destroy(SolucionProgramacion s) {

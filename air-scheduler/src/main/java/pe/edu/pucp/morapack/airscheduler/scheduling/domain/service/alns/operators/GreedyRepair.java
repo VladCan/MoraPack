@@ -13,15 +13,13 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
+import lombok.RequiredArgsConstructor;
+
+@RequiredArgsConstructor
 public class GreedyRepair implements RepairOperator {
 
     private final List<String> sedes; // sedes válidas
     private final Map<String, List<Vuelo>> vuelosPorOrigen; // vuelos disponibles
-
-    public GreedyRepair(List<String> sedes, Map<String, List<Vuelo>> vuelosPorOrigen) {
-        this.sedes = sedes;
-        this.vuelosPorOrigen = vuelosPorOrigen;
-    }
 
     @Override
     public void repair(SolucionProgramacion s) {

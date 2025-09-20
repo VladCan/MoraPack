@@ -9,13 +9,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import lombok.RequiredArgsConstructor;
+
+@RequiredArgsConstructor
 public class WorstRemoval implements DestructionOperator {
     private final int porcentaje;
     private final Random rnd = new Random();
-
-    public WorstRemoval(int porcentaje) {
-        this.porcentaje = porcentaje;
-    }
 
     @Override
     public void destroy(SolucionProgramacion s) {
