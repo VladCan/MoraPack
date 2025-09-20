@@ -76,4 +76,11 @@ public class PlanPedido {
         if (rutas == null) return List.of();
         return rutas.stream().flatMap(r -> r.getTramos().stream()).toList();
     }
+
+    public void limpiarTramos() {
+        if (rutas != null) {
+            rutas.forEach(r -> r.getTramos().clear());
+        }
+    }
+
 }

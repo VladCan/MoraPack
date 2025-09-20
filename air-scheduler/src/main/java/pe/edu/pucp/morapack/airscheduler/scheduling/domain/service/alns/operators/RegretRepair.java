@@ -2,14 +2,12 @@ package pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operato
 
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosTEG;
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.Vuelo;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.PlanPedido;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.TramoAsignado;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.VueloProgramadoId;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.*;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * RegretRepair mejorado con Dijkstra sobre el TEG:
@@ -31,14 +29,18 @@ public class RegretRepair implements RepairOperator {
     @Override
     public void repair(SolucionProgramacion s) {
         for (PlanPedido plan : s.getPlanPorPedido().values()) {
-            if (plan.getTramos() != null && !plan.getTramos().isEmpty()) continue;
+            if (plan.getTramosAplanados() != null && !plan.getTramosAplanados().isEmpty()) continue;
 
             List<List<Vuelo>> rutas = new ArrayList<>();
             for (String sede : sedes) {
-                List<Vuelo> ruta = dijkstraRuta(sede, plan.getDestinoIcao(), plan.getDemanda());
+                List<Vuelo> ruta = dijkstraRuta(sede, plan.getAeropuertoDestino(), plan.getDemanda());
                 if (ruta != null && !ruta.isEmpty()) {
                     rutas.add(ruta);
                 }
+            }
+
+            if( plan.getIdPedido()==456){
+                System.out.println("456");
             }
 
             if (rutas.isEmpty()) continue;
@@ -60,12 +62,21 @@ public class RegretRepair implements RepairOperator {
             }
 
             // Asignar la ruta al plan
-            plan.getTramos().clear();
-            for (Vuelo v : elegida) {
-                plan.getTramos().add(
-                        vueloToTramoAsignado(v, plan.getDemanda(), plan.getCreadoUtc())
-                );
-            }
+            List<TramoAsignado> tramos = elegida.stream()
+                    .map(v -> vueloToTramoAsignado(v, plan.getDemanda(), plan.getCreadoUtc()))
+                    .collect(Collectors.toList());
+
+            RutaAsignada nuevaRuta = new RutaAsignada(plan.getDemanda(),tramos);
+            List<RutaAsignada> rutasActuales = new ArrayList<>(plan.getRutas());
+            rutasActuales.add(nuevaRuta);
+            PlanPedido nuevoPlan = PlanPedido.builder()
+                    .idPedido(plan.getIdPedido())
+                    .aeropuertoDestino(plan.getAeropuertoDestino())
+                    .creadoUtc(plan.getCreadoUtc())
+                    .demanda(plan.getDemanda())
+                    .rutas(rutasActuales) // método que acepta lista completa (Lombok builder soporta)
+                    .build();
+            s.getPlanPorPedido().put(nuevoPlan.getIdPedido(), nuevoPlan);
         }
     }
 
