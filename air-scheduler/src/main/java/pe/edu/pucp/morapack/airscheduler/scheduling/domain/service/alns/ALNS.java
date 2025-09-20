@@ -92,10 +92,10 @@ public class ALNS {
         if (!sol.respetaCapacidadesVuelos()) costo += 50;
 
         // Penalización por incumplimiento de ventana 2h
-        long fueraVentana = sol.getPlanPorPedido().values().stream()
+        /*long fueraVentana = sol.getPlanPorPedido().values().stream()
                 .filter(p -> !p.respetaVentana2h(java.time.Duration.ofHours(2)))
                 .count();
-        costo += fueraVentana * 5;
+        costo += fueraVentana * 5;*/
 
         return costo;
     }

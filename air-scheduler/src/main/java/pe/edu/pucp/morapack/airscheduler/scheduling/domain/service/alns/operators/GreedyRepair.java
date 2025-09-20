@@ -2,6 +2,7 @@ package pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operato
 
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.Vuelo;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.PlanPedido;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.RutaAsignada;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.TramoAsignado;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.VueloProgramadoId;
@@ -25,7 +26,7 @@ public class GreedyRepair implements RepairOperator {
     @Override
     public void repair(SolucionProgramacion s) {
         for (PlanPedido plan : s.getPlanPorPedido().values()) {
-            if (plan.getTramos() != null && !plan.getTramos().isEmpty()) continue;
+            if (plan.getTramosAplanados() != null && !plan.getTramosAplanados().isEmpty()) continue;
 
             // Heurística simple: primer vuelo disponible desde alguna sede
             for (String sede : sedes) {
@@ -33,7 +34,7 @@ public class GreedyRepair implements RepairOperator {
                 if (vuelos == null) continue;
 
                 for (Vuelo v : vuelos) {
-                    if (v.getDestino().equals(plan.getDestinoIcao()) &&
+                    if (v.getDestino().equals(plan.getAeropuertoDestino()) &&
                             v.getCapacidad() >= plan.getDemanda()) {
 
                         // Convertir LocalTime a Instant usando la fecha de creación del plan
@@ -51,12 +52,17 @@ public class GreedyRepair implements RepairOperator {
 
                         TramoAsignado tramo = new TramoAsignado(id, plan.getDemanda(), llegadaUtc);
 
-                        plan.getTramos().clear(); // aseguramos que esté vacío
-                        plan.getTramos().add(tramo);
-                        break; // asignamos solo un vuelo
+                        // Crear una nueva ruta con ese único tramo
+                        RutaAsignada nuevaRuta = new RutaAsignada(plan.getDemanda(),List.of(tramo));
+
+                        // Limpiar y asignar
+                        plan.limpiarTramos();
+                        plan.getRutas().clear(); // ⚠️ getRutas() es unmodifiable → aquí quizá debas exponer addRuta()
+                        plan.getRutas().add(nuevaRuta); // ← si permites modificar rutas
+                        break;
                     }
                 }
-                if (!plan.getTramosMutable().isEmpty()) break; // ya se asignó
+                if (!plan.getTramosAplanados().isEmpty()) break; // ya se asignó
             }
         }
     }
