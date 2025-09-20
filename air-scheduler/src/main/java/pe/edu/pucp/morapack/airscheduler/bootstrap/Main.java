@@ -24,6 +24,8 @@ import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgram
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.VerificadorSLA;
 //import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.ALNS;
 //import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators.*;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.ALNS;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators.*;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.ssp.SSPGeneradorSeed;
 
 public class Main {
@@ -142,20 +144,20 @@ public class Main {
 
             // ALNS
 
-            // List<DestructionOperator> destructores = new ArrayList<>();
-            // destructores.add(new RandomRemoval(20));
-            // destructores.add(new WorstRemoval(20));
-            // List<RepairOperator> reparadores = new ArrayList<>();
-            // reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
+            List<DestructionOperator> destructores = new ArrayList<>();
+            destructores.add(new RandomRemoval(20));
+            destructores.add(new WorstRemoval(20));
+            List<RepairOperator> reparadores = new ArrayList<>();
+            reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
 
-            // ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores,
-            // presenteUTC);
-            // SolucionProgramacion solucionOptima = alns.ejecutar(seed);
+            ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores,
+            presenteUTC);
+            SolucionProgramacion solucionOptima = alns.ejecutar(seed);
             // System.out.println("ALNS");
-            // ImpresorSolucion.imprimirEnArchivo(solucionOptima);
-
+            //ImpresorSolucion.imprimirEnArchivo(solucionOptima);
+            solucionAnterior=solucionOptima;
             // System.exit(1);
-            solucionAnterior = seed;
+            //solucionAnterior = seed;
             System.out.println("Ventana de tiempo planificada, " + presenteUTC);
         }
         System.out.println("─────────────────────────────────────────────");

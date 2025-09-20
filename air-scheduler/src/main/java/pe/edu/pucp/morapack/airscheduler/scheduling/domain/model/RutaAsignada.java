@@ -1,6 +1,7 @@
 package pe.edu.pucp.morapack.airscheduler.scheduling.domain.model;
 
 import lombok.Builder;
+import lombok.Setter;
 import lombok.Singular;
 import lombok.Value;
 
@@ -22,6 +23,8 @@ public class RutaAsignada {
         this.cantidad = cantidad;
         this.tramos = tramos;
     }
+
+
 
     /** Instante de primera llegada de la ruta (arribo de su primer tramo en destino final). */
     public Instant primeraLlegada() {
