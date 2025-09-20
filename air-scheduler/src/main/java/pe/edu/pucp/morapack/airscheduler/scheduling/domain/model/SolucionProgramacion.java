@@ -23,12 +23,13 @@ public class SolucionProgramacion {
     private final CargaPorVuelo cargaPorVuelo;
 
     public SolucionProgramacion(Map<Integer, PlanPedido> planPorPedido, CargaPorVuelo cargaPorVuelo) {
-        this.planPorPedido = Map.copyOf(planPorPedido);
+        this.planPorPedido = new HashMap<>(planPorPedido);  // <-- mutable
         this.cargaPorVuelo = cargaPorVuelo;
     }
 
+
     public SolucionProgramacion(SolucionProgramacion otra) {
-        this.planPorPedido = Map.copyOf(otra.planPorPedido);
+        this.planPorPedido = new HashMap<>(otra.planPorPedido);  // <-- mutable
         this.cargaPorVuelo = otra.cargaPorVuelo;
     }
 

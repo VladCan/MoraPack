@@ -10,9 +10,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * RegretRepair mejorado con Dijkstra sobre el TEG:
- * - Encuentra la mejor ruta (multi-hop) según costo-tiempo.
- * - Usa k para aplicar criterio de regret.
+ * RegretRepair paralelizado:
+ * - Procesa planes en paralelo.
+ * - Procesa rutas dentro de cada plan en paralelo.
  */
 public class RegretRepair implements RepairOperator {
 
@@ -28,56 +28,63 @@ public class RegretRepair implements RepairOperator {
 
     @Override
     public void repair(SolucionProgramacion s) {
-        for (PlanPedido plan : s.getPlanPorPedido().values()) {
-            if (plan.getTramosAplanados() != null && !plan.getTramosAplanados().isEmpty()) continue;
+        List<PlanPedido> planos = new ArrayList<>(s.getPlanPorPedido().values());
 
-            List<List<Vuelo>> rutas = new ArrayList<>();
-            for (String sede : sedes) {
-                List<Vuelo> ruta = dijkstraRuta(sede, plan.getAeropuertoDestino(), plan.getDemanda());
-                if (ruta != null && !ruta.isEmpty()) {
-                    rutas.add(ruta);
-                }
-            }
+        // Paralelizamos el procesamiento de planes
+        List<PlanPedido> nuevosPlanos = planos.parallelStream()
+                .map(plan -> {
+                    if (plan.getRutas() == null || plan.getRutas().isEmpty()) {
+                        return plan; // sin cambios
+                    }
 
-            if( plan.getIdPedido()==456){
-                System.out.println("456");
-            }
+                    // Procesamos rutas en paralelo
+                    List<RutaAsignada> nuevasRutas = plan.getRutas().parallelStream()
+                            .map(rutaActual -> repararRuta(plan, rutaActual))
+                            .collect(Collectors.toList());
 
-            if (rutas.isEmpty()) continue;
+                    // Construimos nuevo plan con rutas actualizadas
+                    return PlanPedido.builder()
+                            .idPedido(plan.getIdPedido())
+                            .aeropuertoDestino(plan.getAeropuertoDestino())
+                            .creadoUtc(plan.getCreadoUtc())
+                            .demanda(plan.getDemanda())
+                            .rutas(nuevasRutas)
+                            .build();
+                })
+                .toList();
 
-            // Ordenamos rutas por costo total (costo + tiempo)
-            //System.out.println("Antes de ordenar:");
-            //rutas.forEach(r -> System.out.println(r + " -> " + costoRuta(r)));
-            rutas.sort(Comparator.comparingDouble(this::costoRuta));
-            //System.out.println("Después de ordenar:");
-            //rutas.forEach(r -> System.out.println(r + " -> " + costoRuta(r)));
-
-            // Selección con regret (aunque aquí usamos la mejor)
-            List<Vuelo> elegida;
-            if (rutas.size() <= k) {
-                elegida = rutas.get(0);
-            } else {
-                double regret = costoRuta(rutas.get(k)) - costoRuta(rutas.get(0));
-                elegida = rutas.get(0);
-            }
-
-            // Asignar la ruta al plan
-            List<TramoAsignado> tramos = elegida.stream()
-                    .map(v -> vueloToTramoAsignado(v, plan.getDemanda(), plan.getCreadoUtc()))
-                    .collect(Collectors.toList());
-
-            RutaAsignada nuevaRuta = new RutaAsignada(plan.getDemanda(),tramos);
-            List<RutaAsignada> rutasActuales = new ArrayList<>(plan.getRutas());
-            rutasActuales.add(nuevaRuta);
-            PlanPedido nuevoPlan = PlanPedido.builder()
-                    .idPedido(plan.getIdPedido())
-                    .aeropuertoDestino(plan.getAeropuertoDestino())
-                    .creadoUtc(plan.getCreadoUtc())
-                    .demanda(plan.getDemanda())
-                    .rutas(rutasActuales) // método que acepta lista completa (Lombok builder soporta)
-                    .build();
+        // Reemplazamos todos los planes de golpe
+        for (PlanPedido nuevoPlan : nuevosPlanos) {
             s.getPlanPorPedido().put(nuevoPlan.getIdPedido(), nuevoPlan);
         }
+    }
+
+    /**
+     * Repara una ruta de un plan (puede ejecutarse en paralelo).
+     */
+    private RutaAsignada repararRuta(PlanPedido plan, RutaAsignada rutaActual) {
+        List<List<Vuelo>> candidatos = new ArrayList<>();
+        for (String sede : sedes) {
+            List<Vuelo> camino = dijkstraRuta(sede, plan.getAeropuertoDestino(), rutaActual.getCantidad());
+            if (camino != null && !camino.isEmpty()) candidatos.add(camino);
+        }
+
+        if (candidatos.isEmpty()) {
+            // No encontramos alternativa → dejamos la ruta igual
+            return rutaActual;
+        }
+
+        // Ordenamos por costo
+        candidatos.sort(Comparator.comparingDouble(this::costoRuta));
+
+        // Elegimos la mejor (regret se puede usar después)
+        List<Vuelo> elegida = candidatos.get(0);
+
+        List<TramoAsignado> tramos = elegida.stream()
+                .map(v -> vueloToTramoAsignado(v, rutaActual.getCantidad(), plan.getCreadoUtc()))
+                .collect(Collectors.toList());
+
+        return new RutaAsignada(rutaActual.getCantidad(), tramos);
     }
 
     /**
@@ -86,7 +93,7 @@ public class RegretRepair implements RepairOperator {
     private List<Vuelo> dijkstraRuta(String origen, String destino, int demanda) {
         Map<String, Double> dist = new HashMap<>();
         Map<String, Vuelo> previo = new HashMap<>();
-        PriorityQueue<String> pq = new PriorityQueue<>(Comparator.comparingDouble(dist::get));
+        PriorityQueue<String> pq = new PriorityQueue<>(Comparator.comparingDouble(n -> dist.getOrDefault(n, Double.POSITIVE_INFINITY)));
 
         for (String nodo : teg.getVuelosPorOrigen().keySet()) {
             dist.put(nodo, Double.POSITIVE_INFINITY);
@@ -96,6 +103,7 @@ public class RegretRepair implements RepairOperator {
 
         while (!pq.isEmpty()) {
             String actual = pq.poll();
+            if (Double.isInfinite(dist.getOrDefault(actual, Double.POSITIVE_INFINITY))) continue;
             if (actual.equals(destino)) break;
 
             List<Vuelo> salidas = teg.getVuelosPorOrigen().get(actual);
@@ -105,7 +113,7 @@ public class RegretRepair implements RepairOperator {
                 if (v.getCapacidad() < demanda) continue;
 
                 double peso = v.getCosto() + v.getHoraGMTDestino().toSecondOfDay() * 0.001;
-                double nuevoDist = dist.get(actual) + peso;
+                double nuevoDist = dist.getOrDefault(actual, Double.POSITIVE_INFINITY) + peso;
 
                 if (nuevoDist < dist.getOrDefault(v.getDestino(), Double.POSITIVE_INFINITY)) {
                     dist.put(v.getDestino(), nuevoDist);
@@ -115,7 +123,6 @@ public class RegretRepair implements RepairOperator {
             }
         }
 
-        // reconstruir ruta
         if (!previo.containsKey(destino)) return null;
 
         List<Vuelo> ruta = new ArrayList<>();
