@@ -4,41 +4,26 @@ package pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns;
 import java.time.Instant;
 import java.util.*;
 
-import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosTEG;
-import pe.edu.pucp.morapack.airscheduler.flights.domain.model.Vuelo;
 import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.Solucion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators.DestructionOperator;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators.RepairOperator;
 
+import lombok.RequiredArgsConstructor;
+
+@RequiredArgsConstructor
 public class ALNS {
 
-    /*private final Map<String, List<Vuelo>> vuelosPorOrigen;
-    private final AeropuertosMap aeropuertosMap;
-    private final List<Pedido> pedidos;
-    private final List<String> sedes;
-    */
-    private final List<DestructionOperator> destructions;
-    private final List<RepairOperator> repairs;
     private final VuelosTEG teg;
     private final List<Pedido> pedidos;
-    private final Random rnd = new Random();
-    private  final Instant presenteUTC;
-    //Parametros ALNS
-    private final int maxIter = 100;
-    private final double tasaCambio = 0.3;  // para probabilidades de aceptar peor solución
+    private final List<DestructionOperator> destructions;
+    private final List<RepairOperator> repairs;
+    private final Instant presenteUTC;
+    private final Random rnd = new Random();        // RNG compartido para selección de operadores
+    private final int maxIter = 100;                // iteraciones máximas
+    private final double tasaCambio = 0.3;          // probabilidad de aceptar peores soluciones
 
-    public ALNS(VuelosTEG teg, List<Pedido> pedidos,
-                List<DestructionOperator> destructions,
-                List<RepairOperator> repairs, Instant presenteUTC) {
-        this.teg = teg;
-        this.pedidos = pedidos;
-        this.destructions = destructions;
-        this.repairs = repairs;
-        this.presenteUTC = presenteUTC;
-    }
     public SolucionProgramacion ejecutar(SolucionProgramacion solucionInicial) {
 
         SolucionProgramacion mejorSolucion = solucionInicial;

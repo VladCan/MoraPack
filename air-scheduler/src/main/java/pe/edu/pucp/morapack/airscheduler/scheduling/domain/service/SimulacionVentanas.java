@@ -11,6 +11,10 @@ import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.scheduling.adapters.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.*;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -68,32 +72,26 @@ public final class SimulacionVentanas {
     }
 
     /** Estado interno de un pedido activo. */
+    @Getter
+    @RequiredArgsConstructor
     private static final class EstadoPedido {
         private final int id;
         private final String destino;
         private final Instant creadoUtc;
         private final int demandaTotal;
+        @Setter
         private int entregado;         // suma de llegadas al destino
+        @Setter
         private int reservadoEnVuelo;  // suma de tramos comprometidos aún no arribados
 
-        EstadoPedido(int id, String destino, Instant creadoUtc, int demanda) {
-            this.id = id; this.destino = destino; this.creadoUtc = creadoUtc; this.demandaTotal = demanda;
-        }
         int remanenteParaPlan() {
             int r = demandaTotal - entregado - reservadoEnVuelo;
             return Math.max(0, r);
         }
-        boolean completado() { return entregado >= demandaTotal; }
 
-        // getters/setters básicos
-        public int getId() { return id; }
-        public String getDestino() { return destino; }
-        public Instant getCreadoUtc() { return creadoUtc; }
-        public int getDemandatotal() { return demandaTotal; }
-        public int getEntregado() { return entregado; }
-        public void setEntregado(int e) { this.entregado = e; }
-        public int getReservadoEnVuelo() { return reservadoEnVuelo; }
-        public void setReservadoEnVuelo(int r) { this.reservadoEnVuelo = r; }
+        boolean completado() {
+            return entregado >= demandaTotal;
+        }
     }
 
     /** Tramo comprometido (ya no se puede cambiar). */
