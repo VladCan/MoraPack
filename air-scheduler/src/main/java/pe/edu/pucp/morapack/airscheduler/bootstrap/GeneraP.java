@@ -22,15 +22,20 @@ public class GeneraP {
             "VIDP", "OSDI", "OERK", "OMDB", "OAKB", "OOMS", "OYSN", "OPKC", "OJAI"
     };
 
-    // Formato final: yyyy-MM-dd-HH-mm-ss
+    // Formato original: yyyy-MM-dd-HH-mm-ss
     private static final DateTimeFormatter HORA_LOCAL =
             DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss");
 
+    // Para el CSV: ISO local sin milisegundos
+    private static final DateTimeFormatter ISO_LOCAL_SECONDS =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
     /**
-     * Genera pedidos con el formato solicitado:
-     * yyyy-MM-dd-HH-mm-ss-dest-###-IdClien
+     * Genera ambos archivos:
+     * - pedidosProfe.txt (formato original)
+     * - pedidosProfe_alt.csv (idpedido,idcliente,codigoaeropuerto,fechaPedido,cantidad)
      */
-    public static void generarArchivo(Path ruta, int cantidadPedidos, int horasHorizonte) {
+    public static void generarArchivo(Path baseRuta, int cantidadPedidos, int horasHorizonte) {
         AeropuertosMap aMap = new AeropuertosMap();
         try (Scanner sc = ArchivoUtils.getScannerFromResource(AIRPORTS_RESOURCE)) {
             if (sc == null)
@@ -39,7 +44,9 @@ public class GeneraP {
         }
 
         Random random = new Random();
-        List<String> pedidos = new ArrayList<>();
+
+        List<String> pedidosFormatoOriginal = new ArrayList<>();
+        List<String> pedidosFormatoNuevo = new ArrayList<>();
 
         // ===== 1) Línea de tiempo global UTC (monótona) =====
         Instant base = Instant.now().truncatedTo(ChronoUnit.SECONDS);
@@ -50,9 +57,9 @@ public class GeneraP {
         Instant t = base;
 
         for (int i = 1; i <= cantidadPedidos; i++) {
-            // Cliente (7 dígitos)
+            // Cliente
             int idCliente = 100 + random.nextInt(51); // [100..150]
-            String idClienteStr = String.format("%07d", idCliente);
+            String idClienteStr7 = String.format("%07d", idCliente); // para el archivo original
 
             // Destino
             String destino = DESTINOS[random.nextInt(DESTINOS.length)];
@@ -60,9 +67,9 @@ public class GeneraP {
             // ===== 2) Avanzar el reloj global en UTC =====
             long step = avgStepSec + (random.nextLong(-jitterMax, jitterMax + 1));
             if (step < 1) step = 1;
-            t = t.plusSeconds(step); // siempre crece, asegura orden cronológico
+            t = t.plusSeconds(step); // siempre crece
 
-            // ===== 3) Convertir a hora local recién aquí =====
+            // ===== 3) Convertir a hora local =====
             int gmt = Optional.ofNullable(aMap.obtener(destino))
                     .map(a -> a.getGMT())
                     .orElse(0);
@@ -70,36 +77,54 @@ public class GeneraP {
             LocalDateTime fechaLocal = LocalDateTime.ofInstant(t, offset);
 
             // ========================
-            // Modelo logístico de demanda
+            // Modelo logístico de demanda (igual que antes)
             // ========================
             double k = 300; // máximo
             double x0 = cantidadPedidos / 2.0; // punto medio
             double r = 0.01 + 0.02 * random.nextDouble(); // pendiente aleatoria
             int cantidad = (int) Math.round(k / (1 + Math.exp(-r * (i - x0))));
-
-            // Ajustar a rango válido [1..300]
             if (cantidad < 20) cantidad = 20;
             if (cantidad > 300) cantidad = 300;
 
-            String cantidadStr = String.format("%03d", cantidad);
+            String cantidadStr3 = String.format("%03d", cantidad);
 
-            // ===== 4) Formato final =====
-            String linea = fechaLocal.format(HORA_LOCAL) + "-" +
+            // ===== 4A) Línea formato original =====
+            String lineaOriginal = fechaLocal.format(HORA_LOCAL) + "-" +
                     destino + "-" +
-                    cantidadStr + "-" +
-                    idClienteStr;
+                    cantidadStr3 + "-" +
+                    idClienteStr7;
+            pedidosFormatoOriginal.add(lineaOriginal);
 
-            pedidos.add(linea);
+            // ===== 4B) Línea formato nuevo =====
+            // idpedido,idcliente,codigoaeropuerto,fechaPedido,cantidad
+            String lineaNueva = i + "," +
+                    idCliente + "," +
+                    destino + "," +
+                    fechaLocal.format(ISO_LOCAL_SECONDS) + "," +
+                    cantidad;
+            pedidosFormatoNuevo.add(lineaNueva);
         }
 
-        // Ya no hace falta ordenar, porque la generación en UTC ya garantiza cronología
-        // pedidos.sort(Comparator.naturalOrder());
+        // ===== Escribir archivos =====
+        // Archivo original
+        Path rutaOriginal = baseRuta;
+        escribirArchivo(rutaOriginal, pedidosFormatoOriginal);
 
+        // Archivo nuevo (mismo folder, distinto nombre)
+        Path rutaNueva = rutaOriginal.getParent() != null
+                ? rutaOriginal.getParent().resolve("pedidosProfe_alt.csv")
+                : Path.of("pedidosProfe_alt.csv");
+        escribirArchivo(rutaNueva, pedidosFormatoNuevo);
+
+        System.out.println("Archivo (formato original) generado en: " + rutaOriginal.toAbsolutePath());
+        System.out.println("Archivo (formato nuevo) generado en: " + rutaNueva.toAbsolutePath());
+    }
+
+    private static void escribirArchivo(Path ruta, List<String> lineas) {
         try (FileWriter writer = new FileWriter(ruta.toFile(), StandardCharsets.UTF_8)) {
-            for (String pedido : pedidos) {
-                writer.write(pedido + "\n");
+            for (String linea : lineas) {
+                writer.write(linea + "\n");
             }
-            System.out.println("Archivo generado en: " + ruta);
         } catch (IOException e) {
             System.out.println("Error al generar archivo: " + e.getMessage());
         }
