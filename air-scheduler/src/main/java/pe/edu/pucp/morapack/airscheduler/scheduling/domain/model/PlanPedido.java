@@ -1,17 +1,20 @@
 package pe.edu.pucp.morapack.airscheduler.scheduling.domain.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Singular;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 /** Plan de un pedido dividido en múltiples rutas (cada ruta agrupa sus tramos y una cantidad). */
 @Getter
 @Builder
+@AllArgsConstructor
 public class PlanPedido {
     private final int idPedido;
     private final String aeropuertoDestino;
@@ -22,10 +25,30 @@ public class PlanPedido {
     @Singular("ruta")
     private final List<RutaAsignada> rutas;
 
+    public PlanPedido(PlanPedido otro) {
+        this.idPedido = otro.getIdPedido();
+        this.aeropuertoDestino = otro.getAeropuertoDestino();
+        this.creadoUtc = otro.getCreadoUtc();
+        this.demanda = otro.getDemanda();
+
+        // Copia profunda de las rutas
+        if (otro.getRutas() != null) {
+            this.rutas = new ArrayList<>();
+            for (RutaAsignada r : otro.getRutas()) {
+                this.rutas.add(new RutaAsignada(r)); // usamos constructor copia de RutaAsignada
+            }
+        } else {
+            this.rutas = new ArrayList<>();
+        }
+    }
+
+
     /** Cantidad total asignada (suma de cantidades de todas las rutas). */
     public int totalAsignado() {
         return (rutas == null) ? 0 : rutas.stream().mapToInt(RutaAsignada::getCantidad).sum();
     }
+
+
 
     /** ¿El pedido está completo? */
     public boolean estaCompleto() {

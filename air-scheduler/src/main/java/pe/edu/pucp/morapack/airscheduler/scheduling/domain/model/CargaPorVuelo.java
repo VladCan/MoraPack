@@ -12,7 +12,7 @@ public class CargaPorVuelo {
 
     private final Map<VueloProgramadoId, Integer> capacidad = new HashMap<>();
     private final Map<VueloProgramadoId, Integer> asignado  = new HashMap<>();
-
+    private final Map<String, Map<String, Integer>> data = new HashMap<>();
     public void registrarCapacidad(VueloProgramadoId id, int cap) {
         capacidad.merge(id, cap, Integer::sum); // si el TEG duplica, sumamos (por seguridad)
     }
@@ -36,5 +36,12 @@ public class CargaPorVuelo {
             throw new IllegalStateException("Se excede la capacidad del vuelo: " + id);
         }
         asignado.put(id, nuevo);
+    }
+
+    public Iterable<? extends Map.Entry<String, Map<String, Integer>>> entrySet() {
+        return data.entrySet();
+    }
+    public void put(String vuelo, Map<String, Integer> carga) {
+        data.put(vuelo, carga);
     }
 }

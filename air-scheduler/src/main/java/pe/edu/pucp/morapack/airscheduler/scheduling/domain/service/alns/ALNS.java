@@ -1,6 +1,6 @@
 package pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns;
 
-
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
@@ -21,25 +21,23 @@ public class ALNS {
     private final List<RepairOperator> repairs;
     private final Instant presenteUTC;
     private final Random rnd = new Random();        // RNG compartido para selección de operadores
-    private final int maxIter = 50;                // iteraciones máximas
+    private final int maxIter = 50;                 // iteraciones máximas
     private final double tasaCambio = 0.3;          // probabilidad de aceptar peores soluciones
 
     public SolucionProgramacion ejecutar(SolucionProgramacion solucionInicial) {
 
-        SolucionProgramacion mejorSolucion = solucionInicial;
-        SolucionProgramacion solucionActual = solucionInicial;
+        // Copias profundas desde el inicio
+        SolucionProgramacion mejorSolucion = new SolucionProgramacion(solucionInicial);
+        SolucionProgramacion solucionActual = new SolucionProgramacion(solucionInicial);
 
         for (int iter = 0; iter < maxIter; iter++) {
 
-            // Seleccionar un operador aleatorio de destrucción y reparación
+            // Seleccionar operadores aleatorios
             DestructionOperator destrOp = destructions.get(rnd.nextInt(destructions.size()));
             RepairOperator repairOp = repairs.get(rnd.nextInt(repairs.size()));
 
-            // Copiar la solución actual
-            SolucionProgramacion nuevaSol = SolucionProgramacion.builder()
-                    .planPorPedido(solucionActual.asMap())
-                    .cargaPorVuelo(solucionActual.getCargaPorVuelo())
-                    .build();
+            // Copia profunda de la solución actual
+            SolucionProgramacion nuevaSol = new SolucionProgramacion(solucionActual);
 
             // Aplicar destrucción
             destrOp.destroy(nuevaSol);
@@ -47,20 +45,20 @@ public class ALNS {
             // Aplicar reparación
             repairOp.repair(nuevaSol);
 
-            // Evaluar costo
+            // Evaluar costos
             double costoNueva = getCostoTotal(nuevaSol);
             double costoActual = getCostoTotal(solucionActual);
             double costoMejor = getCostoTotal(mejorSolucion);
 
             // Actualizar mejor solución
             if (costoNueva < costoMejor) {
-                mejorSolucion = nuevaSol;
-                System.out.println("Cambio");
+                mejorSolucion = new SolucionProgramacion(nuevaSol); // copia profunda
+                //System.out.println("Cambio de mejor solución en iteración " + iter);
             }
 
-            // Criterio de aceptación simple (mejor o igual, o con tasa de cambio)
+            // Aceptar nueva solución (según criterio)
             if (costoNueva <= costoActual || rnd.nextDouble() < tasaCambio) {
-                solucionActual = nuevaSol;
+                solucionActual = new SolucionProgramacion(nuevaSol); // copia profunda
             }
         }
 
@@ -70,18 +68,27 @@ public class ALNS {
     private double getCostoTotal(SolucionProgramacion sol) {
         double costo = 0;
 
-        // Pedidos incompletos
+        // Penalización por pedidos incompletos (10 por cada uno)
         costo += sol.pedidosIncompletos().size() * 10;
 
         // Penalización por incumplimiento de capacidad
-        if (!sol.respetaCapacidadesVuelos()) costo += 50;
+        if (!sol.respetaCapacidadesVuelos()) {
+            costo += 50;
+        }
 
-        // Penalización por incumplimiento de ventana 2h
-        /*long fueraVentana = sol.getPlanPorPedido().values().stream()
-                .filter(p -> !p.respetaVentana2h(java.time.Duration.ofHours(2)))
+        // Penalización por incumplimiento SLA 48h (cada pedido fuera suma 20)
+        long fueraSLA48 = sol.getPlanPorPedido().values().stream()
+                .filter(p -> !p.respetaSLA(Duration.ofHours(48)))
                 .count();
-        costo += fueraVentana * 5;*/
+        costo += fueraSLA48 * 20;
+
+        // Penalización por incumplimiento SLA con pickup de 2h (cada pedido fuera suma 15)
+        long fueraPickup = sol.getPlanPorPedido().values().stream()
+                .filter(p -> !p.respetaSLAConPickup(Duration.ofHours(46))) // SLA48 - 2h
+                .count();
+        costo += fueraPickup * 15;
 
         return costo;
     }
+
 }
