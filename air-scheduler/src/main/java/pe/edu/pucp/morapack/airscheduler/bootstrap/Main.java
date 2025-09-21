@@ -149,7 +149,7 @@ public class Main {
             destructores.add(new WorstRemoval(20));
             List<RepairOperator> reparadores = new ArrayList<>();
             reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
-
+            reparadores.add(new SplitRepair(new ArrayList<>(sedes),teg,50));
             ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores,
             presenteUTC);
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
