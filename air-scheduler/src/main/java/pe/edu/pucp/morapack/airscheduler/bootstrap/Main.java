@@ -176,6 +176,7 @@ public class Main {
     private static void limpiarArchivosPrevios() {
         borrarSiExiste("reporteSimulacion.txt");
         borrarSiExiste("solucion.txt");
+        borrarSiExiste("solucionInicial.txt");
     }
 
     private static void borrarSiExiste(String nombre) {
