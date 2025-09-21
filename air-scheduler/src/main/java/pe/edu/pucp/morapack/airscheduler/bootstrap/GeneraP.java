@@ -17,9 +17,9 @@ public class GeneraP {
     private static final String AIRPORTS_RESOURCE = "c.1inf54.25.2.Aeropuerto.husos.v1.20250818__estudiantes.txt";
 
     private static final String[] DESTINOS = {
-            "SKBO", "SEQM", "SVMI", "SBBR", "SPIM", "SLLP", "SCEL", "SABE", "SGAS", "SUAA",
-            "LATI", "EDDI", "LOWW", "EBCI", "UMMS", "LBSF", "LKPR", "LDZA", "EKCH", "EHAM",
-            "VIDP", "OSDI", "OERK", "OMDB", "OAKB", "OOMS", "OYSN", "OPKC", "UBBB", "OJAI"
+            "SKBO", "SEQM", "SVMI", "SBBR", "SLLP", "SCEL", "SABE", "SGAS", "SUAA",
+            "LATI", "EDDI", "LOWW", "UMMS", "LBSF", "LKPR", "LDZA", "EKCH", "EHAM",
+            "VIDP", "OSDI", "OERK", "OMDB", "OAKB", "OOMS", "OYSN", "OPKC", "OJAI"
     };
 
     // Formato final: yyyy-MM-dd-HH-mm-ss
@@ -72,14 +72,14 @@ public class GeneraP {
             // ========================
             // Modelo logístico de demanda
             // ========================
-            double k = 5000; // máximo
+            double k = 300; // máximo
             double x0 = cantidadPedidos / 2.0; // punto medio
             double r = 0.01 + 0.02 * random.nextDouble(); // pendiente aleatoria
             int cantidad = (int) Math.round(k / (1 + Math.exp(-r * (i - x0))));
 
-            // Ajustar a rango válido [1..999]
-            if (cantidad < 300) cantidad = 300;
-            if (cantidad > 5000) cantidad = 5000;
+            // Ajustar a rango válido [1..300]
+            if (cantidad < 20) cantidad = 20;
+            if (cantidad > 300) cantidad = 300;
 
             String cantidadStr = String.format("%03d", cantidad);
 
@@ -132,6 +132,6 @@ public class GeneraP {
             throw new RuntimeException("No pude crear carpeta: " + out, e);
         }
         System.out.println("Generando en: " + out.toAbsolutePath());
-        generarArchivo(out, 100, 12);
+        generarArchivo(out, 500, 12);
     }
 }
