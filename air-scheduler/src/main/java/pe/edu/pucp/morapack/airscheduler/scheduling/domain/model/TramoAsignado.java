@@ -10,4 +10,16 @@ public class TramoAsignado {
     VueloProgramadoId vuelo;
     int cantidad;
     Instant llegadaUtc;
+
+    public TramoAsignado(VueloProgramadoId vuelo, int cantidad, Instant llegadaUtc) {
+        this.vuelo = vuelo;
+        this.cantidad = cantidad;
+        this.llegadaUtc = llegadaUtc;
+    }
+
+    public TramoAsignado(TramoAsignado otro) {
+        this.vuelo = new VueloProgramadoId(otro.getVuelo()); // nueva instancia
+        this.cantidad = otro.getCantidad();
+        this.llegadaUtc = otro.getLlegadaUtc(); // Instant es inmutable, se puede copiar así
+    }
 }

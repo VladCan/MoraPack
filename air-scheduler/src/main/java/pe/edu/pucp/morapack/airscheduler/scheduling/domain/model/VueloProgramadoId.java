@@ -11,4 +11,18 @@ public class VueloProgramadoId {
     String destino;
     Instant salidaUtc;
     Instant llegadaUtc;
+
+    public VueloProgramadoId(String origen, String destino, Instant salidaUtc, Instant llegadaUtc) {
+        this.origen = origen;
+        this.destino = destino;
+        this.salidaUtc = salidaUtc;
+        this.llegadaUtc = llegadaUtc;
+    }
+
+    public VueloProgramadoId(VueloProgramadoId otro) {
+        this.origen = otro.getOrigen();
+        this.destino = otro.getDestino();
+        this.salidaUtc = otro.getSalidaUtc();
+        this.llegadaUtc = otro.getLlegadaUtc();
+    }
 }
