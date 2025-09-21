@@ -31,7 +31,7 @@ import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.ssp.SSPGenera
 public class Main {
 
     // Parámetros de simulación (ajustables)
-    private static final long HORAS_VENTANA = 6;
+    private static final long HORAS_VENTANA = 12;
     private static final long HORIZONTE_TEG_H = 72; // cuánto futuro modelar
 
     public static void main(String[] args) {
@@ -140,10 +140,10 @@ public class Main {
             SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
             //ImpresorSolucion.imprimirEnArchivo(seed, "solucion.txt");
-            VerificadorSLA.assertBasicos(seed, Duration.ofHours(46));
+            
 
             // ALNS
-
+            
             List<DestructionOperator> destructores = new ArrayList<>();
             destructores.add(new RandomRemoval(20));
             destructores.add(new WorstRemoval(20));
@@ -157,6 +157,7 @@ public class Main {
             //ImpresorSolucion.imprimirEnArchivo(solucionOptima);
             ImpresorSolucion.imprimirEnArchivo(solucionOptima, "solucion.txt");
             solucionAnterior=solucionOptima;
+            VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46));
             // System.exit(1);
             //solucionAnterior = seed;
             System.out.println("Ventana de tiempo planificada, " + presenteUTC);
