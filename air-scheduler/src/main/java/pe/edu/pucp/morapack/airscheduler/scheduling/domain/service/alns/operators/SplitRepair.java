@@ -10,8 +10,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Reparador que toma pedidos grandes y los parte en subrutas
- * para que se asignen a múltiples vuelos si es necesario.
+ * SplitRepair:
+ * - Si un plan NO tiene rutas, genera rutas nuevas dividiendo la demanda.
+ * - Si un plan tiene rutas grandes, las divide en subrutas de tamaño más pequeño.
  */
 public class SplitRepair implements RepairOperator {
 
@@ -34,32 +35,22 @@ public class SplitRepair implements RepairOperator {
 
             List<RutaAsignada> nuevasRutas = new ArrayList<>();
 
-            int demandaRestante = plan.getDemanda();
-            while (demandaRestante > 0) {
-                // lote máximo = min(demandaRestante, mejor capacidad de la red)
-                int lote = calcularLote(demandaRestante);
-
-                List<Vuelo> mejorRuta = buscarMejorRuta(plan.getAeropuertoDestino(), lote);
-
-                if (mejorRuta == null || mejorRuta.isEmpty()) {
-                    // Si no encontramos ruta, dejamos de partir
-                    break;
+            if (plan.getRutas() == null || plan.getRutas().isEmpty()) {
+                // Caso 1: No hay rutas, construir nuevas dividiendo la demanda
+                nuevasRutas.addAll(generarRutasDivididas(plan.getDemanda(), plan.getAeropuertoDestino(), plan.getCreadoUtc()));
+            } else {
+                // Caso 2: Hay rutas → revisar si alguna es demasiado grande
+                for (RutaAsignada ruta : plan.getRutas()) {
+                    if (ruta.getCantidad() > umbralGrande) {
+                        // Dividimos la ruta en bloques más pequeños
+                        nuevasRutas.addAll(generarRutasDivididas(ruta.getCantidad(), plan.getAeropuertoDestino(), plan.getCreadoUtc()));
+                    } else {
+                        nuevasRutas.add(ruta);
+                    }
                 }
-
-                // Convertir a tramos asignados
-                List<TramoAsignado> tramos = mejorRuta.stream()
-                        .map(v -> vueloToTramoAsignado(v, lote, plan.getCreadoUtc()))
-                        .collect(Collectors.toList());
-
-                nuevasRutas.add(new RutaAsignada(lote, tramos));
-                demandaRestante -= lote;
             }
 
-            // Si no generamos nada nuevo, conservar original
-            if (nuevasRutas.isEmpty() && plan.getRutas() != null) {
-                nuevasRutas.addAll(plan.getRutas());
-            }
-
+            // Construir plan actualizado
             PlanPedido nuevoPlan = PlanPedido.builder()
                     .idPedido(plan.getIdPedido())
                     .aeropuertoDestino(plan.getAeropuertoDestino())
@@ -72,9 +63,31 @@ public class SplitRepair implements RepairOperator {
         }
     }
 
-    /** Calcula cuánto partir en cada lote */
+    /** Genera rutas dividiendo la demanda en lotes */
+    private List<RutaAsignada> generarRutasDivididas(int demanda, String destino, Instant creadoUtc) {
+        List<RutaAsignada> rutas = new ArrayList<>();
+        int demandaRestante = demanda;
+
+        while (demandaRestante > 0) {
+            int lote = calcularLote(demandaRestante);
+
+            List<Vuelo> mejorRuta = buscarMejorRuta(destino, lote);
+            if (mejorRuta == null || mejorRuta.isEmpty()) {
+                break; // si no encontramos ruta, detenemos el split
+            }
+
+            List<TramoAsignado> tramos = mejorRuta.stream()
+                    .map(v -> vueloToTramoAsignado(v, lote, creadoUtc))
+                    .collect(Collectors.toList());
+
+            rutas.add(new RutaAsignada(lote, tramos));
+            demandaRestante -= lote;
+        }
+        return rutas;
+    }
+
+    /** Calcula el tamaño del lote */
     private int calcularLote(int demandaRestante) {
-        // ejemplo: mínimo entre la demanda y un bloque fijo (ej. 100)
         return Math.min(demandaRestante, umbralGrande);
     }
 

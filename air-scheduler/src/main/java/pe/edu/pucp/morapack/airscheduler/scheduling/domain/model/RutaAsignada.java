@@ -24,6 +24,10 @@ public class RutaAsignada {
         this.tramos = tramos;
     }
 
+    public RutaAsignada(RutaAsignada r) {
+        this.cantidad=r.getCantidad();
+        this.tramos=r.getTramos();
+    }
 
 
     /** Instante de primera llegada de la ruta (arribo de su primer tramo en destino final). */

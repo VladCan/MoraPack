@@ -29,9 +29,21 @@ public class SolucionProgramacion {
 
 
     public SolucionProgramacion(SolucionProgramacion otra) {
-        this.planPorPedido = new HashMap<>(otra.planPorPedido);  // <-- mutable
-        this.cargaPorVuelo = otra.cargaPorVuelo;
+        // Copiar profundo planPorPedido
+        this.planPorPedido = new HashMap<>();
+        for (Map.Entry<Integer, PlanPedido> entry : otra.planPorPedido.entrySet()) {
+            this.planPorPedido.put(entry.getKey(), new PlanPedido(entry.getValue()));
+        }
+
+        // Copiar profundo cargaPorVuelo
+        this.cargaPorVuelo = new CargaPorVuelo();
+        for (Map.Entry<String, Map<String, Integer>> entry : otra.cargaPorVuelo.entrySet()) {
+            this.cargaPorVuelo.put(entry.getKey(), new HashMap<>(entry.getValue()));
+        }
     }
+
+
+
 
     public PlanPedido planDe(int idPedido) { return planPorPedido.get(idPedido); }
 
