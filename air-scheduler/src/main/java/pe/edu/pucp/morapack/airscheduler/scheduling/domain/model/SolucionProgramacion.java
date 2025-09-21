@@ -36,10 +36,8 @@ public class SolucionProgramacion {
         }
 
         // Copiar profundo cargaPorVuelo
-        this.cargaPorVuelo = new CargaPorVuelo();
-        for (Map.Entry<String, Map<String, Integer>> entry : otra.cargaPorVuelo.entrySet()) {
-            this.cargaPorVuelo.put(entry.getKey(), new HashMap<>(entry.getValue()));
-        }
+        this.cargaPorVuelo = new CargaPorVuelo(otra.cargaPorVuelo);
+
     }
 
 

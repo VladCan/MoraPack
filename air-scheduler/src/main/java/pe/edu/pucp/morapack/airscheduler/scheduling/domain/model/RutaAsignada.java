@@ -6,6 +6,7 @@ import lombok.Singular;
 import lombok.Value;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 /** Una ruta (secuencia de tramos) por la que viaja una cantidad del pedido. */
@@ -25,8 +26,13 @@ public class RutaAsignada {
     }
 
     public RutaAsignada(RutaAsignada r) {
-        this.cantidad=r.getCantidad();
-        this.tramos=r.getTramos();
+        this.cantidad = r.getCantidad();
+        this.tramos = new ArrayList<>();
+        if(r.getTramos()!=null){
+            for(TramoAsignado t: r.getTramos()){
+                this.tramos.add(new TramoAsignado(t));
+            }
+        }
     }
 
 

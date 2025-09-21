@@ -10,11 +10,31 @@ import java.util.Map;
 @Getter
 public class CargaPorVuelo {
 
-    private final Map<VueloProgramadoId, Integer> capacidad = new HashMap<>();
-    private final Map<VueloProgramadoId, Integer> asignado  = new HashMap<>();
-    private final Map<String, Map<String, Integer>> data = new HashMap<>();
+    private Map<VueloProgramadoId, Integer> capacidad = new HashMap<>();
+    private Map<VueloProgramadoId, Integer> asignado  = new HashMap<>();
+    private Map<String, Map<String, Integer>> data = new HashMap<>();
     public void registrarCapacidad(VueloProgramadoId id, int cap) {
         capacidad.merge(id, cap, Integer::sum); // si el TEG duplica, sumamos (por seguridad)
+    }
+
+    public CargaPorVuelo() {
+    }
+
+    public CargaPorVuelo(CargaPorVuelo otra) {
+        this.capacidad = new HashMap<>();
+        for (Map.Entry<VueloProgramadoId, Integer> e : otra.capacidad.entrySet()) {
+            this.capacidad.put(new VueloProgramadoId(e.getKey()), e.getValue());
+        }
+
+        this.asignado = new HashMap<>();
+        for (Map.Entry<VueloProgramadoId, Integer> e : otra.asignado.entrySet()) {
+            this.asignado.put(new VueloProgramadoId(e.getKey()), e.getValue());
+        }
+
+        this.data = new HashMap<>();
+        for (Map.Entry<String, Map<String, Integer>> e : otra.data.entrySet()) {
+            this.data.put(e.getKey(), new HashMap<>(e.getValue())); // copia profunda
+        }
     }
 
     public int capacidad(VueloProgramadoId id) {

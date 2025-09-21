@@ -38,6 +38,8 @@ public class ALNS {
 
             // Copia profunda de la solución actual
             SolucionProgramacion nuevaSol = new SolucionProgramacion(solucionActual);
+            //nuevaSol.getPlanPorPedido().get(1).limpiarTramos();
+            //solucionActual.getPlanPorPedido().get(1).getRutas();
 
             // Aplicar destrucción
             destrOp.destroy(nuevaSol);
