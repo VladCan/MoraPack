@@ -35,6 +35,7 @@ public class Main {
     private static final long HORIZONTE_TEG_H = 72; // cuánto futuro modelar
 
     public static void main(String[] args) {
+        long start = System.nanoTime();
         /*
          * =======================
          * 1) SEDES Y CATÁLOGOS
@@ -139,7 +140,7 @@ public class Main {
 
             SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
-            //ImpresorSolucion.imprimirEnArchivo(seed, "solucion.txt");
+            ImpresorSolucion.imprimirEnArchivo(seed, "solucionInicial.txt");
             
 
             // ALNS
@@ -167,6 +168,9 @@ public class Main {
         System.out.println("📄 Detalle de la solución guardado en: solucion.txt");
         System.out.println("─────────────────────────────────────────────");
         System.out.println("👉 Revisa estos archivos en el directorio del proyecto.");
+        long end = System.nanoTime();
+        long durationMs = (end - start) / 1_000_000;
+        System.out.println("⏱️ Tiempo total de ejecución: " + durationMs + " ms");
     }
 
     private static void limpiarArchivosPrevios() {
