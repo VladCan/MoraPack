@@ -31,10 +31,11 @@ import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.ssp.SSPGenera
 public class Main {
 
     // Parámetros de simulación (ajustables)
-    private static final long HORAS_VENTANA = 6;
+    private static final long HORAS_VENTANA = 12;
     private static final long HORIZONTE_TEG_H = 72; // cuánto futuro modelar
 
     public static void main(String[] args) {
+        long start = System.nanoTime();
         /*
          * =======================
          * 1) SEDES Y CATÁLOGOS
@@ -139,11 +140,11 @@ public class Main {
 
             SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
-            //ImpresorSolucion.imprimirEnArchivo(seed, "solucion.txt");
-            VerificadorSLA.assertBasicos(seed, Duration.ofHours(46));
+            ImpresorSolucion.imprimirEnArchivo(seed, "solucionInicial.txt");
+            
 
             // ALNS
-
+            
             List<DestructionOperator> destructores = new ArrayList<>();
             destructores.add(new RandomRemoval(20));
             destructores.add(new WorstRemoval(20));
@@ -157,6 +158,7 @@ public class Main {
             //ImpresorSolucion.imprimirEnArchivo(solucionOptima);
             ImpresorSolucion.imprimirEnArchivo(solucionOptima, "solucion.txt");
             solucionAnterior=solucionOptima;
+            VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46));
             // System.exit(1);
             //solucionAnterior = seed;
             System.out.println("Ventana de tiempo planificada, " + presenteUTC);
@@ -166,6 +168,9 @@ public class Main {
         System.out.println("📄 Detalle de la solución guardado en: solucion.txt");
         System.out.println("─────────────────────────────────────────────");
         System.out.println("👉 Revisa estos archivos en el directorio del proyecto.");
+        long end = System.nanoTime();
+        long durationMs = (end - start) / 1_000_000;
+        System.out.println("⏱️ Tiempo total de ejecución: " + durationMs + " ms");
     }
 
     private static void limpiarArchivosPrevios() {
