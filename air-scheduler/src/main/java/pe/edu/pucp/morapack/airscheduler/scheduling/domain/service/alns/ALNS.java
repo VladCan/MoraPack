@@ -21,7 +21,7 @@ public class ALNS {
     private final List<RepairOperator> repairs;
     private final Instant presenteUTC;
     private final Random rnd = new Random();        // RNG compartido para selección de operadores
-    private final int maxIter = 50;                 // iteraciones máximas
+    private final int maxIter = 10;                 // iteraciones máximas
     private final double tasaCambio = 0.3;          // probabilidad de aceptar peores soluciones
 
     public SolucionProgramacion ejecutar(SolucionProgramacion solucionInicial) {
