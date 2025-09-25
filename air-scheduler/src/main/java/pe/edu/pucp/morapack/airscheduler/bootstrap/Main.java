@@ -88,7 +88,7 @@ public class Main {
             // quitamos pedidos cumplidos y actualizamos los pedidos medio cumplidos
             if (solucionAnterior != null) pedidos.eliminarYActualizarCumplidosHasta(presenteUTC, solucionAnterior);
             //imprimimos un reporte del estado de los pedididos en el tiempo presenteUTC
-            if (solucionAnterior != null) solucionAnterior.imprimirEnArchivo(presenteUTC, "reporteSimulacion.txt");
+            if (solucionAnterior != null) solucionAnterior.imprimirEnArchivo(presenteUTC, "out/reporteSimulacion.txt");
             // solo copia los pedidos no desencola
             VentanaPedidos ventana = pedidos.acumuladoHasta(presenteUTC);// solo sacamos los pedidos de la ventana
             List<Pedido> listaPedidos = ventana.pedidos();
@@ -114,7 +114,7 @@ public class Main {
 
             SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
-            ImpresorSolucion.imprimirEnArchivo(seed, "solucionInicial.txt");
+            ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt");
             
             // ALNS
             List<DestructionOperator> destructores = new ArrayList<>();
@@ -128,8 +128,8 @@ public class Main {
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
             // System.out.println("ALNS");
             //ImpresorSolucion.imprimirEnArchivo(solucionOptima);
-            ImpresorSolucion.imprimirEnArchivo(solucionOptima, "solucion.txt");
-            ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "reporteAereopuertos.txt");
+            ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt");
+            ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
             solucionAnterior = solucionOptima;
             VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46));
             System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
@@ -139,9 +139,9 @@ public class Main {
             System.out.println("Ventana de tiempo planificada, " + presenteUTC);
         }
         System.out.println("─────────────────────────────────────────────");
-        System.out.println("📄 Reporte de simulación guardado en: reporteSimulacion.txt");
-        System.out.println("📄 Detalle de la solución guardado en: solucion.txt");
-        System.out.println("📄 Movimientos por aeropuerto guardado en: reporteAereopuertos.txt");
+        System.out.println("📄 Reporte de simulación guardado en: out/reporteSimulacion.txt");
+        System.out.println("📄 Detalle de la solución guardado en: out/solucion.txt");
+        System.out.println("📄 Movimientos por aeropuerto guardado en: out/reporteAereopuertos.txt");
         System.out.println("─────────────────────────────────────────────");
         System.out.println("👉 Revisa estos archivos en el directorio del proyecto.");
         long end = System.nanoTime();
@@ -151,10 +151,10 @@ public class Main {
 
 
     private static void limpiarArchivosPrevios() {
-        borrarSiExiste("reporteSimulacion.txt");
-        borrarSiExiste("solucion.txt");
-        borrarSiExiste("solucionInicial.txt");
-        borrarSiExiste("reporteAereopuertos.txt");
+        borrarSiExiste("out/reporteSimulacion.txt");
+        borrarSiExiste("out/solucion.txt");
+        borrarSiExiste("out/solucionInicial.txt");
+        borrarSiExiste("out/reporteAereopuertos.txt");
     }
 
     private static void borrarSiExiste(String nombre) {
