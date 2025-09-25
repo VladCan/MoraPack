@@ -68,3 +68,5 @@ Thumbs.db
 # =========================
 reporteSimulacion.txt
 solucion.txt
+solucionInicial.txt
+out/*

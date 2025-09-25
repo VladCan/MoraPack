@@ -79,12 +79,12 @@ public class GeneraP {
             // ========================
             // Modelo logístico de demanda (igual que antes)
             // ========================
-            double k = 300; // máximo
+            double k = 999; // máximo
             double x0 = cantidadPedidos / 2.0; // punto medio
             double r = 0.01 + 0.02 * random.nextDouble(); // pendiente aleatoria
             int cantidad = (int) Math.round(k / (1 + Math.exp(-r * (i - x0))));
             if (cantidad < 20) cantidad = 20;
-            if (cantidad > 300) cantidad = 300;
+            if (cantidad > 999) cantidad = 999;
 
             String cantidadStr3 = String.format("%03d", cantidad);
 
@@ -157,6 +157,10 @@ public class GeneraP {
             throw new RuntimeException("No pude crear carpeta: " + out, e);
         }
         System.out.println("Generando en: " + out.toAbsolutePath());
+<<<<<<< HEAD
         generarArchivo(out, 50, 12);
+=======
+        generarArchivo(out, 100, 12);
+>>>>>>> refs/remotes/origin/daniel
     }
 }
