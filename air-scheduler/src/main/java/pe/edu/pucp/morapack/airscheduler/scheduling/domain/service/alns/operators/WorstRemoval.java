@@ -21,7 +21,8 @@ public class WorstRemoval implements DestructionOperator {
         Map<Integer, PlanPedido> planes = s.getPlanPorPedido();
         if (planes.isEmpty()) return;
 
-        // Heurística: ordenar planes por cantidad total de tramos (más "complejos" primero)
+        // Heurística: ordenar planes por cantidad total de tramos 
+        // (más "complejos" primero)
         List<PlanPedido> listaPlanes = new ArrayList<>(planes.values());
         listaPlanes.sort(Comparator.comparingInt(
                 p -> -p.getTramosAplanados().size()
@@ -31,7 +32,8 @@ public class WorstRemoval implements DestructionOperator {
 
         for (int i = 0; i < n && i < listaPlanes.size(); i++) {
             PlanPedido plan = listaPlanes.get(i);
-            plan.limpiarTramos(); // destruir = vaciar todos los tramos de sus rutas
+            // destruir = vaciar todos los tramos de sus rutas
+            plan.limpiarTramos(); 
         }
     }
 }

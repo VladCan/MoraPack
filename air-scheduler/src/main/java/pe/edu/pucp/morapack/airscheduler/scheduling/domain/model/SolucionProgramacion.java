@@ -93,9 +93,9 @@ public class SolucionProgramacion {
 
     /** Mantiene el comportamiento existente: imprime en consola. */
     public void imprimir(Instant reloj, String titulo) {
-        try (PrintWriter out = new PrintWriter(System.out, true)) {
-            imprimirA(reloj, titulo, out);
-        }
+        PrintWriter out = new PrintWriter(System.out, true);
+        imprimirA(reloj, titulo, out);
+        out.flush();
     }
 
     /**
@@ -143,11 +143,11 @@ public class SolucionProgramacion {
 
         for (PlanPedido p : pedidosOrden) {
             int dem = p.getDemanda();
-            int ent = entregadoHasta(p, reloj);
+            int ent = asignadoTotal(p);
             Instant ult = ultimaLlegadaHasta(p, reloj);
 
             sumDem += dem;
-            sumEnt += ent;
+            sumEnt += Math.min(dem, ent);   
 
             Row r = new Row(p.getIdPedido(), p.getAeropuertoDestino(), p.getCreadoUtc(), dem, ent, ult);
             if (ent >= dem) {
@@ -163,7 +163,7 @@ public class SolucionProgramacion {
         String sep = "-".repeat(110);
         out.printf("Pedidos: %d  |  Entregados: %d  |  Parciales: %d  |  Pendientes: %d%n",
                 total, nFull, nPartial, nZero);
-        out.printf("Unidades entregadas≤T: %,d / %,d  (%.1f%%)%n", sumEnt, sumDem, pct);
+        out.printf("Unidades asignadas: %,d / %,d  (%.1f%%)%n", sumEnt, sumDem, pct);
         out.println(sep);
 
         String header = String.format(
@@ -218,4 +218,223 @@ public class SolucionProgramacion {
                 .max(Instant::compareTo)
                 .orElse(null);
     }
+
+
+
+    //IMPRIMIR FITNESS
+
+
+
+
+
+
+
+
+
+
+
+
+    public record FitnessParams(
+        double wT, double wU, double wC, double wS,   // pesos
+        double bigCapPerUnit,                         // penalización por UNIDAD excedida de capacidad
+        double bigSlaPerHour,                         // penalización por HORA de tardanza
+        double Tref,                                  // normalizador de tramos (evita 0)
+        java.time.Duration slaMax                     // “deadline” relativo: p.getCreadoUtc() + slaMax
+) {
+    public static FitnessParams defaults() {
+        return new FitnessParams(
+                /*wT*/ 0.05, /*wU*/ 0.20, /*wC*/ 0.75, /*wS*/ 0.00,
+                /*bigCapPerUnit*/ 1.0e5,
+                /*bigSlaPerHour*/ 1.0e5,
+                /*Tref*/ 60.0,                 // ajústalo antes de correr (ver notas abajo)
+                /*slaMax*/ java.time.Duration.ofHours(48)
+        );
+    }
+}
+
+public static final class FitnessResult {
+    public final double fitness;
+    public final long T; public final double Tnorm;
+    public final double U; public final double C;
+    public final long splitsTotales;
+    public final long vuelos; public final long capTotal; public final long asignadoClamped;
+    public final long capOverUnits; public final int capOverVuelos;
+    public final long slaLateHours; public final int slaLatePedidos;
+
+    // contribuciones
+    public final double termT, termU, termC, termS, penCap, penSLA;
+
+    FitnessResult(
+            double fitness, long T, double Tnorm, double U, double C, long splitsTotales,
+            long vuelos, long capTotal, long asignadoClamped,
+            long capOverUnits, int capOverVuelos, long slaLateHours, int slaLatePedidos,
+            double termT, double termU, double termC, double termS, double penCap, double penSLA
+    ) {
+        this.fitness = fitness;
+        this.T = T; this.Tnorm = Tnorm; this.U = U; this.C = C; this.splitsTotales = splitsTotales;
+        this.vuelos = vuelos; this.capTotal = capTotal; this.asignadoClamped = asignadoClamped;
+        this.capOverUnits = capOverUnits; this.capOverVuelos = capOverVuelos;
+        this.slaLateHours = slaLateHours; this.slaLatePedidos = slaLatePedidos;
+        this.termT = termT; this.termU = termU; this.termC = termC; this.termS = termS;
+        this.penCap = penCap; this.penSLA = penSLA;
+    }
+}
+
+/** Calcula y MUESTRA el fitness con desglose claro. */
+public void imprimirFitness(Instant corte, FitnessParams P, PrintWriter out) {
+    out.print(formatearFitness(corte, P));
+    out.flush();
+}
+
+/** Muestra el fitness usando parámetros personalizados en la consola. */
+public void imprimirFitness(Instant corte, FitnessParams P) {
+    System.out.print(formatearFitness(corte, P));
+    System.out.flush();
+}
+
+/** Atajo: imprime a consola con los defaults. */
+public void imprimirFitness(Instant corte) {
+    imprimirFitness(corte, FitnessParams.defaults());
+}
+
+private String formatearFitness(Instant corte, FitnessParams P) {
+    FitnessResult r = evaluarFitness(corte, P);
+    String ln = System.lineSeparator();
+    StringBuilder sb = new StringBuilder(512);
+    java.util.Formatter fmt = new java.util.Formatter(sb, java.util.Locale.US);
+    try {
+        sb.append("╔══════════════════════════════════════════════════════════════════════╗").append(ln);
+        sb.append("║                         REPORTE DE FITNESS (ALNS)                    ║").append(ln);
+        sb.append("╚══════════════════════════════════════════════════════════════════════╝").append(ln);
+        sb.append("Corte (UTC): ").append(ts(corte)).append(ln);
+        sb.append("-".repeat(74)).append(ln);
+
+        fmt.format("Pedidos: %,d | Cumplimiento C = %.4f (%.1f%% por unidades)%n",
+                planPorPedido.size(), r.C, 100.0 * r.C);
+        fmt.format("Vuelos:  %,d | Capacidad total = %,d | Carga usada (clamped) = %,d | U = %.4f (%.1f%%)%n",
+                r.vuelos, r.capTotal, r.asignadoClamped, r.U, 100.0 * r.U);
+        fmt.format("Tramos usados T = %,d | Tnorm = %.4f (Tref = %.2f)%n", r.T, r.Tnorm, P.Tref);
+        fmt.format("Splits totales = %,d%n", r.splitsTotales);
+
+        sb.append("-".repeat(74)).append(ln);
+        sb.append("Violaciones:").append(ln);
+        fmt.format("  Capacidad: %,d unidades en exceso en %,d vuelos%n",
+                r.capOverUnits, r.capOverVuelos);
+        fmt.format("  SLA: %,d pedidos con tardanza acumulada de %,d horas%n",
+                r.slaLatePedidos, r.slaLateHours);
+
+        sb.append("-".repeat(74)).append(ln);
+        sb.append("Contribuciones al Fitness (minimización):").append(ln);
+        fmt.format("  wC*(1-C) = %.6f%n", r.termC);
+        fmt.format("  wU*(1-U) = %.6f%n", r.termU);
+        fmt.format("  wT*Tnorm = %.6f%n", r.termT);
+        fmt.format("  wS*Splits = %.6f%n", r.termS);
+        fmt.format("  PenCap    = %.6f%n", r.penCap);
+        fmt.format("  PenSLA    = %.6f%n", r.penSLA);
+        sb.append("-".repeat(74)).append(ln);
+        fmt.format("=> FITNESS FINAL = %.6f%n", r.fitness);
+        sb.append("=".repeat(74)).append(ln);
+    } finally {
+        fmt.close();
+    }
+    return sb.toString();
+}
+
+// ======= Núcleo del cálculo =======
+
+public FitnessResult evaluarFitness(Instant corte, FitnessParams P) {
+    Objects.requireNonNull(corte, "corte");
+    Objects.requireNonNull(P, "params");
+
+    // 1) Métricas de tramos (T) y splits
+    long T = 0L;
+    long splitsTotales = 0L;
+
+    // Para C (cumplimiento por unidades)
+    long demandTotal = 0L, entregadoTotal = 0L;
+
+    // Para SLA tardanza
+    long slaLateHours = 0L;
+    int  slaLatePedidos = 0;
+
+    for (PlanPedido plan : planPorPedido.values()) {
+        var rutas = plan.getRutas();
+        if (rutas != null && !rutas.isEmpty()) {
+            T += rutas.stream().mapToInt(r -> r.getTramos() == null ? 0 : r.getTramos().size()).sum();
+            // “partes” = cantidad de rutas con al menos 1 tramo
+            long partes = rutas.stream().filter(r -> r.getTramos() != null && !r.getTramos().isEmpty()).count();
+            if (partes > 1) splitsTotales += (partes - 1);
+        }
+
+        int dem = plan.getDemanda();
+        int ent = asignadoTotal(plan);      // ya implementado en tu clase
+        demandTotal += dem;
+        entregadoTotal += Math.min(dem, ent);
+
+        // tardanza respecto a (creado + slaMax)
+        Instant ult = ultimaLlegadaHasta(plan, corte);
+        if (ult != null) {
+            Instant ddl = plan.getCreadoUtc().plus(P.slaMax());
+            if (ult.isAfter(ddl)) {
+                long h = java.time.Duration.between(ddl, ult).toHours();
+                slaLateHours += Math.max(0L, h);
+                slaLatePedidos++;
+            }
+        } else if (dem > 0) {
+            // sin llegadas hasta corte → cuenta como tarde hasta el corte (conservador)
+            Instant ddl = plan.getCreadoUtc().plus(P.slaMax());
+            if (corte.isAfter(ddl)) {
+                long h = java.time.Duration.between(ddl, corte).toHours();
+                slaLateHours += Math.max(0L, h);
+                slaLatePedidos++;
+            }
+        }
+    }
+
+    double C = (demandTotal == 0) ? 1.0 : (double) entregadoTotal / (double) demandTotal;
+    double Tnorm = (P.Tref() <= 0.0) ? T : (T / P.Tref());
+
+    // 2) Métricas de utilización (U) y capacidad excedida usando CargaPorVuelo
+    long capTotal = 0L, asignadoClamped = 0L, capOverUnits = 0L;
+    int capOverVuelos = 0;
+
+    for (var e : cargaPorVuelo.getAsignado().entrySet()) {
+        VueloProgramadoId vueloId = e.getKey();
+        int asign = e.getValue();
+        int cap = cargaPorVuelo.capacidad(vueloId);
+        capTotal += cap;
+        asignadoClamped += Math.min(asign, cap);
+        if (asign > cap) {
+            capOverVuelos++;
+            capOverUnits += (asign - cap);
+        }
+    }
+    long vuelos = cargaPorVuelo.getAsignado().size();
+    double U = (capTotal == 0) ? 0.0 : (double) asignadoClamped / (double) capTotal;
+
+    // 3) Armar contribuciones y fitness
+    double termC = P.wC() * (1.0 - C);
+    double termU = P.wU() * (1.0 - U);
+    double termT = P.wT() * Tnorm;
+    double termS = P.wS() * ((double) splitsTotales / Math.max(1, planPorPedido.size()));
+
+    double penCap = P.bigCapPerUnit() * capOverUnits;      // por UNIDAD excedida
+    double penSLA = P.bigSlaPerHour() * slaLateHours;      // por HORA de tardanza
+
+    double fitness = termC + termU + termT + termS + penCap + penSLA;
+
+    return new FitnessResult(
+            fitness, T, Tnorm, U, C, splitsTotales,
+            vuelos, capTotal, asignadoClamped,
+            capOverUnits, capOverVuelos, slaLateHours, slaLatePedidos,
+            termT, termU, termC, termS, penCap, penSLA
+    );
+}
+/** Suma de cantidades asignadas en el plan (sin filtrar por el corte). */
+private static int asignadoTotal(PlanPedido plan) {
+    if (plan.getRutas() == null) return 0;
+    return plan.getRutas().stream()
+            .mapToInt(RutaAsignada::getCantidad)
+            .sum();
+}
 }
