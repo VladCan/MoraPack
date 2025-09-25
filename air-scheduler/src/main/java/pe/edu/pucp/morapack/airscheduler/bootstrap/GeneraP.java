@@ -157,6 +157,6 @@ public class GeneraP {
             throw new RuntimeException("No pude crear carpeta: " + out, e);
         }
         System.out.println("Generando en: " + out.toAbsolutePath());
-        generarArchivo(out, 500, 12);
+        generarArchivo(out, 50, 12);
     }
 }

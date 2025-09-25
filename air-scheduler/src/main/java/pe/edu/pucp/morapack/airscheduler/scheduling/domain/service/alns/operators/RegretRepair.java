@@ -25,7 +25,6 @@ public class RegretRepair implements RepairOperator {
         this.sedes = sedes;
         this.teg = teg;
     }
-
     @Override
     public void repair(SolucionProgramacion s) {
         List<PlanPedido> planos = new ArrayList<>(s.getPlanPorPedido().values());
@@ -58,10 +57,7 @@ public class RegretRepair implements RepairOperator {
             s.getPlanPorPedido().put(nuevoPlan.getIdPedido(), nuevoPlan);
         }
     }
-
-    /**
-     * Repara una ruta de un plan (puede ejecutarse en paralelo).
-     */
+    //Repara una ruta de un plan (puede ejecutarse en paralelo).
     private RutaAsignada repararRuta(PlanPedido plan, RutaAsignada rutaActual) {
         List<List<Vuelo>> candidatos = new ArrayList<>();
         for (String sede : sedes) {
@@ -86,10 +82,7 @@ public class RegretRepair implements RepairOperator {
 
         return new RutaAsignada(rutaActual.getCantidad(), tramos);
     }
-
-    /**
-     * Dijkstra sobre el grafo de vuelos.
-     */
+    //Dijkstra sobre el grafo de vuelos.
     private List<Vuelo> dijkstraRuta(String origen, String destino, int demanda) {
         Map<String, Double> dist = new HashMap<>();
         Map<String, Vuelo> previo = new HashMap<>();

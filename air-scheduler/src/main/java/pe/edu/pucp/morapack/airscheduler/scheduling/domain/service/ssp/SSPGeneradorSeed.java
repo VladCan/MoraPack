@@ -273,7 +273,7 @@ public class SSPGeneradorSeed {
     }
 
     /** Representa un vuelo FLIGHT del TEG con capacidad fija. */
-    record VueloFicha(VueloProgramadoId id, int capacidad) {}
+    record VueloFicha(VueloProgramadoId id, int capacidad) {}//datos del vuelo
 
     /** Índices de vuelos por origen y por destino. */
     static final class IndexVuelos {
