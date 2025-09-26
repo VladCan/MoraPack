@@ -3,7 +3,7 @@ import ky, { HTTPError } from "ky";
 
 /** Cliente HTTP único para toda la app */
 export const api = ky.create({
-  prefixUrl: import.meta.env.VITE_API_BASE_URL, // e.g. http://localhost:8080/api/v1
+  prefixUrl: import.meta.env.VITE_API_BASE_URL, // http://localhost:8080
   timeout: 10000,
   retry: {
     limit: 2,
@@ -54,8 +54,12 @@ export const getJson = <T>(url: string, searchParams?: Record<string, unknown>) 
         )
       : undefined,
   }).json<T>();
+
 export const postJson = <T>(url: string, json?: unknown) =>
   api.post(url, { json }).json<T>();
+
 export const putJson = <T>(url: string, json?: unknown) =>
   api.put(url, { json }).json<T>();
+
 export const del = (url: string) => api.delete(url).then(() => true);
+

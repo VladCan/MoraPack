@@ -2,7 +2,6 @@ import { z } from "zod";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -11,7 +10,35 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Dropzone } from "@/components/common/Dropzone";
 import { postJson } from "@/services/api";
+import { uploadFile } from "@/services/fileUpload";
+import toast from "react-hot-toast";
+import ToastCustom from "@/components/common/ToastCustom";
 
+const handleFileUpload = async (file: File, endpoint: string) => {
+    try {
+      const response = await uploadFile(endpoint, file);  // Usamos el servicio aquí
+      toast.custom((t) => (
+        <ToastCustom
+          t={t}
+          title="Éxito"
+          message={response}
+          icon="https://icons.iconarchive.com/icons/custom-icon-design/flatastic-2/128/success-icon.png"
+          type="success"
+        />
+      ));
+      
+    } catch (error) {
+      toast.custom((t) => (
+        <ToastCustom
+          t={t}
+          title="Error"
+          message={error}
+          icon="https://icons.iconarchive.com/icons/paomedia/small-n-flat/128/sign-error-icon.png"
+          type="error"
+        />
+      ));
+    }
+  };
 const schema = z.object({
   clienteId: z.string().min(1, "Requerido"),
   aeropuerto: z.string().min(1, "Requerido"),
@@ -29,12 +56,12 @@ export default function Registrar() {
 
   const createPedido = useMutation({
     mutationFn: (v: FormValues) => postJson("/pedidos", v),
-    onSuccess: () => {
-      toast.success("Pedido registrado");
+    onSuccess: (message) => {
+      toast.success("Success "+message);
       form.reset({ clienteId: "", aeropuerto: "LIM", cantidad: 1 });
     },
-    onError: () => {
-      toast.error("Error al registrar el pedido");
+    onError: (error) => {
+      toast.error("Error: "+error);
     },
   });
 
@@ -46,10 +73,10 @@ export default function Registrar() {
           <CardTitle className="text-blue-900">Cargas masivas</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Dropzone label="Carga masiva de vuelos" onFiles={(fs) => console.log("vuelos:", fs[0]?.name)} />
-          <Dropzone label="Carga masiva de husos horarios" onFiles={(fs) => console.log("husos:", fs[0]?.name)} />
-          <Dropzone label="Carga masiva de errores" onFiles={(fs) => console.log("errores:", fs[0]?.name)} />
-          <Dropzone label="Carga masiva de pedidos" onFiles={(fs) => console.log("pedidos:", fs[0]?.name)} />
+          <Dropzone label="Carga masiva de vuelos" onFiles={(fs) => handleFileUpload(fs[0], "vuelos/upload")} />
+          <Dropzone label="Carga masiva de husos horarios" onFiles={(fs) => handleFileUpload(fs[0], "aereopuertos/upload")} />
+          <Dropzone label="Carga masiva de errores" onFiles={(fs) => toast.error("No implementado archivo: "+fs[0]?.name +" no subido")} />
+          <Dropzone label="Carga masiva de pedidos" onFiles={(fs) => handleFileUpload(fs[0], "pedidos/upload")} />
         </CardContent>
       </Card>
 

@@ -30,7 +30,7 @@ import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.ssp.SSPGenera
 
 public class Test {
     // Parámetros de simulación (ajustables)
-    private static final long HORAS_VENTANA = 13;
+    private static final long HORAS_VENTANA = 6;
     private static final long HORIZONTE_TEG_H = 72; // cuánto futuro modelar
 
     public static void main(String[] args) {
