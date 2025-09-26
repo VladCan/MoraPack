@@ -26,9 +26,9 @@ export default function TopNav() {
         <nav className="flex justify-center">
           <ul
             className={[
-              "flex items-center gap-0.5 rounded-full px-4 py-3",
-              "backdrop-blur-md bg-white/10 border border-white/10 shadow-lg",
-              "ring-1 ring-black/5",
+                "flex items-center gap-1 rounded-full p-3 overflow-hidden",
+                "backdrop-blur-md bg-white/10 border border-white/10 shadow-lg",
+                "ring-1 ring-black/5",
             ].join(" ")}
           >
             {tabs.map((t) => (
@@ -38,9 +38,10 @@ export default function TopNav() {
                   end
                   className={({ isActive }) =>
                     [
-                      "px-8 py-3 rounded-full text-[20px] whitespace-nowrap transition-colors",
-                      isActive
-                        ? "bg-primary text-white shadow"
+                        "px-4 py-3 rounded-full text-[20px] whitespace-nowrap transition-colors",
+                        "h-full",  // Ajustamos la altura para que ocupe todo el espacio
+                        isActive
+                        ? "bg-primary text-white shadow-none" // Sin borde extra cuando está activo
                         : "text-primary hover:bg-blue-50/60",
                     ].join(" ")
                   }
