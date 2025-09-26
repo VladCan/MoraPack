@@ -3,11 +3,28 @@ import { BrowserRouter } from "react-router-dom";
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+// Crea un único QueryClient para toda la app
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,   // los datos se consideran frescos 30s
+      retry: 2,            // reintentar 2 veces en errores de red/5xx
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      retry: 0,            // no reintentes en mutations por defecto
+    },
+  },
+});
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <App />
+      <QueryClientProvider client={queryClient}>
+        <App />
+        {/* <ReactQueryDevtools initialIsOpen={false} /> */}
+      </QueryClientProvider>
     </BrowserRouter>
   </StrictMode>,
 )
