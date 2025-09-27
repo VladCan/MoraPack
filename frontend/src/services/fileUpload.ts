@@ -1,24 +1,23 @@
-import { api } from "@/services/api";
-import toast from "react-hot-toast";
+// src/services/uploadFile.ts
+import { api, handleApi } from "@/services/api";
+import type { ApiError } from "@/services/api";
 
-type ApiResponse = {
-    status: string;
-    message: string;
-    filePath?: string;  // Si 'filePath' es opcional
+
+export type ApiResponse = {
+  status: string;
+  message: string;
+  filePath?: string;
 };
-export const uploadFile = async (endpoint: string, file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    try {
-        const response = await api.post(endpoint, { body: formData });
 
-        // Verifica si la respuesta es JSON
-        const responseBody: ApiResponse = await response.json();
-        return responseBody.message; // Puedes retornar la respuesta completa si lo necesitas
+export async function uploadFile(
+  endpoint: string,
+  file: File
+): Promise<[ApiResponse | null, ApiError | null]> {
+  const formData = new FormData();
+  formData.append("file", file);
 
-    } catch (error) {
-        console.error("Error al subir el archivo:", error);
-        toast.error("Error al subir el archivo"); // Muestra un error genérico si algo falla
-        return ''; // Retorna una cadena vacía o el mensaje de error si es necesario
-    }
-};
+  // Ky necesita { body: formData } (sin json)
+  return handleApi<ApiResponse>(
+    api.post(endpoint, { body: formData }).json<ApiResponse>()
+  );
+}

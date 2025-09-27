@@ -6,7 +6,7 @@
  preserveAspectRatio="xMidYMid meet">
 
   <!-- Círculo de fondo blanco -->
-  <circle cx="512" cy="512" r="512" fill="black"/>
+  <!-- <circle cx="512" cy="512" r="512" fill="white"/> -->
 
   <!-- Grupo del icono pintado de azul -->
   <g transform="translate(0,1024) scale(0.1,-0.1)"

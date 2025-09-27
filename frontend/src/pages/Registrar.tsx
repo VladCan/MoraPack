@@ -15,30 +15,21 @@ import toast from "react-hot-toast";
 import ToastCustom from "@/components/common/ToastCustom";
 
 const handleFileUpload = async (file: File, endpoint: string) => {
-    try {
-      const response = await uploadFile(endpoint, file);  // Usamos el servicio aquí
-      toast.custom((t) => (
-        <ToastCustom
-          t={t}
-          title="Éxito"
-          message={response}
-          icon="https://icons.iconarchive.com/icons/custom-icon-design/flatastic-2/128/success-icon.png"
-          type="success"
-        />
-      ));
-      
-    } catch (error) {
-      toast.custom((t) => (
-        <ToastCustom
-          t={t}
-          title="Error"
-          message={error}
-          icon="https://icons.iconarchive.com/icons/paomedia/small-n-flat/128/sign-error-icon.png"
-          type="error"
-        />
-      ));
-    }
-  };
+  const [data, error] = await uploadFile(endpoint, file);
+
+  if (data) {
+    toast.custom((t) => (
+      <ToastCustom t={t} message={data.message} type="success" />),
+      { duration: Infinity }
+    );
+  } else if (error) {
+    toast.custom((t) => (
+      <ToastCustom t={t} message={error.message} type="error" />),
+      { duration: Infinity }
+    );
+    console.error("Detalles del error:", error); // útil para debug
+  }
+};
 const schema = z.object({
   clienteId: z.string().min(1, "Requerido"),
   aeropuerto: z.string().min(1, "Requerido"),
@@ -57,11 +48,23 @@ export default function Registrar() {
   const createPedido = useMutation({
     mutationFn: (v: FormValues) => postJson("/pedidos", v),
     onSuccess: (message) => {
-      toast.success("Success "+message);
+      toast.custom((t) => (
+        <ToastCustom
+          t={t}
+          message={message+"✅"}
+          type="success"
+        />),
+      { duration: Infinity });
       form.reset({ clienteId: "", aeropuerto: "LIM", cantidad: 1 });
     },
     onError: (error) => {
-      toast.error("Error: "+error);
+      toast.custom((t) => (
+        <ToastCustom
+          t={t}
+          message={error+"❗"}
+          type="error"
+        />),
+      { duration: Infinity });
     },
   });
 
@@ -75,7 +78,13 @@ export default function Registrar() {
         <CardContent className="space-y-4">
           <Dropzone label="Carga masiva de vuelos" onFiles={(fs) => handleFileUpload(fs[0], "vuelos/upload")} />
           <Dropzone label="Carga masiva de husos horarios" onFiles={(fs) => handleFileUpload(fs[0], "aereopuertos/upload")} />
-          <Dropzone label="Carga masiva de errores" onFiles={(fs) => toast.error("No implementado archivo: "+fs[0]?.name +" no subido")} />
+          <Dropzone label="Carga masiva de errores" 
+          onFiles={
+            (fs) =>toast.custom((t) => (
+              <ToastCustom t={t} message={"No implementado archivo: "+fs[0]?.name +" no subido"} type="error" />),
+              { duration: Infinity }
+            )
+            } />
           <Dropzone label="Carga masiva de pedidos" onFiles={(fs) => handleFileUpload(fs[0], "pedidos/upload")} />
         </CardContent>
       </Card>

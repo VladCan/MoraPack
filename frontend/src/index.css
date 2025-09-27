@@ -41,6 +41,36 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+@keyframes custom-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(20%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes custom-leave {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(20%);
+  }
+}
+
+.animate-custom-enter {
+  animation: custom-enter 0.25s ease-out forwards;
+}
+
+.animate-custom-leave {
+  animation: custom-leave 0.2s ease-in forwards;
+}
+
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);

@@ -29,7 +29,7 @@ public class VueloController {
         try {
             Files.copy(fileInputStream, outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             return Response
-                    .ok(new JsonResponse("success", "Archivo guardado exitosamente", outputFile.getAbsolutePath()))
+                    .ok(new JsonResponse("success", "Archivo planes de vuelos guardado exitosamente", outputFile.getAbsolutePath()))
                     .build();
         } catch (IOException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
