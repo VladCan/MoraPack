@@ -27,17 +27,31 @@ export async function handleApi<T>(p: Promise<T>): Promise<[T | null, ApiError |
     return [data, null];
   } catch (err) {
     if (err instanceof HTTPError) {
-      const body = await err.response.json().catch(() => ({}));
+      let body: any = {};
+      try {
+        // Intentar leer como JSON
+        body = await err.response.json();
+      } catch {
+        try {
+          // Si no es JSON, leer como texto plano
+          const text = await err.response.text();
+          body = { message: text };
+        } catch {
+          body = {};
+        }
+      }
+
       return [
         null,
         {
           status: err.response.status,
-          message: body?.message ?? err.message,
+          message: body?.message || `Error ${err.response.status}: ${err.message}`,
           code: body?.code,
-          details: body?.details,
+          details: body?.details ?? body,
         },
       ];
     }
+
     return [null, { status: 0, message: (err as Error).message, details: err }];
   }
 }
