@@ -16,7 +16,7 @@ import ToastCustom from "@/components/common/ToastCustom";
 
 const handleFileUpload = async (file: File, endpoint: string) => {
   const [data, error] = await uploadFile(endpoint, file);
-
+  //termina el toast de carga
   if (data) {
     toast.custom((t) => (
       <ToastCustom t={t} message={data.message} type="success" />),

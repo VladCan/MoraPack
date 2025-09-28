@@ -1,4 +1,3 @@
-// src/services/api.ts
 import ky, { HTTPError } from "ky";
 
 /** Cliente HTTP único para toda la app */
@@ -13,21 +12,24 @@ export const api = ky.create({
 });
 
 /** Contrato de error único para la UI */
-export type ApiError = {
+export interface ApiError {
   status: number;
   message: string;
   code?: string;
   details?: unknown;
-};
+}
 
 /** Wrapper: devuelve [data, error] y nunca lanza */
-export async function handleApi<T>(p: Promise<T>): Promise<[T | null, ApiError | null]> {
+export async function handleApi<T>(
+  p: Promise<T>
+): Promise<[T | null, ApiError | null]> {
   try {
     const data = await p;
     return [data, null];
   } catch (err) {
     if (err instanceof HTTPError) {
-      let body: any = {};
+      let body: Record<string, unknown> = {};
+
       try {
         // Intentar leer como JSON
         body = await err.response.json();
@@ -37,43 +39,58 @@ export async function handleApi<T>(p: Promise<T>): Promise<[T | null, ApiError |
           const text = await err.response.text();
           body = { message: text };
         } catch {
-          body = {};
+          body = { message: `Error desconocido ${err.message}` };
         }
       }
 
-      return [
-        null,
-        {
-          status: err.response.status,
-          message: body?.message || `Error ${err.response.status}: ${err.message}`,
-          code: body?.code,
-          details: body?.details ?? body,
-        },
-      ];
+      const message = typeof body.message === "string" ? body.message : JSON.stringify(body);
+
+      const apiError: ApiError = {
+        status: err.response.status,
+        message,
+        code: (body.code as string | undefined) ?? undefined,
+        details: body.details ?? body,
+      };
+
+      return [null, apiError];
     }
 
-    return [null, { status: 0, message: (err as Error).message, details: err }];
+    // Error genérico
+    const apiError: ApiError = {
+      status: 0,
+      message: (err as Error).message,
+      details: err,
+    };
+
+    return [null, apiError];
   }
 }
 
 /** Helpers mínimos para JSON */
-export const getJson = <T>(url: string, searchParams?: Record<string, unknown>) =>
-  api.get(url, {
-    searchParams: searchParams
-      ? new URLSearchParams(
-          Object.entries(searchParams).reduce<Record<string, string>>((acc, [key, value]) => {
-            acc[key] = value != null ? String(value) : "";
-            return acc;
-          }, {})
-        )
-      : undefined,
-  }).json<T>();
 
-export const postJson = <T>(url: string, json?: unknown) =>
+export const getJson = async <T>(
+  url: string,
+  searchParams?: Record<string, unknown>
+): Promise<T> => {
+  const params = searchParams
+    ? new URLSearchParams(
+        Object.entries(searchParams).reduce<Record<string, string>>((acc, [k, v]) => {
+          acc[k] = v != null ? String(v) : "";
+          return acc;
+        }, {})
+      )
+    : undefined;
+
+  return api.get(url, { searchParams: params }).json<T>();
+};
+
+export const postJson = async <T>(url: string, json?: unknown): Promise<T> =>
   api.post(url, { json }).json<T>();
 
-export const putJson = <T>(url: string, json?: unknown) =>
+export const putJson = async <T>(url: string, json?: unknown): Promise<T> =>
   api.put(url, { json }).json<T>();
 
-export const del = (url: string) => api.delete(url).then(() => true);
-
+export const del = async (url: string): Promise<boolean> => {
+  await api.delete(url);
+  return true;
+};

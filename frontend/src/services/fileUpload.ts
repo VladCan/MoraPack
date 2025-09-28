@@ -1,6 +1,7 @@
 // src/services/uploadFile.ts
 import { api, handleApi } from "@/services/api";
 import type { ApiError } from "@/services/api";
+import { apiWithLoadingToast } from "./apiWithLoadingToast";
 
 
 export type ApiResponse = {
@@ -17,7 +18,7 @@ export async function uploadFile(
   formData.append("file", file);
 
   // Ky necesita { body: formData } (sin json)
-  return handleApi<ApiResponse>(
-    api.post(endpoint, { body: formData }).json<ApiResponse>()
+  return apiWithLoadingToast(() =>
+    handleApi(api.post(endpoint, { body: formData }).json<ApiResponse>())
   );
 }

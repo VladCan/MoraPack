@@ -1,82 +1,85 @@
-// src/app/Simulacion.tsx
+// src/pages/Simulacion.tsx
 "use client";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import FlightPath from "@/components/common/FlightPath";
 import MainMap from "@/components/common/MainMap";
+import AirportMarkers, { type AirportPoint } from "@/components/common/map/AirportMarkers";
+import { useAirports } from "@/hooks/useAirports";
+import { useFlightsSSE } from "@/hooks/useFlightsSSE";
+import type { FlightLiveDTO } from "@/types/api";
 
-// Tipado simple para vuelos
-interface Flight {
-  id: string;
-  origin: { lat: number; lon: number };
-  dest: { lat: number; lon: number };
-  pathColor: string;
-  planeColor: string;
-  initialProgress: number;
-}
-
-const flights: Flight[] = [
-  {
-    id: "vuelo1",
-    origin: { lat: 25.7959, lon: -80.2871 }, // Miami
-    dest: { lat: -12.0219, lon: -77.1143 }, // Lima
-    pathColor: "#f472b6",
-    planeColor: "#005097",
-    initialProgress: 0.3,
-  },
-  {
-    id: "vuelo2",
-    origin: { lat: 40.6413, lon: -73.7781 }, // JFK
-    dest: { lat: 51.47, lon: -0.4543 }, // Heathrow
-    pathColor: "#60a5fa",
-    planeColor: "#005097",
-    initialProgress: 0.5,
-  },
-  {
-    id: "vuelo3",
-    origin: { lat: 35.5494, lon: 139.7798 }, // Haneda
-    dest: { lat: 33.9416, lon: -118.4085 }, // LAX
-    pathColor: "#34d399",
-    planeColor: "#005097",
-    initialProgress: 0.6,
-  },
-  // ...agrega el resto de tus vuelos aquí igual que antes
-];
+const COLOR_SEDE   = "#005097";
+const COLOR_NORMAL = "#0ea5e9";
+const HOVER_COLOR  = "#ef4444";
+const ACTIVE_COLOR = "#005097";
 
 export default function Simulacion() {
-  // Estado para manejar progreso de cada vuelo
-  const [progressMap, setProgressMap] = useState<Record<string, number>>(
-    Object.fromEntries(flights.map((f) => [f.id, f.initialProgress]))
-  );
+  // Aeropuertos (como ya lo tenías)
+  const { data: airportsDto } = useAirports();
+  const [hoveredAirportId, setHoveredAirportId] = useState<string | null>(null);
+  const [activeAirportId,  setActiveAirportId]  = useState<string | null>(null);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setProgressMap((prev) => {
-        const updated: Record<string, number> = {};
-        for (const key in prev) {
-          let next = prev[key] + 0.002; // velocidad
-          if (next > 1) next = 0; // reset al inicio
-          updated[key] = next;
-        }
-        return updated;
-      });
-    }, 100); // cada 100ms
-    return () => clearInterval(interval);
-  }, []);
+  const airports: AirportPoint[] = useMemo(() => {
+    if (!airportsDto) return [];
+    return airportsDto
+      .filter(a => typeof a.lat === "number" && typeof a.lon === "number")
+      .map(a => ({
+        id: a.codigo,
+        name: `${a.ciudad ?? a.codigo} (${a.codigo})`,
+        lon: a.lon!, lat: a.lat!,
+        color: a.sede ? COLOR_SEDE : COLOR_NORMAL
+      }));
+  }, [airportsDto]);
+
+  const displayAirports: AirportPoint[] = useMemo(() => {
+    return airports.map(a => ({
+      ...a,
+      color:
+        a.id === activeAirportId ? ACTIVE_COLOR :
+        a.id === hoveredAirportId ? HOVER_COLOR : a.color
+    }));
+  }, [airports, hoveredAirportId, activeAirportId]);
+
+  // 🔴 VUELOS EN VIVO por SSE
+  const { data: liveFlights } = useFlightsSSE("/vuelos/live");
+
+  // Mapear DTO → props de FlightPath (usa progress del backend)
+  const flightPaths = useMemo(() => {
+    return (liveFlights ?? []).map((f: FlightLiveDTO) => ({
+      id: f.id,
+      origin: { lat: f.originLat, lon: f.originLon },
+      dest:   { lat: f.destLat,   lon: f.destLon   },
+      progress: f.progress,
+      pathColor: f.pathColor,
+      planeColor: f.planeColor
+    }));
+  }, [liveFlights]);
 
   return (
     <div className="min-h-screen bg-neutral-50">
       <MainMap>
-        {flights.map((flight) => (
+        {/* Vuelos en vivo */}
+        {flightPaths.map((fp) => (
           <FlightPath
-            key={flight.id}
-            id={flight.id}
-            origin={flight.origin}
-            dest={flight.dest}
-            progress={progressMap[flight.id] ?? 0}
-            pathColor={flight.pathColor}
-            planeColor={flight.planeColor}
+            key={fp.id}
+            id={fp.id}
+            origin={fp.origin}
+            dest={fp.dest}
+            progress={fp.progress}
+            pathColor={fp.pathColor}
+            planeColor={fp.planeColor}
           />
         ))}
+
+        {/* Aeropuertos */}
+        <AirportMarkers
+          items={displayAirports}
+          activeId={activeAirportId}
+          icon="airport"
+          size={20}
+          onHoverChange={(id) => setHoveredAirportId(id)}
+          onClick={(id) => setActiveAirportId(prev => (prev === id ? null : id))}
+        />
       </MainMap>
     </div>
   );
