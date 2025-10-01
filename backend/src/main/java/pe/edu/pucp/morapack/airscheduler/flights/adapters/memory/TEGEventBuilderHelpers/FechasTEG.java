@@ -10,7 +10,7 @@ public final class FechasTEG {
     private FechasTEG() {}
 
     /** Instantes diarios en [inicio, fin) con la hora UTC indicada. */
-    static List<Instant> instantesDiariosEnVentana(Instant inicio, Instant fin, LocalTime horaGMT) {
+    static List<Instant> instantesDiariosEnVentana(Instant inicio, Instant fin, LocalTime horaGMT) {// inicio: dd/mm/yyyy hh:mm:ss fin: dd/mm/yyyy hh:mm:ss horaGMT: hh:mm
         List<Instant> res = new ArrayList<>();
         ZonedDateTime z0  = inicio.atZone(ZoneOffset.UTC).truncatedTo(ChronoUnit.DAYS);
         ZonedDateTime zFn = fin.atZone(ZoneOffset.UTC).truncatedTo(ChronoUnit.DAYS);
