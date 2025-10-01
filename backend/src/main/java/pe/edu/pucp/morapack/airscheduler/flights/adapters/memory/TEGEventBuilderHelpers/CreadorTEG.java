@@ -101,7 +101,7 @@ public final class CreadorTEG {
             for (Vuelo v : vuelosMap.vuelosDesde(origen)) {
                 for (Instant salida : instantesDiariosEnVentana(p.getInicioUtc(), p.getFinUtc(),
                         v.getHoraGMTOrigen())) {
-                    Instant llegada = combinarFechaYHora(salida, v.getHoraGMTDestino());
+                    Instant llegada = combinarFechaYHora(salida, v.getHoraGMTDestino()); 
                     if (!llegada.isAfter(salida))
                         llegada = llegada.plus(1, ChronoUnit.DAYS);
 
