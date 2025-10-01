@@ -52,5 +52,54 @@ public Multi<List<FlightLiveDTO>> live(
 
     return service.streamLiveFlights(nowSupplier, effectiveLimit);
 }
+/* 
+SE GENERÓ TODO RESULTADO ====> solucionAnterior
 
+vuelos{
+    salida
+    llega
+    horaUTCsalida
+    horaUTCllegada
 }
+DTO vueloConPedido{
+    Vuelo vuelos
+    string idPedido
+    double carga
+}
+
+
+vuelosConPedidos => List<vueloConPedido>
+
+pedidos= sacarTodosLosPedidos(solucionAnterior) //lista que no cambia está estático
+    pedidosActivos
+    pedidosCompletados
+vuelosConPedidos= convertirSolucion(solucionAnterior) //lista que no cambia está estático
+    vuelosActivos
+    vuelosCompletados
+
+SSE --> conexion con el back (verifica si la info del front está actualizada)
+    pedidosActivos
+    pedidosCompletados
+    vuelosActivos
+    vuelosCompletados
+    estadoActual
+
+estadoAereopuerto= actualizarAereopuerto(vuelosConPedidos,aereopuertos,reloj)
+    estadoActual
+        estadoAntiguo (on demand)
+
+cola colaDeEventos= new cola(solucionAnterior)
+Hora proximoEvento=new Hora()
+for(;;){
+    if(reloj=proximoEvento){
+        actualizar(colaDeEventos){
+            pedidosActivos
+            pedidosCompletados
+            vuelosActivos
+            vuelosCompletados
+            estadoActual
+        }
+    }
+    if(pedidosActivos.vacio())break;
+}
+*/
