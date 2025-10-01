@@ -103,7 +103,7 @@ public class Test {
             TEGParametros params = TEGParametros.builder()
                     .inicioUtc(presenteUTC)
                     .finUtc(finUTC)
-                    .capacidadWaitPorDefecto(null) // null => usa cap. de bodega del aeropuerto
+                    //.capacidadWaitPorDefecto(null) // null => usa cap. de bodega del aeropuerto
                     .sedes(sedes)
                     .arribosLibres(enVuelo) // <— vuelos ya despegados
                     .reservasWaitIniciales(reservas) // <— ocupa bodega por pickup 2h
