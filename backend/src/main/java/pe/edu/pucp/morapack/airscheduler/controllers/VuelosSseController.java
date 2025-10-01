@@ -72,7 +72,7 @@ COSAS A TESTER
         HORA DE CANCELACIÓN (boing 009 explotó una turbina)
         VUELO CANCELADO dia,hora,origen,destino 
         2025-09-30-06:56,SKBO-SVMI-13:56-17:19
-        yyyy-MM-dd-HH:mm,ORIGEN-DESTINO-HH:mm-HH:mm
+        yyyy-MM-dd-HH:mm,ORIGEN-DESTINO-HH:mm-HH:mm 
 
 
 
