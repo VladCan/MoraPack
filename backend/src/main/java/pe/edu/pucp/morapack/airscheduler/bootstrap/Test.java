@@ -131,6 +131,7 @@ public class Test {
             ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt");
             ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
             solucionAnterior = solucionOptima;
+            //verificacionTotal(solucionAnterior)
             VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46));
             System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
             solucionOptima.imprimirFitness(presenteUTC);
