@@ -1,5 +1,5 @@
 // src/components/FlightPath.tsx
-import PlaneIcon from "@/assets/plane2.svg?react"; // Asegúrate de que el path sea correcto
+import PlaneIcon from "@/assets/plane2.svg?react";
 import { Marker, Source, Layer } from "react-map-gl/maplibre";
 import { useMemo } from "react";
 
@@ -143,7 +143,7 @@ export default function FlightPath({
           type="line"
           paint={{
             "line-color": pathColor,
-            "line-width": 3,
+            "line-width": 0.5,
           }}
         />
       </Source>
@@ -151,7 +151,7 @@ export default function FlightPath({
       {/* Avioncito minimalista */}
       <Marker longitude={planePos.lon} latitude={planePos.lat} anchor="center">
         <PlaneIcon
-            className="w-5 h-5 transition-transform duration-300"
+            className="w-2 h-2 transition-transform duration-300"
             style={{
                 color: planeColor, // ← Aplica directamente el color
                 transform: `rotate(${hdg + ROTATION_OFFSET}deg)`,

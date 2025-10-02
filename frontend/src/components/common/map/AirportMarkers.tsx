@@ -1,47 +1,49 @@
-import AirportMarker from "./AirportMarker";
-
-export type AirportPoint = {
-  id: string;
-  name?: string;
-  lon: number;
-  lat: number;
-  color?: string;
-};
+// src/components/common/map/AirportMarkers.tsx
+import AirportsLayer, { type AirportPoint } from "./AirportsLayer";
 
 type AirportMarkersProps = {
   items: AirportPoint[];
   activeId?: string | null;
+  hoveredId?: string | null;
   onClick?: (id: string) => void;
   onHoverChange?: (id: string | null) => void;
+
+  // Estilo
+  showLabels?: boolean;
+  baseColor?: string;
+  activeColor?: string;
+  hoverColor?: string;
+  iconSize?: number; // 👈 px (default 16)
+
+  // Compat (ya no se usan, los dejamos para no romper imports antiguos)
   icon?: "airport" | "house";
   size?: number;
 };
 
+export type { AirportPoint };
+
 export default function AirportMarkers({
   items,
   activeId = null,
+  hoveredId = null,
   onClick,
   onHoverChange,
-  icon = "airport",
-  size = 28,
+  baseColor = "#0ea5e9",
+  activeColor = "#005097",
+  hoverColor = "#ef4444",
+  iconSize = 16, // 👈 más pequeño por defecto
 }: AirportMarkersProps) {
   return (
-    <>
-      {items.map((a) => (
-        <AirportMarker
-          key={a.id}
-          id={a.id}
-          name={a.name}
-          lon={a.lon}
-          lat={a.lat}
-          color={a.color}
-          size={size}
-          icon={icon}
-          active={a.id === activeId}
-          onClick={onClick}
-          onHoverChange={onHoverChange}
-        />
-      ))}
-    </>
+    <AirportsLayer
+      airports={items}
+      activeId={activeId}
+      hoveredId={hoveredId}
+      onClick={onClick}
+      onHoverChange={onHoverChange}
+      baseColor={baseColor}
+      activeColor={activeColor}
+      hoverColor={hoverColor}
+      iconSize={iconSize}
+    />
   );
 }

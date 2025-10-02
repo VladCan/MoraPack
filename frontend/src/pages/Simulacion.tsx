@@ -1,56 +1,61 @@
 // src/pages/Simulacion.tsx
 "use client";
 import { useMemo, useState } from "react";
+import { z } from "zod";
 import FlightPath from "@/components/common/FlightPath";
 import MainMap from "@/components/common/MainMap";
-import AirportMarkers, {
-  type AirportPoint,
-} from "@/components/common/map/AirportMarkers";
+import AirportMarkers, { type AirportPoint } from "@/components/common/map/AirportMarkers";
 import { useAirports } from "@/hooks/useAirports";
 import { useFlightsSSE } from "@/hooks/useFlightsSSE";
 
-const COLOR_SEDE = "#005097";
-const COLOR_NORMAL = "#0ea5e9";
-const HOVER_COLOR = "#ef4444";
+const COLOR_SEDE   = "#005097";
+const COLOR_NORMAL = "#38bdf8"; // 👈 más suave que #0ea5e9
+const HOVER_COLOR  = "#ef4444";
 const ACTIVE_COLOR = "#005097";
 
+// DTO backend (zod)
+const AirportDtoSchema = z.object({
+  codigo: z.string(),
+  ciudad: z.string().nullable().optional(),
+  lon: z.number(),
+  lat: z.number(),
+  sede: z.boolean().optional(),
+});
+const AirportsDtoSchema = z.array(AirportDtoSchema);
+
+type FlightDto = {
+  id: string;
+  originLat: number;
+  originLon: number;
+  destLat: number;
+  destLon: number;
+  progress: number;
+  pathColor: string;
+  planeColor: string;
+};
+
 export default function Simulacion() {
-  // Aeropuertos (como ya lo tenías)
-  const { data: airportsDto } = useAirports();
+  const { data: airportsDtoRaw } = useAirports();
   const [hoveredAirportId, setHoveredAirportId] = useState<string | null>(null);
   const [activeAirportId, setActiveAirportId] = useState<string | null>(null);
 
   const airports: AirportPoint[] = useMemo(() => {
-    if (!airportsDto) return [];
-    return airportsDto
-      .filter((a) => typeof a.lat === "number" && typeof a.lon === "number")
-      .map((a) => ({
-        id: a.codigo,
-        name: `${a.ciudad ?? a.codigo} (${a.codigo})`,
-        lon: a.lon!,
-        lat: a.lat!,
-        color: a.sede ? COLOR_SEDE : COLOR_NORMAL,
-      }));
-  }, [airportsDto]);
-
-  const displayAirports: AirportPoint[] = useMemo(() => {
-    return airports.map((a) => ({
-      ...a,
-      color:
-        a.id === activeAirportId
-          ? ACTIVE_COLOR
-          : a.id === hoveredAirportId
-          ? HOVER_COLOR
-          : a.color,
+    const parsed = AirportsDtoSchema.safeParse(airportsDtoRaw);
+    if (!parsed.success) return [];
+    return parsed.data.map((a) => ({
+      id: a.codigo,
+      name: `${a.ciudad ?? a.codigo} (${a.codigo})`,
+      lon: a.lon,
+      lat: a.lat,
+      color: a.sede ? COLOR_SEDE : COLOR_NORMAL,
+      isSede: !!a.sede, 
     }));
-  }, [airports, hoveredAirportId, activeAirportId]);
+  }, [airportsDtoRaw]);
 
-  // 🔴 VUELOS EN VIVO por SSE
-  const { data: liveFlights } = useFlightsSSE("/vuelos/live?limit=50");
-
-  // Mapear DTO → props de FlightPath (usa progress del backend)
+  // SSE vuelos
+  const { data: liveFlights } = useFlightsSSE("/vuelos/live?limit=200");
   const flightPaths = useMemo(() => {
-    const arr = (liveFlights ?? []).slice(0, 50); // doble seguro en el front
+    const arr = (liveFlights ?? []) as FlightDto[];
     return arr.map((f) => ({
       id: f.id,
       origin: { lat: f.originLat, lon: f.originLon },
@@ -64,7 +69,6 @@ export default function Simulacion() {
   return (
     <div className="min-h-screen bg-neutral-50">
       <MainMap>
-        {/* Vuelos en vivo */}
         {flightPaths.map((fp) => (
           <FlightPath
             key={fp.id}
@@ -77,16 +81,18 @@ export default function Simulacion() {
           />
         ))}
 
-        {/* Aeropuertos */}
         <AirportMarkers
-          items={displayAirports}
+          items={airports}
           activeId={activeAirportId}
-          icon="airport"
-          size={20}
-          onHoverChange={(id) => setHoveredAirportId(id)}
+          hoveredId={hoveredAirportId}
+          baseColor={COLOR_NORMAL}
+          activeColor={ACTIVE_COLOR}
+          hoverColor={HOVER_COLOR}
+          onHoverChange={setHoveredAirportId}
           onClick={(id) =>
             setActiveAirportId((prev) => (prev === id ? null : id))
           }
+          iconSize={16}
         />
       </MainMap>
     </div>
