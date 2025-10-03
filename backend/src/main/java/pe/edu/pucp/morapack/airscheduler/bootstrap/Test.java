@@ -100,8 +100,10 @@ public class Test {
             List<OcupacionAlmacen> reservas = EstadoAnteriorExtractor.
                                                 reservasDesdeSolucionAnterior(solucionAnterior,presenteUTC, Duration.ofHours(2));
             //imprimimos enVuelo y reservas para debug
+            System.out.println("───────────────────ENVUELO Y RESERVAS──────────────────────────");
             System.out.println("Vuelos en vuelo: " + enVuelo);
             System.out.println("Reservas: " + reservas);
+            System.out.println("────────────────────PRESENTE: "+presenteUTC+"────────────────────");
             //definimos los valores necesarios para el Time Elapse Event Graph TEEG
             TEGParametros params = TEGParametros.builder()
                     .inicioUtc(presenteUTC)
