@@ -56,6 +56,31 @@ public class GeneraP {
 
         Instant t = base;
 
+        // ===== Variables del generador de cantidades =====
+        final int piso = 120;
+        final int techo = 999;
+
+        // Techo "blando" para la logística base (evita llegar rápido a 999)
+        final double kSoft = 940 + random.nextInt(21); // 940..960
+
+        // Queremos dejar el piso alrededor del pedido 10
+        final int m = 10;
+
+        // Pendiente moderada
+        final double r = 0.05 + 0.02 * random.nextDouble(); // 0.05–0.07
+
+        // x0 para que L(m) ~ piso (usando kSoft)
+        final double x0 = m + (1.0 / r) * Math.log((kSoft / (double) piso) - 1.0);
+
+        // Suavizado AR(1): combinación de la media logística con el valor previo
+        final double alpha = 0.35; // cercanía a la media (0 -> sigue mucho al previo, 1 -> sigue la media)
+
+        int prevCantidad = piso;
+
+        // Definir ventanas de cola
+        final int tailStart = (int) Math.floor(0.90 * cantidadPedidos); // último 10%
+        final int allowHardMaxFrom = (int) Math.floor(0.98 * cantidadPedidos); // último 2% permite 999
+
         for (int i = 1; i <= cantidadPedidos; i++) {
             // Cliente
             int idCliente = 100 + random.nextInt(51); // [100..150]
@@ -77,16 +102,54 @@ public class GeneraP {
             LocalDateTime fechaLocal = LocalDateTime.ofInstant(t, offset);
 
             // ========================
-            // Modelo logístico de demanda (igual que antes)
+            // 4) Generación de cantidad con:
+            //    - media logística creciente (hasta kSoft)
+            //    - suavizado AR(1) hacia la media
+            //    - ruido gaussiano proporcional
+            //    - impulso de cola al final
+            //    - tope dinámico (evitar 999 temprano)
             // ========================
-            double k = 999; // máximo
-            double x0 = cantidadPedidos / 2.0; // punto medio
-            double r = 0.01 + 0.02 * random.nextDouble(); // pendiente aleatoria
-            int cantidad = (int) Math.round(k / (1 + Math.exp(-r * (i - x0))));
-            if (cantidad < 20) cantidad = 20;
-            if (cantidad > 999) cantidad = 999;
+            // Media logística base
+            double mu = kSoft / (1.0 + Math.exp(-r * (i - x0)));
 
-            String cantidadStr3 = String.format("%03d", cantidad);
+            // Ruido: gaussiano con desviación proporcional a la media (más variedad en altos)
+            double sigma = Math.max(3.0, 0.02 * mu); // 2% de mu, mínimo 3
+            double gauss = random.nextGaussian() * sigma;
+
+            // Suavizado hacia la media (AR(1))
+            double yCont = alpha * mu + (1.0 - alpha) * prevCantidad + gauss;
+
+            int y = (int) Math.round(yCont);
+
+            // Piso
+            if (y < piso) y = piso;
+
+            // Impulso de cola en el último 10%
+            if (i >= tailStart) {
+                double prog = (i - tailStart) / (double) Math.max(1, (cantidadPedidos - tailStart));
+                // Factor crece de 1.0 a ~1.25 (curva suave)
+                double tailFactor = 1.0 + 0.15 * prog + 0.10 * prog * prog; // hasta +25% al final
+                y = (int) Math.round(y * tailFactor);
+            }
+
+            // Tope dinámico: antes del último 2% no permitimos tocar 999;
+            // imponemos un techo variable ligeramente por debajo de 999.
+            if (i < allowHardMaxFrom) {
+                int softCapDyn = techo - (5 + random.nextInt(21)); // 999-(5..25) => 974..994
+                if (y > softCapDyn) y = softCapDyn;
+            }
+
+            // Jitter entero pequeño para romper empates
+            y += random.nextInt(7) - 3; // -3..+3
+
+            // Clamps finales
+            if (y < piso) y = piso;
+            if (y > techo) y = techo;
+
+            // Guardar para la próxima iteración (suavizado)
+            prevCantidad = y;
+
+            String cantidadStr3 = String.format("%03d", y);
 
             // ===== 4A) Línea formato original =====
             String lineaOriginal = fechaLocal.format(HORA_LOCAL) + "-" +
@@ -101,7 +164,7 @@ public class GeneraP {
                     idCliente + "," +
                     destino + "," +
                     fechaLocal.format(ISO_LOCAL_SECONDS) + "," +
-                    cantidad;
+                    y;
             pedidosFormatoNuevo.add(lineaNueva);
         }
 
@@ -157,6 +220,6 @@ public class GeneraP {
             throw new RuntimeException("No pude crear carpeta: " + out, e);
         }
         System.out.println("Generando en: " + out.toAbsolutePath());
-        generarArchivo(out, 4000, 744);
+        generarArchivo(out, 1000, 744);
     }
 }
