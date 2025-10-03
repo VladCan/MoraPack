@@ -99,6 +99,9 @@ public class Test {
 
             List<OcupacionAlmacen> reservas = EstadoAnteriorExtractor.
                                                 reservasDesdeSolucionAnterior(solucionAnterior,presenteUTC, Duration.ofHours(2));
+            //imprimimos enVuelo y reservas para debug
+            System.out.println("Vuelos en vuelo: " + enVuelo);
+            System.out.println("Reservas: " + reservas);
             //definimos los valores necesarios para el Time Elapse Event Graph TEEG
             TEGParametros params = TEGParametros.builder()
                     .inicioUtc(presenteUTC)
@@ -115,7 +118,8 @@ public class Test {
             SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
             ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt");
-            
+            //VerificadorSLA.assertBasicos(seed, Duration.ofHours(46));
+            //solucionAnterior = seed;
             // ALNS
             List<DestructionOperator> destructores = new ArrayList<>();
             destructores.add(new RandomRemoval(20));
@@ -133,8 +137,8 @@ public class Test {
             solucionAnterior = solucionOptima;
             //verificacionTotal(solucionAnterior)
             VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46));
-            System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
-            solucionOptima.imprimirFitness(presenteUTC);
+            //System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
+            //solucionOptima.imprimirFitness(presenteUTC);
             // System.exit(1);
             //solucionAnterior = seed;
             System.out.println("Ventana de tiempo planificada, " + presenteUTC);
