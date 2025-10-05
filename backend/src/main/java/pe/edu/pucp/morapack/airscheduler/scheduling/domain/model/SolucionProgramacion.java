@@ -437,4 +437,121 @@ private static int asignadoTotal(PlanPedido plan) {
             .mapToInt(RutaAsignada::getCantidad)
             .sum();
 }
+
+
+
+
+
+
+
+
+
+
+
+    // ============================================== //
+    // ============================================== //
+    // ============================================== //
+    // ============================================== //
+    // ============================================== //
+    // ============================================== //
+    // ============================================== //
+    // ============================================== //
+    // ============================================== //
+    // ====== REPORTE: capacidad por vuelo en ventana ======
+    public void imprimirCapacidadVuelosEnVentana(Instant inicio, Instant fin, String nombreArchivo) {
+        final var TS = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
+                .withZone(java.time.ZoneOffset.UTC);
+
+        record Row(String org, Instant sal, String dst, Instant lla, int cap, int asg) {}
+
+        List<Row> filas = new ArrayList<>();
+        for (var e : cargaPorVuelo.getAsignado().entrySet()) {
+            VueloProgramadoId id = e.getKey();
+            int asignado = e.getValue() == null ? 0 : e.getValue();
+            if (id == null) continue;
+
+            Instant sal = id.getSalidaUtc();
+            if (sal == null || sal.isBefore(inicio) || !sal.isBefore(fin)) continue; // filtro por ventana
+
+            int cap = cargaPorVuelo.capacidad(id);
+            filas.add(new Row(id.getOrigen(), sal, id.getDestino(), id.getLlegadaUtc(), cap, asignado));
+        }
+
+        filas.sort(Comparator.comparing(Row::sal).thenComparing(Row::org).thenComparing(Row::dst));
+
+        int violaciones = 0;
+        long sumCap = 0, sumAsg = 0;
+
+        java.nio.file.Path path = java.nio.file.Path.of(
+                (nombreArchivo == null || nombreArchivo.isBlank())
+                        ? "out/reporteCapacidadVuelos.txt" : nombreArchivo);
+
+        try {
+            java.nio.file.Files.createDirectories(path.getParent());
+            try (var bw = java.nio.file.Files.newBufferedWriter(
+                    path, java.nio.charset.StandardCharsets.UTF_8,
+                    java.nio.file.StandardOpenOption.CREATE,
+                    java.nio.file.StandardOpenOption.TRUNCATE_EXISTING);
+                 var out = new java.io.PrintWriter(bw)) {
+
+                out.println("=".repeat(110));
+                out.println("REPORTE DE CAPACIDAD POR VUELO");
+                out.println("Ventana: [" + TS.format(inicio) + " — " + TS.format(fin) + ")");
+                out.println("=".repeat(110));
+
+                String header = String.format("%-22s  %-9s  %-22s  %-14s  %-12s  %s%n",
+                        "SALIDA (UTC)", "ORIG→DEST", "LLEGADA (UTC)", "CAPACIDAD", "OCUPACIÓN", "ESTADO");
+                out.print(header);
+                out.println("-".repeat(header.length() - 1));
+
+                for (Row r : filas) {
+                    sumCap += Math.max(0, r.cap);
+                    sumAsg += Math.max(0, r.asg);
+                    boolean over = r.asg > r.cap;
+                    if (over) violaciones++;
+
+                    String estado = obtenerSaturacion(r.cap, r.asg);
+                    if (over) estado = estado + "  **EXCESO +" + (r.asg - r.cap) + "**";
+
+                    // construir el string de ocupación con separador de miles
+                    String occStr = String.format("%,d/%,d", r.asg, r.cap);
+
+                    //        SALIDA                 ORIG→DEST        LLEGADA            CAPACIDAD     OCUPACIÓN (string)  ESTADO
+                    out.printf("%-22s  %-9s  %-22s  %,14d  %-12s  %s%n",
+                            TS.format(r.sal),
+                            r.org + "→" + r.dst,
+                            TS.format(r.lla == null ? r.sal : r.lla),
+                            r.cap,
+                            occStr,     // <- %s sin coma
+                            estado);
+                }
+
+                double pctGlobal = (sumCap <= 0) ? 0.0 : (100.0 * sumAsg / sumCap);
+                out.println("-".repeat(header.length() - 1));
+                out.printf("Vuelos en ventana: %,d | Violaciones: %,d%n", filas.size(), violaciones);
+                out.printf("Ocupación global: %,d / %,d  (%.1f%%)%n", sumAsg, sumCap, pctGlobal);
+                out.println("=".repeat(110));
+            }
+        } catch (Exception ex) {
+            throw new RuntimeException("No se pudo escribir el reporte en " + path.toAbsolutePath(), ex);
+        }
+    }
+
+
+    /** Semáforo de saturación (ocupación/capacidad) como el de bodegas. */
+    private static String obtenerSaturacion(int capacidad, int ocupacion) {
+        if (capacidad <= 0) return "NA";
+        double pct = (ocupacion * 100.0) / capacidad;
+        long pctRed = Math.round(pct);
+        if (pct < 33.33)       return "Disponible ✅ " + pctRed + "%";
+        else if (pct < 66.66)  return "Limitado ⚠️ " + pctRed + "%";
+        else if (pct < 99.99)  return "Saturado ❌ " + pctRed + "%";
+        else if (pctRed == 100) return "Capacidad máxima 🚫🚫🚫";
+        else                   return "Exceso total ☠️☠️☠️";
+    }
+
+
+
+
+
 }

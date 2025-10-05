@@ -31,21 +31,31 @@ import java.util.stream.Collectors;
  */
 public class SSPGeneradorSeed {
 
-    private static final int H_MAX = 5;                        // tope razonable de escalas para evitar explosión
+    private static final int H_MAX = 3;                        // tope razonable de escalas para evitar explosión
     private final Set<String> sedes;                           // orígenes habilitados para multi-hop
     private final StockLibre stockLibre;                       // stock disponible por no-sede (arribos exógenos no comprometidos)
+    private final OcupacionPorAeropuerto ocupacionPorAeropuerto;
     private final Duration slaLlegadaMax = Duration.ofHours(46);
 
     /** Construye con sedes y arribos libres (no comprometidos) por aeropuerto. */
     public SSPGeneradorSeed(Set<String> sedes, Map<String, List<ArriboExogeno>> arribosLibres) {
         this.sedes = (sedes == null) ? Set.of() : Set.copyOf(sedes);
         this.stockLibre = new StockLibre(arribosLibres);
+        //Nuevo:
+        this.ocupacionPorAeropuerto = null;
     }
 
     /** Si no tienes arribos libres todavía. */
     public SSPGeneradorSeed(Set<String> sedes) {
-        this(sedes, Map.of());
+        this(sedes, Map.of(), null);
     }
+
+    public SSPGeneradorSeed(Set<String> sedes, Map<String, List<ArriboExogeno>> arribosLibres, OcupacionPorAeropuerto ocupacionPorAeropuerto) {
+        this.sedes = (sedes == null) ? Set.of() : Set.copyOf(sedes);
+        this.stockLibre = new StockLibre(arribosLibres);
+        this.ocupacionPorAeropuerto = ocupacionPorAeropuerto;
+    }
+
 
     public SolucionProgramacion generarSeed(VuelosTEG teg,
                                             List<Pedido> pedidosOrdenados,
@@ -82,20 +92,27 @@ public class SSPGeneradorSeed {
                 }
 
                 // 2) Si no hay ruta desde sedes, opcional: intenta DIRECTO desde no-sede con stock libre
-                if (ruta == null) {
+                /*if (ruta == null) {
                     ruta = buscarDirectoNoSede(idx, carga, dest, presenteUtc, limiteLlegada);
-                }
+                }*/
 
                 if (ruta == null) break; // no hay más forma de asignar en esta ventana/SLA
 
-                // 3) Determinar cantidad asignable: mínimo de residuales en la ruta
+                // 3.1) Determinar cantidad asignable: mínimo de residuales en los vuelos de la ruta
                 int capRuta = capacidadEnRuta(carga, ruta);
                 if (capRuta <= 0) {
                     // ruta inútil, evitamos bucle
                     break;
                 }
 
-                int q = Math.min(capRuta, rem);
+                //3.2) Determinar cantidad asignable: mínimo de residuales en las esperas/llegada+2h de la ruta
+                int capOcup = capacidadPorOcupacion(ruta);
+                if (capOcup <= 0) {
+                    // La ruta no “entra” por ocupación → intenta otra ruta
+                    continue;
+                }
+
+                int q = Math.min(Math.min(capRuta, capOcup), rem);
 
                 // 4) Si la ruta inicia en no-sede, validar/consumir stock libre antes de la salida del primer tramo
                 String origenInicial = ruta.legs.get(0).id.getOrigen();
@@ -111,7 +128,10 @@ public class SSPGeneradorSeed {
                     stockLibre.consumir(origenInicial, salidaInicial, q);
                 }
 
-                // 5) Asignar q en todos los tramos y construir la RutaAsignada
+                // 5.1) Reservar 'q' en los aeropuertos/almacenes
+                reservarOcupacionesRuta(ruta, q);
+
+                // 5.2) Asignar 'q' en todos los vuelos de los tramos y construir la RutaAsignada
                 List<TramoAsignado> tramosRuta = new ArrayList<>(ruta.legs.size());
                 for (VueloFicha leg : ruta.legs) {
                     carga.asignar(leg.id, q);
@@ -140,6 +160,54 @@ public class SSPGeneradorSeed {
                 .planPorPedido(planPorPedido)
                 .cargaPorVuelo(carga)
                 .build();
+    }
+
+    // ===================== Helper para validar y reservar espacios de almacén =====================
+
+    static final class Intervalo {
+        final String ap;
+        final Instant ini;
+        final Instant fin;
+        Intervalo(String ap, Instant ini, Instant fin) { this.ap = ap; this.ini = ini; this.fin = fin; }
+    }
+
+    private List<Intervalo> intervalosDeRuta(Ruta r){
+        List<Intervalo> ints = new ArrayList<>();
+        List<VueloFicha> legs = r.legs;
+
+        for (int i = 0; i<legs.size() - 1; i++) {
+            var a = legs.get(i);
+            var b = legs.get(i + 1);
+            Instant ini = a.id.getLlegadaUtc();
+            Instant fin = b.id.getSalidaUtc();
+
+            //Aca modelamos si hay espera real (casi siempre habrá)
+            if (ini.isBefore(fin)){
+                ints.add(new Intervalo(a.id.getDestino(), ini, fin));
+            }
+        }
+
+        var last = legs.get(legs.size() - 1);
+        Instant arrUTC = last.id.getLlegadaUtc();
+        ints.add(new Intervalo(last.id.getDestino(), arrUTC, arrUTC.plus(Duration.ofHours(2))));
+        return ints;
+    }
+
+    private int capacidadPorOcupacion(Ruta ruta){
+        int min = Integer.MAX_VALUE;
+        for (Intervalo it : intervalosDeRuta(ruta)){
+            int q = ocupacionPorAeropuerto.maxReservable(it.ap, it.ini, it.fin);
+            min = Math.min(min, q);
+        }
+        return (min == Integer.MAX_VALUE) ? 0 : min;
+    }
+
+    private void reservarOcupacionesRuta(Ruta ruta, int q){
+        for (Intervalo it : intervalosDeRuta(ruta)){
+            if (it.ini.isBefore(it.fin)){
+                ocupacionPorAeropuerto.reservar(it.ap, it.ini, it.fin, q);
+            }
+        }
     }
 
     // ===================== BÚSQUEDA DE RUTAS =====================
@@ -207,13 +275,35 @@ public class SSPGeneradorSeed {
             // poda por capacidad: si no hay residual, no sigas
             if (carga.residual(f.id) <= 0) continue;
 
+            // poda por holgura/estancia para aeropuerto de llegada: si no hay espacio para 1 unidad, no sigas
+            if (!path.isEmpty()) {
+                VueloFicha prev = path.get(path.size() - 1);
+                String apEscala = prev.id.getDestino();
+                Instant inicioEspera = prev.id.getLlegadaUtc();
+                Instant finEspera = f.id.getSalidaUtc();
+
+                // Sólo si hay espera real (inicio < fin) verificamos holgura
+                if (inicioEspera.isBefore(finEspera)) {
+                    int holgura = ocupacionPorAeropuerto.maxReservable(apEscala, inicioEspera, finEspera);
+                    if (holgura < 1) continue; // NO hay espacio ni para 1 → podar rama
+                }
+            }
+
             path.add(f);
 
             if (f.id.getDestino().equals(dest)) {
                 // alcanzamos el destino: ruta válida solo si hopsRestantes == 0
                 if (hopsRestantes == 0) {
-                    Ruta cand = new Ruta(new ArrayList<>(path));
-                    if (mejor == null || cand.arriboFinal.isBefore(mejor.arriboFinal)) mejor = cand;
+                    String apDestino = f.id.getDestino();
+                    Instant arrUTC = f.id.getLlegadaUtc();
+                    Instant wait = arrUTC.plus(Duration.ofHours(2));
+
+                    int holgura = ocupacionPorAeropuerto.maxReservable(apDestino, arrUTC, wait);
+
+                    if (holgura >= 1){
+                        Ruta cand = new Ruta(new ArrayList<>(path));
+                        if (mejor == null || cand.arriboFinal.isBefore(mejor.arriboFinal)) mejor = cand;
+                    }
                 }
             } else if (hopsRestantes > 0) {
                 // extender desde el nuevo aeropuerto, earliest = llegada del vuelo actual

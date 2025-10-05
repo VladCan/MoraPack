@@ -58,7 +58,7 @@ public class GeneraP {
 
         // ===== Variables del generador de cantidades =====
         final int piso = 120;
-        final int techo = 999;
+        final int techo = 350;
 
         // Techo "blando" para la logística base (evita llegar rápido a 999)
         final double kSoft = 940 + random.nextInt(21); // 940..960
@@ -220,6 +220,6 @@ public class GeneraP {
             throw new RuntimeException("No pude crear carpeta: " + out, e);
         }
         System.out.println("Generando en: " + out.toAbsolutePath());
-        generarArchivo(out, 1000, 744);
+        generarArchivo(out, 300, 30);
     }
 }
