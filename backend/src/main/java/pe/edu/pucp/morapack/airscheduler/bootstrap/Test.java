@@ -20,6 +20,7 @@ import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.CargarPedidos.VentanaPedidos;
 import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.scheduling.adapters.io.ImpresorSolucion;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.OcupacionPorAeropuerto;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.VerificadorSLA;
 //import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.ALNS;
@@ -38,7 +39,7 @@ public class Test {
         long start = System.nanoTime();
         /*
          * =======================
-         * 1) SEDES Y CATÁLOGOS
+         * 1) SEDES Y CATÁLOGOS (CARGAMOS MAPA DE OCUPACIÓN POR AEROPUERTO)
          * =======================
          */
         final Set<String> sedes = new HashSet<>(Arrays.asList("SPIM", "EBCI", "UBBB"));
@@ -57,6 +58,9 @@ public class Test {
                 return;
             mapa.leerDatos(sc);
         }
+
+        OcupacionPorAeropuerto ocupacionPorAeropuerto = new OcupacionPorAeropuerto(aeropuertosMap);
+
         /*
          * =======================
          * 2) PEDIDOS (CRUDO)
@@ -119,7 +123,9 @@ public class Test {
 
             VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, mapa).construir(params);
 
-            SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
+            //SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
+
+            SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of(), ocupacionPorAeropuerto);
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
             ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt");
             //VerificadorSLA.assertBasicos(seed, Duration.ofHours(46));
@@ -145,6 +151,11 @@ public class Test {
             //solucionOptima.imprimirFitness(presenteUTC);
             // System.exit(1);
             //solucionAnterior = seed;
+
+            solucionOptima.imprimirCapacidadVuelosEnVentana(
+                    presenteUTC, finUTC, "out/reporteCapacidadVuelos_" + presenteUTC.toString().replace(':','-') + ".txt"
+            );
+
             System.out.println("Ventana de tiempo planificada, " + presenteUTC);
         }
         System.out.println("─────────────────────────────────────────────");
