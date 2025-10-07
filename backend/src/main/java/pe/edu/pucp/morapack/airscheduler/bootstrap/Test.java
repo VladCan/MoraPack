@@ -22,13 +22,11 @@ import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.scheduling.adapters.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.VerificadorSLA;
-//import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.ALNS;
-//import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators.*;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.ALNS;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators.*;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.ssp.SSPGeneradorSeed;
 
-public class Test {
+public class Test {//ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
     // Parámetros de simulación (ajustables)
     private static final long HORAS_VENTANA = 6;
     private static final long HORIZONTE_TEG_H = 72; // cuánto futuro modelar
@@ -66,11 +64,57 @@ public class Test {
         try (Scanner sc = ArchivoUtils.getScannerFromResource("pedidosProfe.txt")) {
             if (sc == null)return;
             pedidos.leerDatosProfe(sc);
-        }
+        }//localtime no localdatetime
         /*
          * ============================================
          * 3) NORMALIZACIÓN A UTC
          * ============================================
+         */
+        /*
+         * FIJAS:
+         * buscar que los ratios del fitness estén  normalizado
+         * 
+         * 
+         * verificar disponibilidad de aereopuertos por RANGO de tiempo que vas a usar!!!!
+         * 1:04am - 5:04am x1    10:04pm-2:04am  x1
+         * validar con todo y fecha si no no sirve!!
+         * pasarlo primero a date con fecha y luego recién lo dejamos en UTC
+         * 
+         * COPYS:
+         * PEDIDOS DEL MISMO LUGAR
+         * MISMAS RUTAS XD
+         * puedes reutilizar rutas ya cargadas
+         * 
+         * Queso quesito= edam; //es solo un puntero
+         * Queso quesito2= deepcopy(quesito);
+         * 
+         * Queso a= new Queso();
+         * Queso b= new Queso();
+         * 
+         * a= b; //puntero
+         * a.clone(b); // (shallow copy)
+         * listas internas son las mismas!!
+         * lista1= new ArrayList<>();
+         * lista2= new ArrayList<>();
+         * 
+         * lita1=lista2; //puntero
+         * lista1=new ArrayList<>(lista2);
+         * 
+         * si cambias cualquier elemento compartido, se refleja en ambos solo si son clases
+         * 
+         * 
+         * deepCopy (nuevo objeto al 100%)
+         * es un clonado custom que no deja nada compartido
+         * halfdeepcopy?
+         * nos interesa una parte copiada de forma independiente y otra compartida
+         * esto para poder comparar bien las soluciones sin estar creando ni cambiando todo
+         * 
+         * 
+         * computeIfAbsent
+         * pool de aereopuertos, pool de rutas, etc
+         * 
+         * 
+         * 
          */
         // Lleva cada pedido a UTC usando el GMT del destino
         pedidos.normalizarUtc(aeropuertosMap);
