@@ -70,7 +70,8 @@
 .animate-custom-leave {
   animation: custom-leave 0.2s ease-in forwards;
 }
-
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
