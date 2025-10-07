@@ -73,7 +73,7 @@ export default function NavClock({
     <div
       className={[
         "select-none",
-        "rounded-full bg-white/90 border border-black/10 shadow-sm",
+        "rounded-full bg-white/10 border border-black/10 shadow-sm",
         "backdrop-blur-sm",
         "px-3.5 py-1.5",
         "flex items-center gap-2",
