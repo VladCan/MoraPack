@@ -15,7 +15,7 @@ import java.util.TreeMap;
  * Se instancia una sola vez por ejecución (no es static o singleton, digamos que es similar).
  */
 
-public class OcupacionPorAeropuerto {
+public class OcupacionPorAeropuerto {//TODO => LIMPIAR ESTO SOLO DEBE TENER LA INFO DEL PRESENTE
     private Map<String, TreeMap<Instant, Integer>> eventos = new HashMap<>();
     private Map<String, TreeMap<Instant, Integer>> checkpoints = new HashMap<>(); //Esto es para no tener que sumar los eventos de hace tiempo (me recuerda a SO)¿
     //Validar si la key es el IATA del aeropuerto

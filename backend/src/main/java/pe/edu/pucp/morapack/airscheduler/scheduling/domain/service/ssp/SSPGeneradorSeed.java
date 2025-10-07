@@ -34,7 +34,7 @@ public class SSPGeneradorSeed {
     private static final int H_MAX = 3;                        // tope razonable de escalas para evitar explosión
     private final Set<String> sedes;                           // orígenes habilitados para multi-hop
     private final StockLibre stockLibre;                       // stock disponible por no-sede (arribos exógenos no comprometidos)
-    private final OcupacionPorAeropuerto ocupacionPorAeropuerto;
+    private final OcupacionPorAeropuerto ocupacionPorAeropuerto;//clase nueva implementada para control de stocks en tierra
     private final Duration slaLlegadaMax = Duration.ofHours(46);
 
     /** Construye con sedes y arribos libres (no comprometidos) por aeropuerto. */

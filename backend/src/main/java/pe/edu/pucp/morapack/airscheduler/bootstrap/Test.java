@@ -56,7 +56,6 @@ public class Test {//ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                 return;
             mapa.leerDatos(sc);
         }
-
         OcupacionPorAeropuerto ocupacionPorAeropuerto = new OcupacionPorAeropuerto(aeropuertosMap);
 
         /*
