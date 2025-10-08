@@ -35,7 +35,6 @@ public class RutaAsignada {
         }
     }
 
-
     /** Instante de primera llegada de la ruta (arribo de su primer tramo en destino final). */
     public Instant primeraLlegada() {
         return tramos.isEmpty() ? null : tramos.get(0).getLlegadaUtc();

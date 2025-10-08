@@ -46,17 +46,29 @@ public class CargaPorVuelo {
     }
 
     public int residual(VueloProgramadoId id) {
+        int capacidad = capacidad(id);
+        int asignado = asignado(id);
+
+        /*if (capacidad(id) > 0 || asignado > 0) {
+            System.out.println("Es mayor a 0!");
+        }*/
+
         return Math.max(0, capacidad(id) - asignado(id));
     }
 
     public void asignar(VueloProgramadoId id, int cantidad) {
-        if (cantidad <= 0) return;
+        //if (cantidad <= 0) return;
         int nuevo = asignado(id) + cantidad;
-        if (nuevo > capacidad(id)) {
+        int capacidad = capacidad(id);
+
+        if (nuevo > capacidad) {
+            System.out.println("Nuevo: " + nuevo + ", cantidad: " + capacidad);
             throw new IllegalStateException("Se excede la capacidad del vuelo: " + id);
         }
         asignado.put(id, nuevo);
     }
+
+
 
     public Iterable<? extends Map.Entry<String, Map<String, Integer>>> entrySet() {
         return data.entrySet();

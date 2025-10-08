@@ -78,7 +78,6 @@ public class OcupacionPorAeropuerto {
         validarIntervalo(inicio, fin);
         if (q <= 0) throw new IllegalArgumentException("q debe ser > 0");
 
-
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
 
         /*Instant objetivo = Instant.parse("2025-10-07T03:23:00Z");
@@ -126,8 +125,50 @@ public class OcupacionPorAeropuerto {
     }
 
     //Esta está pensada para replanificación/cancelación:
-    void liberar(String idAeropuerto, Instant inicio, Instant fin, int q){
+    public void liberar(String idAeropuerto, Instant inicio, Instant fin, int q){
         //Tambien debería de hacer lo de Si el delta queda 0, se remueve.
+
+        validarIntervalo(inicio, fin);
+        if (q <= 0) throw new IllegalArgumentException("q debe ser > 0");
+
+        TreeMap<Instant, Integer> evs = eventosDe(idAeropuerto);
+
+        // === Protección: para no permitir ocupación negativa en el intervalo ===
+        // Ocupación justo antes de aplicar la liberación
+        int occ = ocupacion(idAeropuerto, inicio);
+
+        int minOcc = Integer.MAX_VALUE;;
+
+        // Recorremos los deltas existentes en [inicio, fin) para ver el piso de ocupación
+        for (int delta : evs.subMap(inicio, true, fin, false).values()) {
+            occ += delta;
+            if (occ < minOcc) minOcc = occ;
+        }
+
+        if (minOcc == Integer.MAX_VALUE) minOcc = occ;
+
+        // No podemos liberar más de la mínima ocupación del intervalo
+        // Esto es más como un cinturón, obviamente solo se debería de liberar lo que hemos reservado. Por precaución
+        // igual lo colocamos.
+        int qEfectivo = Math.min(q, Math.max(0, minOcc));
+        if (qEfectivo == 0) {
+            // Nada que liberar de forma segura; salimos sin tocar eventos
+            return;
+        }
+
+        // === Aplicamos deltas inversos a reservar ===
+        // liberar = -q en inicio, +q en fin
+        evs.merge(inicio, -qEfectivo, Integer::sum);
+        evs.merge(fin,     +qEfectivo, Integer::sum);
+
+        // Limpiamos deltas que queden en 0
+        Integer dIni = evs.get(inicio);
+        if (dIni != null && dIni == 0) evs.remove(inicio);
+        Integer dFin = evs.get(fin);
+        if (dFin != null && dFin == 0) evs.remove(fin);
+
+        // Invalida checkpoints desde el día de 'inicio' hacia adelante
+        invalidarCheckpoints(idAeropuerto, inicio, fin);
     }
 
     ///
@@ -167,6 +208,7 @@ public class OcupacionPorAeropuerto {
 
     private void validarIntervalo(Instant a, Instant b) {
         if (a == null || b == null) throw new IllegalArgumentException("inicio/fin no pueden ser null");
+        if (!a.isBefore(b)) System.out.println("Intervalo inválido: inicio: " + a + ", fin: " + b);
         if (!a.isBefore(b)) throw new IllegalArgumentException("intervalo inválido: inicio >= fin");
     }
 
