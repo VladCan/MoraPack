@@ -29,7 +29,7 @@ import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.ssp.SSPGenera
 
 public class Test {//ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
     // Parámetros de simulación (ajustables)
-    private static final long HORAS_VENTANA = 6;
+    private static final long HORAS_VENTANA = 13;//cambio temporal TODO -> devolverlo a 6 luego del test de  Fabian 
     private static final long HORIZONTE_TEG_H = 72; // cuánto futuro modelar
 
     public static void main(String[] args) {
@@ -57,7 +57,8 @@ public class Test {//ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             mapa.leerDatos(sc);
         }
         OcupacionPorAeropuerto ocupacionPorAeropuerto = new OcupacionPorAeropuerto(aeropuertosMap);
-
+        // se va llenar de datos que no son necesarios
+        // nos dificulta la replanificación
         /*
          * =======================
          * 2) PEDIDOS (CRUDO)
@@ -127,6 +128,7 @@ public class Test {//ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
         limpiarArchivosPrevios();
         //guardaremos la solución anterior para poder replanificar
         SolucionProgramacion solucionAnterior = null;
+
         while (!pedidos.isEmpty()) {
             // reloj avanza hacia el futuro el valro de HORAS_VENTANA
             reloj = reloj.plus(Duration.ofHours(HORAS_VENTANA));
@@ -165,7 +167,7 @@ public class Test {//ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                     .build();
 
             VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, mapa).construir(params);
-
+            //TODO --> tenemos que crear una función que alimente ocupacionPorAeropuerto con lo que tiene teg
             //SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
 
             SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of(), ocupacionPorAeropuerto);
@@ -233,3 +235,30 @@ public class Test {//ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
         }
     }
 }
+
+
+
+/*
+ * 10am solucion1
+ * 10000 productos
+ * logramos planificar todo 10/10
+ * 
+ * 
+ * 
+ * 
+ * 
+ * enviamos 5000 productos (4000 ya llegaron y estan en aereopuetos y 1000 están en vuelo)
+ * 4pm solucion2
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * OcupacionPorAeropuerto
+ * 
+ * 
+ * 
+ * 
+ * 
+ */
