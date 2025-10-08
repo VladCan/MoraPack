@@ -3,6 +3,7 @@ package pe.edu.pucp.morapack.airscheduler.controllers;
 public class planificacionController {
     //TODO -> jamil acá tienes que crear un par de endpoints que le manden al front toda la info
     //este es el plan
+    //TODO -> RELOJ SSE <--- 
     /*
      * 
 FRONT:
