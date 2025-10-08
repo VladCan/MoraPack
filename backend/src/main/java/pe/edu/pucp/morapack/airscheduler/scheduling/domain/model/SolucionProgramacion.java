@@ -27,6 +27,10 @@ public class SolucionProgramacion {
         this.cargaPorVuelo = cargaPorVuelo;
     }
 
+    public CargaPorVuelo getCargaPorVuelo() {
+        return cargaPorVuelo;
+    }
+
 
     public SolucionProgramacion(SolucionProgramacion otra) {
         // Copiar profundo planPorPedido

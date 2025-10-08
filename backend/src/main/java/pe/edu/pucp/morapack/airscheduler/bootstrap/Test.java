@@ -35,6 +35,7 @@ public class Test {
     private static final long HORIZONTE_TEG_H = 72; // cuánto futuro modelar
 
     public static void main(String[] args) {
+
         //contador de tiempo de ejecución
         long start = System.nanoTime();
         /*
@@ -133,12 +134,11 @@ public class Test {
             // ALNS
             List<DestructionOperator> destructores = new ArrayList<>();
             destructores.add(new RandomRemoval(20));
-            destructores.add(new WorstRemoval(20));
+            //destructores.add(new WorstRemoval(20));
             List<RepairOperator> reparadores = new ArrayList<>();
             reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
-            reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg, 50));
-            ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores,
-            presenteUTC);
+            //reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg, 50));
+            ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC, ocupacionPorAeropuerto);
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
             // System.out.println("ALNS");
             //ImpresorSolucion.imprimirEnArchivo(solucionOptima);

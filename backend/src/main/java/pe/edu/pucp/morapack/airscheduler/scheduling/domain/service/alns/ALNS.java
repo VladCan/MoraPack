@@ -6,6 +6,7 @@ import java.util.*;
 
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosTEG;
 import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.OcupacionPorAeropuerto;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators.DestructionOperator;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators.RepairOperator;
@@ -20,8 +21,10 @@ public class ALNS {
     private final List<DestructionOperator> destructions;
     private final List<RepairOperator> repairs;
     private final Instant presenteUTC;
+    private final OcupacionPorAeropuerto ocupacionPorAeropuerto;
+
     private final Random rnd = new Random();        // RNG compartido para selección de operadores
-    private final int maxIter = 10;                 // iteraciones máximas
+    private final int maxIter = 70;                 // iteraciones máximas
     private final double tasaCambio = 0.3;          // probabilidad de aceptar peores soluciones
 
     public SolucionProgramacion ejecutar(SolucionProgramacion solucionInicial) {
@@ -31,6 +34,7 @@ public class ALNS {
         SolucionProgramacion solucionActual = new SolucionProgramacion(solucionInicial);
 
         for (int iter = 0; iter < maxIter; iter++) {
+            System.out.println("Iteración ALNS " + iter);
 
             // Seleccionar operadores aleatorios
             DestructionOperator destrOp = destructions.get(rnd.nextInt(destructions.size()));
@@ -41,11 +45,13 @@ public class ALNS {
             //nuevaSol.getPlanPorPedido().get(1).limpiarTramos();
             //solucionActual.getPlanPorPedido().get(1).getRutas();
 
+            Journal journal = new Journal(ocupacionPorAeropuerto);
+
             // Aplicar destrucción
-            destrOp.destroy(nuevaSol);
+            destrOp.destroy(nuevaSol, journal, presenteUTC);
 
             // Aplicar reparación
-            repairOp.repair(nuevaSol);
+            repairOp.repair(nuevaSol, journal, presenteUTC);
 
             // Evaluar costos
             double costoNueva = getCostoTotal(nuevaSol);
@@ -59,9 +65,20 @@ public class ALNS {
             }
 
             // Aceptar nueva solución (según criterio)
-            if (costoNueva <= costoActual || rnd.nextDouble() < tasaCambio) {
+            boolean aceptar = (costoNueva <= costoActual) || (rnd.nextDouble() < tasaCambio);
+
+            if (aceptar) {
+                //La ruta es aceptada, se confirman los cambios de ocupaciones
+                System.out.println("Nos estamos quedando con la nueva solución");
+                journal.commit();
                 solucionActual = new SolucionProgramacion(nuevaSol); // copia profunda
             }
+            else {
+                //La ruta quedó descartada, no se confirman los cambios de ocupaciones
+                System.out.println("Nos estamos quedando con la solución inicial");
+                journal.rollback();
+            }
+
         }
 
         return mejorSolucion;
@@ -92,5 +109,35 @@ public class ALNS {
 
         return costo;
     }
+
+    /// Dado que al destruir/construir rutas ahora vamos a cambiar las ocupaciones de los aeropuerto/vuelos, podemos
+    /// construir una ruta que finalmente no usemos. Para no "chancar" el libro global de ocupaciones, usamos Journal
+
+    public static final class Journal {
+        private final OcupacionPorAeropuerto occ;
+        private final Deque<Runnable> undo = new ArrayDeque<>();
+
+        public Journal(OcupacionPorAeropuerto occ) { this.occ = occ; }
+
+        public OcupacionPorAeropuerto getOcc() {
+            return this.occ;
+        }
+
+        // En vez de llamar occ.reservar directamente, los operadores llaman:
+        public void reservar(String ap, Instant ini, Instant fin, int q) {
+            occ.reservar(ap, ini, fin, q);
+            undo.push(() -> occ.liberar(ap, ini, fin, q)); // inversa
+        }
+        public void liberar(String ap, Instant ini, Instant fin, int q) {
+            occ.liberar(ap, ini, fin, q);
+            undo.push(() -> occ.reservar(ap, ini, fin, q)); // inversa
+        }
+
+        public void rollback() {
+            while (!undo.isEmpty()) undo.pop().run();
+        }
+        public void commit() { undo.clear(); } // nada que deshacer
+    }
+
 
 }

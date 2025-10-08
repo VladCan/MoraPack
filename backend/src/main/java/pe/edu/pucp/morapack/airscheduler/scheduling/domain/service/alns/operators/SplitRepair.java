@@ -3,6 +3,7 @@ package pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operato
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosTEG;
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.Vuelo;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.*;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.ALNS;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -27,7 +28,7 @@ public class SplitRepair implements RepairOperator {
     }
 
     @Override
-    public void repair(SolucionProgramacion s) {
+    public void repair(SolucionProgramacion s, ALNS.Journal journal, Instant presenteUTC) {
         List<PlanPedido> planos = new ArrayList<>(s.getPlanPorPedido().values());
 
         for (PlanPedido plan : planos) {
