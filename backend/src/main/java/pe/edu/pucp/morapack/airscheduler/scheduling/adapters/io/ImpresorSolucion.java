@@ -452,7 +452,7 @@ public final class ImpresorSolucion {
                                 .filter(e -> e.getValue() != null && e.getValue() > 0)
                                 .sorted(Comparator
                                                 .comparing((Map.Entry<VueloProgramadoId, Integer> e) -> e.getKey()
-                                                                .getSalidaUtc())
+                                                                .getLlegadaUtc())
                                                 .thenComparing(e -> e.getKey().getOrigen())
                                                 .thenComparing(e -> e.getKey().getDestino()))
                                 .toList();

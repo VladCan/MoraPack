@@ -24,7 +24,7 @@ public class ALNS {
     private final OcupacionPorAeropuerto ocupacionPorAeropuerto;
 
     private final Random rnd = new Random();        // RNG compartido para selección de operadores
-    private final int maxIter = 70;                 // iteraciones máximas
+    private final int maxIter = 5;                 // iteraciones máximas
     private final double tasaCambio = 0.3;          // probabilidad de aceptar peores soluciones
 
     public SolucionProgramacion ejecutar(SolucionProgramacion solucionInicial) {
