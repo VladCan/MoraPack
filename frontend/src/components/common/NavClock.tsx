@@ -73,12 +73,12 @@ export default function NavClock({
     <div
       className={[
         "select-none",
-        "rounded-full bg-white/10 border border-black/10 shadow-sm",
-        "backdrop-blur-sm",
-        "px-3.5 py-1.5",
-        "flex items-center gap-2",
-        "text-primary",
-        "font-medium",
+        // Glassmorphism similar a tu <ul>
+        "rounded-full gap-2 px-3.5 py-1.5",
+        "bg-card/40 shadow-lg ring-1 ring-border",
+        "backdrop-blur-md backdrop-saturate-150",
+        // Tipografía/colores
+        "flex items-center text-base font-medium",
         className,
       ].join(" ")}
       title="Hora del sistema"
@@ -87,7 +87,7 @@ export default function NavClock({
       <div className="leading-tight">
         <div className="tabular-nums tracking-wide">{time}</div>
         {showDate && (
-          <div className="text-[10px] text-primary/70 uppercase">{date}</div>
+          <div className="text-[10px] text-base uppercase">{date}</div>
         )}
       </div>
     </div>
