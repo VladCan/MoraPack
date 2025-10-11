@@ -3,11 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "bun@1.3.0",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "typecheck": "bunx tsc -p tsconfig.app.json --noEmit",
+    "dev": "bunx vite",
+    "build": "bunx tsc -b && vite build",
+    "lint": "bunx eslint .",
+    "preview": "bunx vite preview"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
