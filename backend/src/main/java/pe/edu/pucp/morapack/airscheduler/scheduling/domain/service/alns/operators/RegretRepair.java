@@ -45,6 +45,11 @@ public class RegretRepair implements RepairOperator {
 
         for (PlanPedido plan : planos) {
             if (plan.getRutas() == null || plan.getRutas().isEmpty()) {
+
+                if (plan.getIdPedido() == 3){
+                    System.out.println("");
+                }
+
                 List<List<Vuelo>> candidatos = new ArrayList<>();
                 for (String sede : sedes) {
                     List<Vuelo> camino = dijkstraRuta(sede, plan, presenteUTC, cargaPorVuelo, journal);
@@ -61,7 +66,7 @@ public class RegretRepair implements RepairOperator {
 
                 //Usamos el helper para convertir a tramos
                 List<TramoAsignado> tramos = elegida.stream()
-                        .map(v -> vueloToTramoAsignado(v, plan.getDemanda(), plan.getCreadoUtc()))
+                        .map(v -> vueloToTramoAsignado(v, plan.getDemanda(), presenteUTC))
                         .collect(Collectors.toList());
 
                 //Ahora que tenemos esta ruta, tenemos que consumir los recursos. Para ello, escribimos en el journal
@@ -119,6 +124,7 @@ public class RegretRepair implements RepairOperator {
         String destino = plan.getAeropuertoDestino();
         int demanda = plan.getDemanda();
 
+
         Map<String, Double> dist = new HashMap<>();
         Map<String, Vuelo> previo = new HashMap<>();
         PriorityQueue<String> pq = new PriorityQueue<>(Comparator.comparingDouble(n -> dist.getOrDefault(n, Double.POSITIVE_INFINITY)));
@@ -128,6 +134,10 @@ public class RegretRepair implements RepairOperator {
         }
         dist.put(origen, 0.0);
         pq.add(origen);
+
+        if (plan.getIdPedido() == 3){
+            System.out.println("");
+        }
 
         while (!pq.isEmpty()) {
 
@@ -141,8 +151,8 @@ public class RegretRepair implements RepairOperator {
             for (Vuelo v : salidas) {
 
                 //Convertimos el HH-MM de los vuelos a HH-MM DD/MM/AA (no es exactamente ese formato, pero se entiende la idea de lo que hacemos)
-                Instant salidaUtc = v.getHoraGMTOrigen() .atDate(plan.getCreadoUtc().atZone(ZoneOffset.UTC).toLocalDate()) .toInstant(ZoneOffset.UTC);
-                Instant llegadaUtc = v.getHoraGMTDestino() .atDate(plan.getCreadoUtc().atZone(ZoneOffset.UTC).toLocalDate()) .toInstant(ZoneOffset.UTC);
+                Instant salidaUtc = v.getHoraGMTOrigen() .atDate(presenteUTC.atZone(ZoneOffset.UTC).toLocalDate()) .toInstant(ZoneOffset.UTC);
+                Instant llegadaUtc = v.getHoraGMTDestino() .atDate(presenteUTC.atZone(ZoneOffset.UTC).toLocalDate()) .toInstant(ZoneOffset.UTC);
 
                 //Vuelo salió ayer y llega hoy, sumamos 1.
                 if (!llegadaUtc.isAfter(salidaUtc)) {
@@ -186,6 +196,11 @@ public class RegretRepair implements RepairOperator {
         if (ruta.isEmpty()) return null;
 
         //Con la ruta armada, vamos a pasar a las validaciones finales 1) y 2)
+
+        if (plan.getIdPedido() == 3){
+            System.out.println("");
+        }
+
 
         // 1) Validamos las ocupaciones en las escalas
         int qOccEscalas = Integer.MAX_VALUE;
@@ -249,8 +264,10 @@ public class RegretRepair implements RepairOperator {
         // 2) Validamos las 2h de ocupación en el destino.
         Vuelo ultimo = ruta.get(ruta.size() - 1);
         Instant llegadaFinal = ultimo.getHoraGMTDestino()
-                .atDate(plan.getCreadoUtc().atZone(ZoneOffset.UTC).toLocalDate())
+                .atDate(presenteUTC.atZone(ZoneOffset.UTC).toLocalDate())
                 .toInstant(ZoneOffset.UTC);
+
+
 
         int qOccDest = journal.getOcc().maxReservable(destino, llegadaFinal, llegadaFinal.plus(Duration.ofHours(2)));
         if (qOccDest < demanda) {

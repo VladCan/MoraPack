@@ -51,6 +51,8 @@ public class WorstRemoval implements DestructionOperator {
     public boolean liberarRecursosDePlan(PlanPedido plan, Instant presenteUTC, SolucionProgramacion s, ALNS.Journal journal){
         List<RutaAsignada> rutas = plan.getRutas();
 
+        if (rutas == null || rutas.isEmpty()) return false;
+
         for (RutaAsignada ruta : rutas) {
             // 1) si no hay tramos, no hay nada que liberar en esta ruta
             if (ruta.getTramos() == null || ruta.getTramos().isEmpty()) continue;

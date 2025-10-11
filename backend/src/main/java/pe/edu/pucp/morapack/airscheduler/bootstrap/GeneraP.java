@@ -57,8 +57,8 @@ public class GeneraP {
         Instant t = base;
 
         // ===== Variables del generador de cantidades =====
-        final int piso = 200;
-        final int techo = 500;
+        final int piso = 250;
+        final int techo = 400;
 
         // Techo "blando" para la logística base (evita llegar rápido a 999)
         final double kSoft = 940 + random.nextInt(21); // 940..960

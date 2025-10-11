@@ -80,6 +80,9 @@ public class Test {
         // Lleva cada pedido a UTC usando el GMT del destino
         pedidos.normalizarUtc(aeropuertosMap);
 
+        //Para asegurar que siempre estén ordenados por fecha de creación UTC
+        pedidos.ordenarPorUTC();
+
         Instant reloj = pedidos.primerInstanteUTC();
         if (reloj == null) return; //no hay pedidos que simular
         limpiarArchivosPrevios();
