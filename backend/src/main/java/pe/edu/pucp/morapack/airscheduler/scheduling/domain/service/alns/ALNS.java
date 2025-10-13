@@ -6,6 +6,7 @@ import java.util.*;
 
 import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosTEG;
 import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.scheduling.adapters.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.OcupacionPorAeropuerto;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators.DestructionOperator;
@@ -65,7 +66,7 @@ public class ALNS {
             }
 
             // Aceptar nueva solución (según criterio)
-            boolean aceptar = (costoNueva <= costoActual) || (rnd.nextDouble() < tasaCambio);
+            boolean aceptar = (costoNueva < costoActual) || (rnd.nextDouble() < tasaCambio);
 
             if (aceptar) {
                 //La ruta es aceptada, se confirman los cambios de ocupaciones
@@ -78,6 +79,10 @@ public class ALNS {
                 System.out.println("Nos estamos quedando con la solución inicial");
                 journal.rollback();
             }
+
+            ImpresorSolucion.imprimirEnArchivo(solucionActual, "out/solucionActualALNS.txt");
+            ImpresorSolucion.imprimirEnArchivo(nuevaSol, "out/solucionNuevaALNS.txt");
+            ImpresorSolucion.imprimirEnArchivo(mejorSolucion, "out/mejorSolucionALNS.txt");
 
         }
 
