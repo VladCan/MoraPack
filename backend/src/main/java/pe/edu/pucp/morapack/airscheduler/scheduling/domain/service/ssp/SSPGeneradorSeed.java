@@ -5,6 +5,8 @@ import pe.edu.pucp.morapack.airscheduler.flights.domain.model.ArriboExogeno;
 import pe.edu.pucp.morapack.airscheduler.flights.domain.model.VuelosEdge;
 import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.*;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.IndexVuelos;
+import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.VueloFicha;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -66,7 +68,7 @@ public class SSPGeneradorSeed {
 
         // Capacidades iniciales (residuales) por vuelo
         CargaPorVuelo carga = new CargaPorVuelo();
-        for (var vf : idx.todos()) carga.registrarCapacidad(vf.id, vf.capacidad);
+        for (var vf : idx.todos()) carga.registrarCapacidad(vf.id(), vf.capacidad());
 
         Map<Integer, PlanPedido> planPorPedido = new HashMap<>();
 
@@ -115,8 +117,8 @@ public class SSPGeneradorSeed {
                 int q = Math.min(Math.min(capRuta, capOcup), rem);
 
                 // 4) Si la ruta inicia en no-sede, validar/consumir stock libre antes de la salida del primer tramo
-                String origenInicial = ruta.legs.get(0).id.getOrigen();
-                Instant salidaInicial = ruta.legs.get(0).id.getSalidaUtc();
+                String origenInicial = ruta.legs.get(0).id().getOrigen();
+                Instant salidaInicial = ruta.legs.get(0).id().getSalidaUtc();
                 if (!sedes.contains(origenInicial)) {
                     int disp = stockLibre.disponible(origenInicial, salidaInicial);
                     if (disp <= 0) {
@@ -134,8 +136,8 @@ public class SSPGeneradorSeed {
                 // 5.2) Asignar 'q' en todos los vuelos de los tramos y construir la RutaAsignada
                 List<TramoAsignado> tramosRuta = new ArrayList<>(ruta.legs.size());
                 for (VueloFicha leg : ruta.legs) {
-                    carga.asignar(leg.id, q);
-                    tramosRuta.add(new TramoAsignado(leg.id, q, leg.id.getLlegadaUtc()));
+                    carga.asignar(leg.id(), q);
+                    tramosRuta.add(new TramoAsignado(leg.id(), q, leg.id().getLlegadaUtc()));
                 }
                 rutasAsignadas.add(new RutaAsignada(q, tramosRuta));
 
@@ -178,18 +180,18 @@ public class SSPGeneradorSeed {
         for (int i = 0; i<legs.size() - 1; i++) {
             var a = legs.get(i);
             var b = legs.get(i + 1);
-            Instant ini = a.id.getLlegadaUtc();
-            Instant fin = b.id.getSalidaUtc();
+            Instant ini = a.id().getLlegadaUtc();
+            Instant fin = b.id().getSalidaUtc();
 
             //Aca modelamos si hay espera real (casi siempre habrá)
             if (ini.isBefore(fin)){
-                ints.add(new Intervalo(a.id.getDestino(), ini, fin));
+                ints.add(new Intervalo(a.id().getDestino(), ini, fin));
             }
         }
 
         var last = legs.get(legs.size() - 1);
-        Instant arrUTC = last.id.getLlegadaUtc();
-        ints.add(new Intervalo(last.id.getDestino(), arrUTC, arrUTC.plus(Duration.ofHours(2))));
+        Instant arrUTC = last.id().getLlegadaUtc();
+        ints.add(new Intervalo(last.id().getDestino(), arrUTC, arrUTC.plus(Duration.ofHours(2))));
         return ints;
     }
 
@@ -218,7 +220,7 @@ public class SSPGeneradorSeed {
         final Instant arriboFinal;
         Ruta(List<VueloFicha> legs) {
             this.legs = legs;
-            this.arriboFinal = legs.get(legs.size()-1).id.getLlegadaUtc();
+            this.arriboFinal = legs.get(legs.size()-1).id().getLlegadaUtc();
         }
     }
 
@@ -269,18 +271,18 @@ public class SSPGeneradorSeed {
 
         // Iterar por vuelos que respeten el tiempo
         for (VueloFicha f : salidas) {
-            if (f.id.getSalidaUtc().isBefore(earliest)) continue;
-            if (f.id.getLlegadaUtc().isAfter(latest)) continue;
+            if (f.id().getSalidaUtc().isBefore(earliest)) continue;
+            if (f.id().getLlegadaUtc().isAfter(latest)) continue;
 
             // poda por capacidad: si no hay residual, no sigas
-            if (carga.residual(f.id) <= 0) continue;
+            if (carga.residual(f.id()) <= 0) continue;
 
             // poda por holgura/estancia para aeropuerto de llegada: si no hay espacio para 1 unidad, no sigas
             if (!path.isEmpty()) {
                 VueloFicha prev = path.get(path.size() - 1);
-                String apEscala = prev.id.getDestino();
-                Instant inicioEspera = prev.id.getLlegadaUtc();
-                Instant finEspera = f.id.getSalidaUtc();
+                String apEscala = prev.id().getDestino();
+                Instant inicioEspera = prev.id().getLlegadaUtc();
+                Instant finEspera = f.id().getSalidaUtc();
 
                 // Sólo si hay espera real (inicio < fin) verificamos holgura
                 if (inicioEspera.isBefore(finEspera)) {
@@ -291,11 +293,11 @@ public class SSPGeneradorSeed {
 
             path.add(f);
 
-            if (f.id.getDestino().equals(dest)) {
+            if (f.id().getDestino().equals(dest)) {
                 // alcanzamos el destino: ruta válida solo si hopsRestantes == 0
                 if (hopsRestantes == 0) {
-                    String apDestino = f.id.getDestino();
-                    Instant arrUTC = f.id.getLlegadaUtc();
+                    String apDestino = f.id().getDestino();
+                    Instant arrUTC = f.id().getLlegadaUtc();
                     Instant wait = arrUTC.plus(Duration.ofHours(2));
 
                     int holgura = ocupacionPorAeropuerto.maxReservable(apDestino, arrUTC, wait);
@@ -307,7 +309,7 @@ public class SSPGeneradorSeed {
                 }
             } else if (hopsRestantes > 0) {
                 // extender desde el nuevo aeropuerto, earliest = llegada del vuelo actual
-                Ruta rec = dfsRutas(idx, carga, f.id.getDestino(), dest, f.id.getLlegadaUtc(), latest, hopsRestantes - 1, path);
+                Ruta rec = dfsRutas(idx, carga, f.id().getDestino(), dest, f.id().getLlegadaUtc(), latest, hopsRestantes - 1, path);
                 if (rec != null) {
                     if (mejor == null || rec.arriboFinal.isBefore(mejor.arriboFinal)) mejor = rec;
                 }
@@ -326,13 +328,13 @@ public class SSPGeneradorSeed {
                                      Instant earliest,
                                      Instant latest) {
         List<VueloFicha> direct = idx.porDestino(dest).stream()
-                .filter(vf -> !vf.id.getSalidaUtc().isBefore(earliest)
-                           && !vf.id.getLlegadaUtc().isAfter(latest))
-                .sorted(Comparator.comparing(v -> v.id.getLlegadaUtc()))
+                .filter(vf -> !vf.id().getSalidaUtc().isBefore(earliest)
+                           && !vf.id().getLlegadaUtc().isAfter(latest))
+                .sorted(Comparator.comparing(v -> v.id().getLlegadaUtc()))
                 .collect(Collectors.toList());
 
         for (VueloFicha vf : direct) {
-            if (carga.residual(vf.id) <= 0) continue;
+            if (carga.residual(vf.id()) <= 0) continue;
             return new Ruta(List.of(vf));
         }
         return null;
@@ -341,7 +343,7 @@ public class SSPGeneradorSeed {
     private int capacidadEnRuta(CargaPorVuelo carga, Ruta r) {
         int min = Integer.MAX_VALUE;
         for (VueloFicha leg : r.legs) {
-            min = Math.min(min, carga.residual(leg.id));
+            min = Math.min(min, carga.residual(leg.id()));
         }
         return (min == Integer.MAX_VALUE) ? 0 : min;
     }
@@ -360,39 +362,6 @@ public class SSPGeneradorSeed {
                 throw new IllegalStateException("Define campo cantidad en Pedido (getCantidad o getCantPaquetes).");
             }
         }
-    }
-
-    /** Representa un vuelo FLIGHT del TEG con capacidad fija. */
-    record VueloFicha(VueloProgramadoId id, int capacidad) {}//datos del vuelo
-
-    /** Índices de vuelos por origen y por destino. */
-    static final class IndexVuelos {
-        private final Map<String, List<VueloFicha>> porDestino = new HashMap<>();
-        private final Map<String, List<VueloFicha>> porOrigen  = new HashMap<>();
-        private final List<VueloFicha> all = new ArrayList<>();
-
-        IndexVuelos(VuelosTEG teg) {
-            for (VuelosEdge e : teg.arcos()) {
-                if (e.tipo() != VuelosEdge.Type.FLIGHT) continue;
-                var a = e.salida();
-                var b = e.destino();
-                if (a == null || b == null || a.getTiempoUTC() == null || b.getTiempoUTC() == null) continue;
-
-                VueloProgramadoId id = new VueloProgramadoId(
-                        a.getCodigoAP(), b.getCodigoAP(), a.getTiempoUTC(), b.getTiempoUTC());
-                VueloFicha vf = new VueloFicha(id, e.capacidad());
-
-                all.add(vf);
-                porDestino.computeIfAbsent(id.getDestino(), k -> new ArrayList<>()).add(vf);
-                porOrigen.computeIfAbsent(id.getOrigen(),  k -> new ArrayList<>()).add(vf);
-            }
-            porDestino.values().forEach(lst -> lst.sort(Comparator.comparing(v -> v.id.getLlegadaUtc())));
-            porOrigen.values().forEach(lst  -> lst.sort(Comparator.comparing(v -> v.id.getSalidaUtc())));
-        }
-
-        List<VueloFicha> porDestino(String destino) { return porDestino.getOrDefault(destino, List.of()); }
-        List<VueloFicha> porOrigen(String origen)   { return porOrigen.getOrDefault(origen, List.of()); }
-        List<VueloFicha> todos() { return all; }
     }
 
     /**

@@ -123,11 +123,11 @@ public class OcupacionPorAeropuerto {
 
         TreeMap<Instant, Integer> evs = eventosDe(idAeropuerto);
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
+        /*DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
         Instant objetivo = Instant.parse("2025-10-09T00:54:00Z");
         if (idAeropuerto.equals("LOWW") && !inicio.isAfter(objetivo) && !inicio.isBefore(objetivo)){
             System.out.println("Estamos en la fecha: " + formatter.format(inicio));
-        }
+        }*/
 
 
         // === Protección: para no permitir ocupación negativa en el intervalo ===
@@ -174,11 +174,11 @@ public class OcupacionPorAeropuerto {
 
         var ck = checkpointsDe(idAeropuerto);
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
+        /*DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
         Instant objetivo = Instant.parse("2025-10-10T00:00:00Z");
         if (idAeropuerto.equals("LOWW") && !inicio.isAfter(objetivo) && !inicio.isBefore(objetivo)){
             System.out.println("Estamos en la fecha: " + formatter.format(inicio));
-        }
+        }*/
 
 
         Instant dayStart = inicioDeDiaUTC(inicio);

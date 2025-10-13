@@ -13,14 +13,14 @@ import java.time.Instant;
 import java.util.*;
 
 /** Solución completa: planes por pedido + carga agregada por vuelo. */
-@Getter
-@Builder
-public class SolucionProgramacion {
+    @Getter
+    @Builder
+    public class SolucionProgramacion {
 
-    @Singular("plan")
-    private final Map<Integer, PlanPedido> planPorPedido;
+        @Singular("plan")
+        private final Map<Integer, PlanPedido> planPorPedido;
 
-    private final CargaPorVuelo cargaPorVuelo;
+        private final CargaPorVuelo cargaPorVuelo;
 
     public SolucionProgramacion(Map<Integer, PlanPedido> planPorPedido, CargaPorVuelo cargaPorVuelo) {
         this.planPorPedido = new HashMap<>(planPorPedido);  // <-- mutable
