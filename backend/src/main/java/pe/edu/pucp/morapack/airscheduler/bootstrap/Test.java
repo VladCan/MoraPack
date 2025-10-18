@@ -29,7 +29,7 @@ import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.ssp.SSPGenera
 
 public class Test {//ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
     // Parámetros de simulación (ajustables)
-    private static final long HORAS_VENTANA = 13;//cambio temporal TODO -> devolverlo a 6 luego del test de  Fabian 
+    private static final long HORAS_VENTANA = 6;//cambio temporal TODO -> devolverlo a 6 luego del test de  Fabian (done already)
     private static final long HORIZONTE_TEG_H = 72; // cuánto futuro modelar
 
     public static void main(String[] args) {
