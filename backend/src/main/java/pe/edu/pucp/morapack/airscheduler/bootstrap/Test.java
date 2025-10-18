@@ -7,34 +7,36 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
-import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.TEGEventBuilder;
-import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosMap;
-import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosTEG;
-import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.TEGEventBuilderHelpers.TEGParametros;
-import pe.edu.pucp.morapack.airscheduler.flights.adapters.utils.EstadoAnteriorExtractor;
-import pe.edu.pucp.morapack.airscheduler.flights.domain.model.ArriboExogeno;
-import pe.edu.pucp.morapack.airscheduler.flights.domain.model.OcupacionAlmacen;
-import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.ArchivoUtils;
-import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.CargarPedidos;
-import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.CargarPedidos.VentanaPedidos;
-import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
-import pe.edu.pucp.morapack.airscheduler.scheduling.adapters.io.ImpresorSolucion;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.OcupacionPorAeropuerto;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.model.SolucionProgramacion;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.VerificadorSLA;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.ALNS;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns.operators.*;
-import pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.ssp.SSPGeneradorSeed;
 
-public class Test {//ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
+import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.memory.AeropuertosMap;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.memory.TEGEventBuilder;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.memory.VuelosMap;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.memory.VuelosTEG;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.memory.TEGEventBuilderHelpers.TEGParametros;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.utils.EstadoAnteriorExtractor;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.domain.model.ArriboExogeno;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.domain.model.OcupacionAlmacen;
+import pe.edu.pucp.morapack.airscheduler.engine.orders.adapters.io.ArchivoUtils;
+import pe.edu.pucp.morapack.airscheduler.engine.orders.adapters.io.CargarPedidos;
+import pe.edu.pucp.morapack.airscheduler.engine.orders.adapters.io.CargarPedidos.VentanaPedidos;
+import pe.edu.pucp.morapack.airscheduler.engine.orders.domain.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.adapters.io.ImpresorSolucion;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.domain.model.OcupacionPorAeropuerto;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.domain.model.SolucionProgramacion;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.domain.service.VerificadorSLA;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.domain.service.alns.ALNS;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.domain.service.alns.operators.*;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.domain.service.ssp.SSPGeneradorSeed;
+
+public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
     // Parámetros de simulación (ajustables)
-    private static final long HORAS_VENTANA = 6;//cambio temporal TODO -> devolverlo a 6 luego del test de  Fabian (done already)
+    private static final long HORAS_VENTANA = 6;// cambio temporal TODO -> devolverlo a 6 luego del test de Fabian (done
+                                                // already)
     private static final long HORIZONTE_TEG_H = 72; // cuánto futuro modelar
 
     public static void main(String[] args) {
 
-        //contador de tiempo de ejecución
+        // contador de tiempo de ejecución
         long start = System.nanoTime();
         /*
          * =======================
@@ -67,70 +69,20 @@ public class Test {//ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
          */
         CargarPedidos pedidos = new CargarPedidos();
         try (Scanner sc = ArchivoUtils.getScannerFromResource("pedidosProfe.txt")) {
-            if (sc == null)return;
+            if (sc == null)
+                return;
             pedidos.leerDatosProfe(sc);
-        }//localtime no localdatetime
-        /*
-         * ============================================
-         * 3) NORMALIZACIÓN A UTC
-         * ============================================
-         */
-        /*
-         * FIJAS:
-         * buscar que los ratios del fitness estén  normalizado
-         * 
-         * 
-         * verificar disponibilidad de aereopuertos por RANGO de tiempo que vas a usar!!!!
-         * 1:04am - 5:04am x1    10:04pm-2:04am  x1
-         * validar con todo y fecha si no no sirve!!
-         * pasarlo primero a date con fecha y luego recién lo dejamos en UTC
-         * 
-         * COPYS:
-         * PEDIDOS DEL MISMO LUGAR
-         * MISMAS RUTAS XD
-         * puedes reutilizar rutas ya cargadas
-         * 
-         * Queso quesito= edam; //es solo un puntero
-         * Queso quesito2= deepcopy(quesito);
-         * 
-         * Queso a= new Queso();
-         * Queso b= new Queso();
-         * 
-         * a= b; //puntero
-         * a.clone(b); // (shallow copy)
-         * listas internas son las mismas!!
-         * lista1= new ArrayList<>();
-         * lista2= new ArrayList<>();
-         * 
-         * lita1=lista2; //puntero
-         * lista1=new ArrayList<>(lista2);
-         * 
-         * si cambias cualquier elemento compartido, se refleja en ambos solo si son clases
-         * 
-         * 
-         * deepCopy (nuevo objeto al 100%)
-         * es un clonado custom que no deja nada compartido
-         * halfdeepcopy?
-         * nos interesa una parte copiada de forma independiente y otra compartida
-         * esto para poder comparar bien las soluciones sin estar creando ni cambiando todo
-         * 
-         * 
-         * computeIfAbsent
-         * pool de aereopuertos, pool de rutas, etc
-         * 
-         * 
-         * 
-         */
-        // Lleva cada pedido a UTC usando el GMT del destino
+        } // localtime no localdatetime
         pedidos.normalizarUtc(aeropuertosMap);
 
-        //Para asegurar que siempre estén ordenados por fecha de creación UTC
+        // Para asegurar que siempre estén ordenados por fecha de creación UTC
         pedidos.ordenarPorUTC();
 
         Instant reloj = pedidos.primerInstanteUTC();
-        if (reloj == null) return; //no hay pedidos que simular
+        if (reloj == null)
+            return; // no hay pedidos que simular
         limpiarArchivosPrevios();
-        //guardaremos la solución anterior para poder replanificar
+        // guardaremos la solución anterior para poder replanificar
         SolucionProgramacion solucionAnterior = null;
 
         while (!pedidos.isEmpty()) {
@@ -139,70 +91,75 @@ public class Test {//ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             Instant presenteUTC = reloj;
             Instant finUTC = presenteUTC.plus(HORIZONTE_TEG_H, ChronoUnit.HOURS);// para TEG
             // quitamos pedidos cumplidos y actualizamos los pedidos medio cumplidos
-            if (solucionAnterior != null) pedidos.eliminarYActualizarCumplidosHasta(presenteUTC, solucionAnterior);
-            //imprimimos un reporte del estado de los pedididos en el tiempo presenteUTC
-            if (solucionAnterior != null) solucionAnterior.imprimirEnArchivo(presenteUTC, "out/reporteSimulacion.txt");
+            if (solucionAnterior != null)
+                pedidos.eliminarYActualizarCumplidosHasta(presenteUTC, solucionAnterior);
+            // imprimimos un reporte del estado de los pedididos en el tiempo presenteUTC
+            if (solucionAnterior != null)
+                solucionAnterior.imprimirEnArchivo(presenteUTC, "out/reporteSimulacion.txt");
             // solo copia los pedidos no desencola
             VentanaPedidos ventana = pedidos.acumuladoHasta(presenteUTC);// solo sacamos los pedidos de la ventana
             List<Pedido> listaPedidos = ventana.pedidos();
-            if (listaPedidos.isEmpty()) break;
-            //guardamos los vuelos en curso y las reservas de espacio en aereopuertos de la solución anterior
-            Map<String, List<ArriboExogeno>> enVuelo = EstadoAnteriorExtractor.
-                                                construirArribosEnVuelo(solucionAnterior,presenteUTC);
+            if (listaPedidos.isEmpty())
+                break;
+            // guardamos los vuelos en curso y las reservas de espacio en aereopuertos de la
+            // solución anterior
+            Map<String, List<ArriboExogeno>> enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior,
+                    presenteUTC);
 
-            List<OcupacionAlmacen> reservas = EstadoAnteriorExtractor.
-                                                reservasDesdeSolucionAnterior(solucionAnterior,presenteUTC, Duration.ofHours(2));
-            //imprimimos enVuelo y reservas para debug
+            List<OcupacionAlmacen> reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior,
+                    presenteUTC, Duration.ofHours(2));
+            // imprimimos enVuelo y reservas para debug
             DebugEstado.debugEstado(
-                enVuelo,
-                reservas,
-                presenteUTC,
-                Paths.get("out", "iteracionPrevia.txt")
-            );
-            //definimos los valores necesarios para el Time Elapse Event Graph TEEG
+                    enVuelo,
+                    reservas,
+                    presenteUTC,
+                    Paths.get("out", "iteracionPrevia.txt"));
+            // definimos los valores necesarios para el Time Elapse Event Graph TEEG
             TEGParametros params = TEGParametros.builder()
                     .inicioUtc(presenteUTC)
                     .finUtc(finUTC)
-                    //.capacidadWaitPorDefecto(null) // null => usa cap. de bodega del aeropuerto
+                    // .capacidadWaitPorDefecto(null) // null => usa cap. de bodega del aeropuerto
                     .sedes(sedes)
                     .arribosLibres(enVuelo) // <— vuelos ya despegados
                     .reservasWaitIniciales(reservas) // <— ocupa bodega por pickup 2h
-                    // .stockInicial(stockInicial) //en caso sea conveniente para el modelo (en evaluacion)
+                    // .stockInicial(stockInicial) //en caso sea conveniente para el modelo (en
+                    // evaluacion)
                     .build();
 
             VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, mapa).construir(params);
-            //TODO --> tenemos que crear una función que alimente ocupacionPorAeropuerto con lo que tiene teg
-            //SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
+            // TODO --> tenemos que crear una función que alimente ocupacionPorAeropuerto
+            // con lo que tiene teg
+            // SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
 
             SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of(), ocupacionPorAeropuerto);
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
             ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt");
-            //VerificadorSLA.assertBasicos(seed, Duration.ofHours(46));
-            //solucionAnterior = seed;
+            // VerificadorSLA.assertBasicos(seed, Duration.ofHours(46));
+            // solucionAnterior = seed;
             // ALNS
             List<DestructionOperator> destructores = new ArrayList<>();
             destructores.add(new RandomRemoval(20));
-            //destructores.add(new WorstRemoval(20));
+            // destructores.add(new WorstRemoval(20));
             List<RepairOperator> reparadores = new ArrayList<>();
             reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
-            //reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg, 50));
+            // reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg, 50));
             ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC, ocupacionPorAeropuerto);
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
             // System.out.println("ALNS");
-            //ImpresorSolucion.imprimirEnArchivo(solucionOptima);
+            // ImpresorSolucion.imprimirEnArchivo(solucionOptima);
             ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt");
             ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
             solucionAnterior = solucionOptima;
-            //verificacionTotal(solucionAnterior)
+            // verificacionTotal(solucionAnterior)
             VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46));
-            //System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
-            //solucionOptima.imprimirFitness(presenteUTC);
+            // System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
+            // solucionOptima.imprimirFitness(presenteUTC);
             // System.exit(1);
-            //solucionAnterior = seed;
+            // solucionAnterior = seed;
 
             solucionOptima.imprimirCapacidadVuelosEnVentana(
-                    presenteUTC, finUTC, "out/reporteCapacidadVuelos_" + presenteUTC.toString().replace(':','-') + ".txt"
-            );
+                    presenteUTC, finUTC,
+                    "out/reporteCapacidadVuelos_" + presenteUTC.toString().replace(':', '-') + ".txt");
 
             System.out.println("Ventana de tiempo planificada, " + presenteUTC);
         }
@@ -216,7 +173,6 @@ public class Test {//ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
         long durationMs = (end - start) / 1_000_000;
         System.out.println("⏱️ Tiempo total de ejecución: " + durationMs + " ms");
     }
-
 
     private static void limpiarArchivosPrevios() {
         borrarSiExiste("out/iteracionPrevia.txt");
@@ -238,30 +194,3 @@ public class Test {//ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
         }
     }
 }
-
-
-
-/*
- * 10am solucion1
- * 10000 productos
- * logramos planificar todo 10/10
- * 
- * 
- * 
- * 
- * 
- * enviamos 5000 productos (4000 ya llegaron y estan en aereopuetos y 1000 están en vuelo)
- * 4pm solucion2
- * 
- * 
- * 
- * 
- * 
- * 
- * OcupacionPorAeropuerto
- * 
- * 
- * 
- * 
- * 
- */

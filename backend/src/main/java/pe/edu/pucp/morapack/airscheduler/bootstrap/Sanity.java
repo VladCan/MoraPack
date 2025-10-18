@@ -7,12 +7,12 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.AeropuertosMap;
-import pe.edu.pucp.morapack.airscheduler.flights.adapters.memory.VuelosTEG;
-import pe.edu.pucp.morapack.airscheduler.flights.domain.model.AereopuertoNode;
-import pe.edu.pucp.morapack.airscheduler.flights.domain.model.VuelosEdge;
-import pe.edu.pucp.morapack.airscheduler.orders.adapters.io.CargarPedidos;
-import pe.edu.pucp.morapack.airscheduler.orders.domain.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.memory.AeropuertosMap;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.memory.VuelosTEG;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.domain.model.AereopuertoNode;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.domain.model.VuelosEdge;
+import pe.edu.pucp.morapack.airscheduler.engine.orders.adapters.io.CargarPedidos;
+import pe.edu.pucp.morapack.airscheduler.engine.orders.domain.model.Pedido;
 
 @Slf4j
 @UtilityClass

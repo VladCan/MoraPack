@@ -13,11 +13,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
+import pe.edu.pucp.morapack.airscheduler.engine.flights.domain.model.ArriboExogeno;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.domain.model.OcupacionAlmacen;
+
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toList;
-
-import pe.edu.pucp.morapack.airscheduler.flights.domain.model.ArriboExogeno;
-import pe.edu.pucp.morapack.airscheduler.flights.domain.model.OcupacionAlmacen;
 
 public final class DebugEstado {
 
