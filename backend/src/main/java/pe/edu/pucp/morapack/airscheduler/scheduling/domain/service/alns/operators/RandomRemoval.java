@@ -37,6 +37,7 @@ public class RandomRemoval implements DestructionOperator {
                 continue;
             };
             plan.limpiarTramos();
+            System.out.println("Se removieron las rutas del pedido id:" + plan.getIdPedido());
             continue;
         }
     }
@@ -45,14 +46,6 @@ public class RandomRemoval implements DestructionOperator {
         List<RutaAsignada> rutas = plan.getRutas();
 
         if (rutas == null || rutas.isEmpty()) return false;
-
-        /*
-        if (rutas.size() == 0){
-            System.out.println("Para el pedido " + plan.getIdPedido() + " hay: " + rutas.size() + " rutas");
-        }
-
-        System.out.println("Para el pedido " + plan.getIdPedido() + " hay: " + rutas.size() + " rutas");
-         */
 
         for (RutaAsignada ruta : rutas) {
             // 1) si no hay tramos, no hay nada que liberar en esta ruta
@@ -80,13 +73,13 @@ public class RandomRemoval implements DestructionOperator {
             // 2) liberamos las 2h de espera en el destino final
             TramoAsignado ultimo = ruta.getTramos().get(ruta.getTramos().size() - 1);
             Instant llegadaFinal = ultimo.getVuelo().getLlegadaUtc();
+
             journal.liberar(plan.getAeropuertoDestino(), llegadaFinal, llegadaFinal.plus(java.time.Duration.ofHours(2)), q);
 
+            // 3) liberamos los vuelos (tramos) de la ruta
             for (TramoAsignado t : ruta.getTramos()) {
                 s.getCargaPorVuelo().asignar(t.getVuelo(), -q);
             }
-
-            // 3) Faltan liberar los vuelos
 
         }
 

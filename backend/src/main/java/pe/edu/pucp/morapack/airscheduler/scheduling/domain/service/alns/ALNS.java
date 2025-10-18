@@ -1,5 +1,6 @@
 package pe.edu.pucp.morapack.airscheduler.scheduling.domain.service.alns;
 
+import java.io.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -28,11 +29,14 @@ public class ALNS {
     private final int maxIter = 5;                 // iteraciones máximas
     private final double tasaCambio = 0.3;          // probabilidad de aceptar peores soluciones
 
+    public static final File logFile = new File("journal.log");
+
     public SolucionProgramacion ejecutar(SolucionProgramacion solucionInicial) {
 
         // Copias profundas desde el inicio
         SolucionProgramacion mejorSolucion = new SolucionProgramacion(solucionInicial);
         SolucionProgramacion solucionActual = new SolucionProgramacion(solucionInicial);
+        OcupacionPorAeropuerto ocupacionPorAeropuerto1 = new OcupacionPorAeropuerto(ocupacionPorAeropuerto);
 
         for (int iter = 0; iter < maxIter; iter++) {
             System.out.println("Iteración ALNS " + iter);
@@ -66,18 +70,27 @@ public class ALNS {
             }
 
             // Aceptar nueva solución (según criterio)
-            boolean aceptar = (costoNueva < costoActual) || (rnd.nextDouble() < tasaCambio);
+            boolean aceptar = (costoNueva < costoActual);
+            //boolean aceptar = (costoNueva < costoActual) || (rnd.nextDouble() < tasaCambio);
 
             if (aceptar) {
                 //La ruta es aceptada, se confirman los cambios de ocupaciones
-                System.out.println("Nos estamos quedando con la nueva solución");
+                System.out.println("✔\uFE0F Nos estamos quedando con la nueva solución");
                 journal.commit();
                 solucionActual = new SolucionProgramacion(nuevaSol); // copia profunda
+
+                /// Para prueba (esto no se usa):
+                ocupacionPorAeropuerto1 = new OcupacionPorAeropuerto(journal.occ);
             }
             else {
+
                 //La ruta quedó descartada, no se confirman los cambios de ocupaciones
-                System.out.println("Nos estamos quedando con la solución inicial");
+                System.out.println("✔\uFE0F Nos estamos quedando con la solución inicial");
                 journal.rollback();
+
+                /// Para prueba (esto no se usa en el algoritmo):
+                verificarImprimirIguales(journal.occ, ocupacionPorAeropuerto1);
+
             }
 
             ImpresorSolucion.imprimirEnArchivo(solucionActual, "out/solucionActualALNS.txt");
@@ -115,6 +128,16 @@ public class ALNS {
         return costo;
     }
 
+    public static void log(String message) {
+        try (FileWriter fw = new FileWriter(logFile, true);
+             BufferedWriter bw = new BufferedWriter(fw);
+             PrintWriter out = new PrintWriter(bw)) {
+            out.println("[" + Instant.now() + "] " + message);
+        } catch (IOException e) {
+            System.err.println("Error al escribir en el log: " + e.getMessage());
+        }
+    }
+
     /// Dado que al destruir/construir rutas ahora vamos a cambiar las ocupaciones de los aeropuerto/vuelos, podemos
     /// construir una ruta que finalmente no usemos. Para no "chancar" el libro global de ocupaciones, usamos Journal
 
@@ -130,19 +153,77 @@ public class ALNS {
 
         // En vez de llamar occ.reservar directamente, los operadores llaman:
         public void reservar(String ap, Instant ini, Instant fin, int q) {
+            log("✔\uFE0F Vamos a RESERVAR " + q + " (" + ini + " - " + fin + ") en " + ap);
+
             occ.reservar(ap, ini, fin, q);
-            undo.push(() -> occ.liberar(ap, ini, fin, q)); // inversa
+            undo.push(() -> {
+                log("↩️ Aplicando: LIBERAR " + q + " (" + ini + " - " + fin + ") en " + ap);
+                occ.liberar(ap, ini, fin, q);
+            }); // inversa
         }
         public void liberar(String ap, Instant ini, Instant fin, int q) {
+            log("✖\uFE0F Vamos a LIBERAR " + q + " (" + ini + " - " + fin + ") en " + ap);
+
             occ.liberar(ap, ini, fin, q);
-            undo.push(() -> occ.reservar(ap, ini, fin, q)); // inversa
+            undo.push(() -> {
+                log("↩️ Aplicando: RESERVAR " + q + " (" + ini + " - " + fin + ") en " + ap);
+                occ.reservar(ap, ini, fin, q);
+            }); // inversa
         }
 
         public void rollback() {
+            log("❌ Solucíón DENEGADA. Ejecutando rollback...");
             while (!undo.isEmpty()) undo.pop().run();
+            log("---------------------------------------------------------------");
         }
-        public void commit() { undo.clear(); } // nada que deshacer
+
+        public void commit() {
+            log("✅ Solucíón ACEPTADA. Nada que deshacer.");
+            undo.clear();
+            log("---------------------------------------------------------------");
+        } // nada que deshacer
+
+
+
     }
 
+    /// TODO0 ESTO DE ABAJO LO CREÉ PARA VERIFICAR QUE EL JOURNAL VUELVE CORRECTAMENTE
+    /// AL ESTADO ANTERIOR CUANDO EJECUTAMOS UN ROLLBACK:
+    ///
+    /// pd: hasta ahora, ningun rollback ha fallado (vuelve correctamente al estado anterior)
+
+    public void verificarImprimirIguales(OcupacionPorAeropuerto o1, OcupacionPorAeropuerto o2){
+        if (sonIguales(o1, o2)){
+            log("✅✅ Las 2 soluciones son iguales! Rollback exitoso. ✅✅");
+        }
+        else {
+            log("❌❌ Las 2 soluciones NO son iguales! Rollback fallido. ❌❌");
+        }
+    }
+
+    public static boolean sonIguales(OcupacionPorAeropuerto o1, OcupacionPorAeropuerto o2) {
+        if (o1 == o2) return true;
+        if (o1 == null || o2 == null) return false;
+
+        // Compara ambos mapas: eventos y checkpoints
+        return mapasIguales(o1.getEventos(), o2.getEventos()) &&
+                mapasIguales(o1.getCheckpoints(), o2.getCheckpoints());
+    }
+
+    private static boolean mapasIguales(Map<String, TreeMap<Instant, Integer>> m1,
+                                        Map<String, TreeMap<Instant, Integer>> m2) {
+        if (m1.size() != m2.size()) return false;
+
+        for (Map.Entry<String, TreeMap<Instant, Integer>> entry : m1.entrySet()) {
+            String key = entry.getKey();
+            TreeMap<Instant, Integer> v1 = entry.getValue();
+            TreeMap<Instant, Integer> v2 = m2.get(key);
+
+            if (v2 == null) return false;
+            if (!Objects.equals(v1, v2)) return false; // TreeMap ya implementa equals correctamente
+        }
+
+        return true;
+    }
 
 }

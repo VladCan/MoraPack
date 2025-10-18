@@ -15,6 +15,7 @@ import java.util.TreeMap;
  * Se instancia una sola vez por ejecución (no es static o singleton, digamos que es similar).
  */
 
+/// PRECAUCIÓN ANTES DE HACERLO GLOBAL O FINAL, SE USA UNA INSTANCIA NEW EN EL REGRET REPAIR
 public class OcupacionPorAeropuerto {
     private Map<String, TreeMap<Instant, Integer>> eventos = new HashMap<>();
     private Map<String, TreeMap<Instant, Integer>> checkpoints = new HashMap<>(); //Esto es para no tener que sumar los eventos de hace tiempo (me recuerda a SO)¿
@@ -25,6 +26,30 @@ public class OcupacionPorAeropuerto {
         this.aeropuertosMap = aeropuertosMap;
     }
 
+    /// LOS GETTERS SOLO SE USAN PARA PROBAR EL JOURNAL EN ALNS (VER QUE EL ROLLBACK FUNCIONA)
+    public Map<String, TreeMap<Instant, Integer>> getEventos() {
+        return eventos;
+    }
+
+    public Map<String, TreeMap<Instant, Integer>> getCheckpoints() {
+        return checkpoints;
+    }
+
+    //Constructor copia
+    public OcupacionPorAeropuerto(OcupacionPorAeropuerto original){
+        this.eventos = new HashMap<>();
+        for (Map.Entry<String, TreeMap<Instant, Integer>> entry : original.eventos.entrySet()) {
+            this.eventos.put(entry.getKey(), new TreeMap<>(entry.getValue()));
+        }
+
+        this.checkpoints = new HashMap<>();
+        for (Map.Entry<String, TreeMap<Instant, Integer>> entry : original.checkpoints.entrySet()) {
+            this.checkpoints.put(entry.getKey(), new TreeMap<>(entry.getValue()));
+        }
+
+        this.aeropuertosMap = original.aeropuertosMap;
+    }
+
     ///
     /// Funciones principales: disponible, ocupacion, maxReservable, reservar, liberar.
     ///
@@ -33,6 +58,7 @@ public class OcupacionPorAeropuerto {
         return aeropuertosMap.obtener(idAeropuerto).getCapacidad() - ocupacion(idAeropuerto, t);
     }
 
+    /// POR AHORA USAR SOLO DENTRO DE LA CLASE (TOINCLUSIVE TRUE)
     private Integer ocupacion(String idAeropuerto, Instant t){
         if (t == null) throw new IllegalArgumentException("Null date");
 
@@ -40,9 +66,10 @@ public class OcupacionPorAeropuerto {
         TreeMap<Instant, Integer> cks = checkpointsDe(idAeropuerto);
 
         Instant dayStart = inicioDeDiaUTC(t);
-        asegurarCheckpoint(idAeropuerto, dayStart);
+        //asegurarCheckpoint(idAeropuerto, dayStart);
 
-        int ocupacion = cks.get(dayStart);
+        /// GetOrDefault
+        int ocupacion = cks.getOrDefault(dayStart, 0);
 
         for (var e : evs.subMap(dayStart, false, t, true).values()) {
             ocupacion += e;
@@ -60,6 +87,13 @@ public class OcupacionPorAeropuerto {
             System.out.println("Estamos en la fecha: " + formatter.format(inicio));
         }*/
 
+        if (inicio.equals(fin)) {
+            // No hay tiempo de estancia ⇒ no se necesita holgura.
+            // Puedes devolver Integer.MAX_VALUE o la capacidad del almacén.
+            //System.out.println("Inicio y fin iguales.");
+            return Integer.MAX_VALUE; // preferible para no bloquear conexiones “pegadas”
+        }
+
         int capacidad = capacidadDe(idAeropuerto);
         if (capacidad <= 0) return 0; //Para asegurar como siempre.
 
@@ -70,7 +104,7 @@ public class OcupacionPorAeropuerto {
         int occ = ocupacion(idAeropuerto, inicio);
         int pico = occ;
 
-        for (var delta : evs.subMap(inicio, false, fin, true).values()) {
+        for (var delta : evs.subMap(inicio, false, fin, false).values()) {
             occ += delta;
             if (occ > pico) pico = occ;
         }
@@ -84,11 +118,16 @@ public class OcupacionPorAeropuerto {
         validarIntervalo(inicio, fin);
         if (q <= 0) throw new IllegalArgumentException("q debe ser > 0");
 
-        /*DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
-        Instant objetivo = Instant.parse("2025-10-10T02:00:00Z");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
+        Instant objetivo = Instant.parse("2025-10-10T06:18:00Z");
         if (idAeropuerto.equals("LOWW") && !inicio.isAfter(objetivo) && !inicio.isBefore(objetivo)){
             System.out.println("Estamos en la fecha: " + formatter.format(inicio));
-        }*/
+        }
+
+        if (inicio.equals(fin)){
+            System.out.println("Inicio y fin iguales.");
+            return;
+        }
 
         int maxQ = maxReservable(idAeropuerto, inicio, fin);
         if (q > maxQ){ //Si queremos asignar más de lo que realmente se puede.
@@ -120,6 +159,11 @@ public class OcupacionPorAeropuerto {
 
         validarIntervalo(inicio, fin);
         if (q <= 0) throw new IllegalArgumentException("q debe ser > 0");
+
+        if (inicio.equals(fin)){
+            //System.out.println("Inicio y fin iguales.");
+            return;
+        }
 
         TreeMap<Instant, Integer> evs = eventosDe(idAeropuerto);
 
@@ -170,6 +214,11 @@ public class OcupacionPorAeropuerto {
     }
 
     private void actualizarCheckpointsEnRango(String idAeropuerto, Instant inicio, Instant fin, int q){
+
+        if (q == 0) {
+            System.out.println("Estamos pasando un q=0 en actualizarCheckpointsEnRango");
+            return;
+        }
         if (!inicio.isBefore(fin)) return;
 
         var ck = checkpointsDe(idAeropuerto);
@@ -185,10 +234,9 @@ public class OcupacionPorAeropuerto {
         Instant midnight = inicio.equals(dayStart) ? dayStart : dayStart.plusSeconds(24 * 60 * 60);
 
         while (midnight.isBefore(fin)){
-            asegurarCheckpoint(idAeropuerto, midnight);
-
-            ck.merge(midnight, q, Integer::sum);
-            Integer v = ck.get(midnight);
+            //Merge y recuperamos el valor
+            Integer v = ck.merge(midnight, q, Integer::sum);
+            if (v < 0) System.out.println("Resultado del merge < 0");
             if (v != null && v == 0) ck.remove(midnight);
 
             midnight = midnight.plusSeconds(24 * 60 * 60); // siguiente medianoche
@@ -234,8 +282,9 @@ public class OcupacionPorAeropuerto {
 
     private void validarIntervalo(Instant a, Instant b) {
         if (a == null || b == null) throw new IllegalArgumentException("inicio/fin no pueden ser null");
-        if (!a.isBefore(b)) System.out.println("Intervalo inválido: inicio: " + a + ", fin: " + b);
-        if (!a.isBefore(b)) throw new IllegalArgumentException("intervalo inválido: inicio >= fin");
+        if (a.isAfter(b)) throw new IllegalArgumentException("intervalo inválido: inicio > fin");
+        //if (!a.isBefore(b)) System.out.println("Intervalo inválido: inicio: " + a + ", fin: " + b);
+        //if (!a.isBefore(b)) throw new IllegalArgumentException("intervalo inválido: inicio >= fin");
     }
 
     private int capacidadDe(String idAeropuerto) {
