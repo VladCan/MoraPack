@@ -22,4 +22,8 @@ public class TramoAsignado {
         this.cantidad = otro.getCantidad();
         this.llegadaUtc = otro.getLlegadaUtc(); // Instant es inmutable, se puede copiar así
     }
+
+    public VueloProgramadoId getVuelo() {
+        return vuelo;
+    }
 }

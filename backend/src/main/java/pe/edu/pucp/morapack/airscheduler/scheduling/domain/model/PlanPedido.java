@@ -23,7 +23,7 @@ public class PlanPedido {
 
     /** Conjunto de rutas por las que viajan “porciones” del pedido. */
     @Singular("ruta")
-    private final List<RutaAsignada> rutas;
+    private List<RutaAsignada> rutas;
 
     public PlanPedido(PlanPedido otro) {
         this.idPedido = otro.getIdPedido();
@@ -102,7 +102,9 @@ public class PlanPedido {
 
     public void limpiarTramos() {
         if (rutas != null) {
-            rutas.forEach(r -> r.getTramos().clear());
+            rutas.clear();
+        } else {
+            rutas = new ArrayList<>();
         }
     }
 

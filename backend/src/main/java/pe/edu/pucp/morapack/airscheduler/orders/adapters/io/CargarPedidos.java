@@ -31,6 +31,22 @@ public class CargarPedidos {
         colaPedidos.add(pedido);
     }
 
+    public void ordenarPorUTC() {
+        List<Pedido> tmp = new ArrayList<>(colaPedidos);
+        // Elige el getter correcto según tu modelo:
+        // 1) Si tienes un Instant:
+        // tmp.sort(Comparator.comparing(Pedido::getUtcInstant));
+
+        // 2) Si guardas el ISO como String:
+        // tmp.sort(Comparator.comparing(p -> Instant.parse(p.getUtcIso())));
+
+        // 3) Si el método se llama getFechaUTC():
+        tmp.sort(Comparator.comparing(Pedido::getCreatedAtUtc));
+
+        colaPedidos.clear();
+        colaPedidos.addAll(tmp);
+    }
+
     /** Copia defensiva en lista. */
     public List<Pedido> getLista() {
         return new ArrayList<>(colaPedidos);

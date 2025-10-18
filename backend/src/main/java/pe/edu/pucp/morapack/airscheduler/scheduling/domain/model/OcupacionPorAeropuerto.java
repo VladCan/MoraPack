@@ -15,7 +15,8 @@ import java.util.TreeMap;
  * Se instancia una sola vez por ejecución (no es static o singleton, digamos que es similar).
  */
 
-public class OcupacionPorAeropuerto {//TODO => LIMPIAR ESTO SOLO DEBE TENER LA INFO DEL PRESENTE
+/// PRECAUCIÓN ANTES DE HACERLO GLOBAL O FINAL, SE USA UNA INSTANCIA NEW EN EL REGRET REPAIR
+public class OcupacionPorAeropuerto {
     private Map<String, TreeMap<Instant, Integer>> eventos = new HashMap<>();
     private Map<String, TreeMap<Instant, Integer>> checkpoints = new HashMap<>(); //Esto es para no tener que sumar los eventos de hace tiempo (me recuerda a SO)¿
     //Validar si la key es el IATA del aeropuerto
@@ -23,6 +24,30 @@ public class OcupacionPorAeropuerto {//TODO => LIMPIAR ESTO SOLO DEBE TENER LA I
 
     public OcupacionPorAeropuerto(AeropuertosMap aeropuertosMap) {
         this.aeropuertosMap = aeropuertosMap;
+    }
+
+    /// LOS GETTERS SOLO SE USAN PARA PROBAR EL JOURNAL EN ALNS (VER QUE EL ROLLBACK FUNCIONA)
+    public Map<String, TreeMap<Instant, Integer>> getEventos() {
+        return eventos;
+    }
+
+    public Map<String, TreeMap<Instant, Integer>> getCheckpoints() {
+        return checkpoints;
+    }
+
+    //Constructor copia
+    public OcupacionPorAeropuerto(OcupacionPorAeropuerto original){
+        this.eventos = new HashMap<>();
+        for (Map.Entry<String, TreeMap<Instant, Integer>> entry : original.eventos.entrySet()) {
+            this.eventos.put(entry.getKey(), new TreeMap<>(entry.getValue()));
+        }
+
+        this.checkpoints = new HashMap<>();
+        for (Map.Entry<String, TreeMap<Instant, Integer>> entry : original.checkpoints.entrySet()) {
+            this.checkpoints.put(entry.getKey(), new TreeMap<>(entry.getValue()));
+        }
+
+        this.aeropuertosMap = original.aeropuertosMap;
     }
 
     ///
@@ -33,18 +58,20 @@ public class OcupacionPorAeropuerto {//TODO => LIMPIAR ESTO SOLO DEBE TENER LA I
         return aeropuertosMap.obtener(idAeropuerto).getCapacidad() - ocupacion(idAeropuerto, t);
     }
 
-    public Integer ocupacion(String idAeropuerto, Instant t){
+    /// POR AHORA USAR SOLO DENTRO DE LA CLASE (TOINCLUSIVE TRUE)
+    private Integer ocupacion(String idAeropuerto, Instant t){
         if (t == null) throw new IllegalArgumentException("Null date");
 
         TreeMap<Instant, Integer> evs = eventosDe(idAeropuerto);
         TreeMap<Instant, Integer> cks = checkpointsDe(idAeropuerto);
 
         Instant dayStart = inicioDeDiaUTC(t);
-        asegurarCheckpoint(idAeropuerto, dayStart);
+        //asegurarCheckpoint(idAeropuerto, dayStart);
 
-        int ocupacion = cks.get(dayStart);
+        /// GetOrDefault
+        int ocupacion = cks.getOrDefault(dayStart, 0);
 
-        for (var e : evs.subMap(dayStart, false, t, false).values()) {
+        for (var e : evs.subMap(dayStart, false, t, true).values()) {
             ocupacion += e;
         }
         return ocupacion;
@@ -53,6 +80,19 @@ public class OcupacionPorAeropuerto {//TODO => LIMPIAR ESTO SOLO DEBE TENER LA I
 
     public Integer maxReservable(String idAeropuerto, Instant inicio, Instant fin){
         validarIntervalo(inicio, fin);
+
+        /*DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
+        Instant objetivo = Instant.parse("2025-10-10T00:54:00Z");
+        if (idAeropuerto.equals("LOWW") && !inicio.isAfter(objetivo) && !inicio.isBefore(objetivo) && eventosDe(idAeropuerto).size() >= 18){
+            System.out.println("Estamos en la fecha: " + formatter.format(inicio));
+        }*/
+
+        if (inicio.equals(fin)) {
+            // No hay tiempo de estancia ⇒ no se necesita holgura.
+            // Puedes devolver Integer.MAX_VALUE o la capacidad del almacén.
+            //System.out.println("Inicio y fin iguales.");
+            return Integer.MAX_VALUE; // preferible para no bloquear conexiones “pegadas”
+        }
 
         int capacidad = capacidadDe(idAeropuerto);
         if (capacidad <= 0) return 0; //Para asegurar como siempre.
@@ -64,7 +104,7 @@ public class OcupacionPorAeropuerto {//TODO => LIMPIAR ESTO SOLO DEBE TENER LA I
         int occ = ocupacion(idAeropuerto, inicio);
         int pico = occ;
 
-        for (var delta : evs.subMap(inicio, true, fin, false).values()) {
+        for (var delta : evs.subMap(inicio, false, fin, false).values()) {
             occ += delta;
             if (occ > pico) pico = occ;
         }
@@ -78,14 +118,16 @@ public class OcupacionPorAeropuerto {//TODO => LIMPIAR ESTO SOLO DEBE TENER LA I
         validarIntervalo(inicio, fin);
         if (q <= 0) throw new IllegalArgumentException("q debe ser > 0");
 
-
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
+        Instant objetivo = Instant.parse("2025-10-10T06:18:00Z");
+        if (idAeropuerto.equals("LOWW") && !inicio.isAfter(objetivo) && !inicio.isBefore(objetivo)){
+            System.out.println("Estamos en la fecha: " + formatter.format(inicio));
+        }
 
-        /*Instant objetivo = Instant.parse("2025-10-07T03:23:00Z");
-        if (!inicio.isAfter(objetivo) && !inicio.isBefore(objetivo)) {
-            //System.out.println("Estamos en la fecha: " + formatter.format(inicio));
-        };
-        */
+        if (inicio.equals(fin)){
+            System.out.println("Inicio y fin iguales.");
+            return;
+        }
 
         int maxQ = maxReservable(idAeropuerto, inicio, fin);
         if (q > maxQ){ //Si queremos asignar más de lo que realmente se puede.
@@ -107,27 +149,100 @@ public class OcupacionPorAeropuerto {//TODO => LIMPIAR ESTO SOLO DEBE TENER LA I
         if (evs.get(inicio) != null && evs.get(inicio) == 0) evs.remove(inicio);
         if (evs.get(fin) != null && evs.get(fin) == 0) evs.remove(fin);
 
-        invalidarCheckpoints(idAeropuerto, inicio, fin);
-    }
-
-    /** Borra checkpoints desde el día de 'inicio' hacia adelante
-     *  (para que se reconstruyan la próxima vez con los eventos nuevos). */
-    private void invalidarCheckpoints(String idAeropuerto, Instant inicio, Instant fin) {
-        TreeMap<Instant, Integer> ck = checkpointsDe(idAeropuerto);
-        if (ck.isEmpty()) return;
-
-        Instant dIni = inicioDeDiaUTC(inicio);
-        // opción conservadora: limpiar todos los futuros checkpoints
-        ck.tailMap(dIni, true).clear();
-
-        // si prefieres solo hasta el día de 'fin', usa:
-        // Instant dFin = inicioDeDiaUTC(fin);
-        // ck.subMap(dIni, true, dFin, true).clear();
+        // Actualiza checkpoints en medianoches dentro de [inicio, fin)
+        actualizarCheckpointsEnRango(idAeropuerto, inicio, fin, +q);
     }
 
     //Esta está pensada para replanificación/cancelación:
-    void liberar(String idAeropuerto, Instant inicio, Instant fin, int q){
+    public void liberar(String idAeropuerto, Instant inicio, Instant fin, int q){
         //Tambien debería de hacer lo de Si el delta queda 0, se remueve.
+
+        validarIntervalo(inicio, fin);
+        if (q <= 0) throw new IllegalArgumentException("q debe ser > 0");
+
+        if (inicio.equals(fin)){
+            //System.out.println("Inicio y fin iguales.");
+            return;
+        }
+
+        TreeMap<Instant, Integer> evs = eventosDe(idAeropuerto);
+
+        /*DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
+        Instant objetivo = Instant.parse("2025-10-09T00:54:00Z");
+        if (idAeropuerto.equals("LOWW") && !inicio.isAfter(objetivo) && !inicio.isBefore(objetivo)){
+            System.out.println("Estamos en la fecha: " + formatter.format(inicio));
+        }*/
+
+
+        // === Protección: para no permitir ocupación negativa en el intervalo ===
+        // Ocupación justo antes de aplicar la liberación
+        int occ = ocupacion(idAeropuerto, inicio);
+        int minOcc = occ;
+        //int minOcc = Integer.MAX_VALUE;;
+
+        // Recorremos los deltas existentes en [inicio, fin) para ver el piso de ocupación
+        for (int delta : evs.subMap(inicio, false, fin, false).values()) {
+            occ += delta;
+            if (occ < minOcc) minOcc = occ;
+        }
+        //if (minOcc == Integer.MAX_VALUE) minOcc = occ;
+
+        // No podemos liberar más de la mínima ocupación del intervalo
+        // Esto es más como un cinturón, obviamente solo se debería de liberar lo que hemos reservado. Por precaución
+        // igual lo colocamos.
+        int qEfectivo = Math.min(q, Math.max(0, minOcc));
+        if (qEfectivo != q) System.out.println("qEfectivo != q: " + qEfectivo + " != " + q);
+        if (qEfectivo == 0) {
+            System.out.println("No podemos liberar de forma segura");
+            // Nada que liberar de forma segura; salimos sin tocar eventos
+            return;
+        }
+
+        // === Aplicamos deltas inversos a reservar ===
+        // liberar = -q en inicio, +q en fin
+        evs.merge(inicio, -qEfectivo, Integer::sum);
+        evs.merge(fin,     +qEfectivo, Integer::sum);
+
+        // Limpiamos deltas que queden en 0
+        Integer dIni = evs.get(inicio);
+        if (dIni != null && dIni == 0) evs.remove(inicio);
+        Integer dFin = evs.get(fin);
+        if (dFin != null && dFin == 0) evs.remove(fin);
+
+        // Actualiza checkpoints en medianoches dentro de [inicio, fin) con signo contrario
+        actualizarCheckpointsEnRango(idAeropuerto, inicio, fin, -qEfectivo);
+    }
+
+    private void actualizarCheckpointsEnRango(String idAeropuerto, Instant inicio, Instant fin, int q){
+
+        if (q == 0) {
+            System.out.println("Estamos pasando un q=0 en actualizarCheckpointsEnRango");
+            return;
+        }
+        if (!inicio.isBefore(fin)) return;
+
+        var ck = checkpointsDe(idAeropuerto);
+
+        /*DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
+        Instant objetivo = Instant.parse("2025-10-10T00:00:00Z");
+        if (idAeropuerto.equals("LOWW") && !inicio.isAfter(objetivo) && !inicio.isBefore(objetivo)){
+            System.out.println("Estamos en la fecha: " + formatter.format(inicio));
+        }*/
+
+
+        Instant dayStart = inicioDeDiaUTC(inicio);
+        Instant midnight = inicio.equals(dayStart) ? dayStart : dayStart.plusSeconds(24 * 60 * 60);
+
+        while (midnight.isBefore(fin)){
+            //Merge y recuperamos el valor
+            Integer v = ck.merge(midnight, q, Integer::sum);
+            if (v < 0) System.out.println("Resultado del merge < 0");
+            if (v != null && v == 0) ck.remove(midnight);
+
+            midnight = midnight.plusSeconds(24 * 60 * 60); // siguiente medianoche
+        }
+
+
     }
 
     ///
@@ -154,7 +269,7 @@ public class OcupacionPorAeropuerto {//TODO => LIMPIAR ESTO SOLO DEBE TENER LA I
         Instant desde = (prevCk != null) ? prevCk.getKey() : Instant.MIN; // si no hay, desde el principio
 
         // Sumamos eventos en (desde, dayStart)
-        for (var delta : ev.subMap(desde, false, dayStart, false).values()) {
+        for (var delta : ev.subMap(desde, false, dayStart, true).values()) {
             occ += delta;
         }
         ck.put(dayStart, occ);
@@ -167,7 +282,9 @@ public class OcupacionPorAeropuerto {//TODO => LIMPIAR ESTO SOLO DEBE TENER LA I
 
     private void validarIntervalo(Instant a, Instant b) {
         if (a == null || b == null) throw new IllegalArgumentException("inicio/fin no pueden ser null");
-        if (!a.isBefore(b)) throw new IllegalArgumentException("intervalo inválido: inicio >= fin");
+        if (a.isAfter(b)) throw new IllegalArgumentException("intervalo inválido: inicio > fin");
+        //if (!a.isBefore(b)) System.out.println("Intervalo inválido: inicio: " + a + ", fin: " + b);
+        //if (!a.isBefore(b)) throw new IllegalArgumentException("intervalo inválido: inicio >= fin");
     }
 
     private int capacidadDe(String idAeropuerto) {
