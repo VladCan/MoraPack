@@ -1,8 +1,8 @@
 package pe.edu.pucp.morapack.airscheduler.bootstrap;
 
-import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.memory.AeropuertosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.orders.adapters.io.ArchivoUtils;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.domain.model.OcupacionPorAeropuerto;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.OcupacionPorAeropuerto;
+import pe.edu.pucp.morapack.airscheduler.infra.io.ArchivoUtils;
+import pe.edu.pucp.morapack.airscheduler.infra.memory.AeropuertosMap;
 
 import java.time.Instant;
 import java.util.Arrays;

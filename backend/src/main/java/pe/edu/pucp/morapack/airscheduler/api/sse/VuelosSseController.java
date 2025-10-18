@@ -6,8 +6,8 @@ import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
-import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.api.dto.FlightLiveDTO;
-import pe.edu.pucp.morapack.airscheduler.engine.flights.service.VuelosLiveService;
+import pe.edu.pucp.morapack.airscheduler.api.dto.FlightLiveDTO;
+import pe.edu.pucp.morapack.airscheduler.api.service.VuelosLiveService;
 
 import org.jboss.resteasy.reactive.RestStreamElementType;
 

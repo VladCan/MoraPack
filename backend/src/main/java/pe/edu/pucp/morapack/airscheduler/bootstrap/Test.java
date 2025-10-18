@@ -8,25 +8,25 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
-import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.memory.AeropuertosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.memory.TEGEventBuilder;
-import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.memory.VuelosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.memory.VuelosTEG;
-import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.memory.TEGEventBuilderHelpers.TEGParametros;
-import pe.edu.pucp.morapack.airscheduler.engine.flights.adapters.utils.EstadoAnteriorExtractor;
-import pe.edu.pucp.morapack.airscheduler.engine.flights.domain.model.ArriboExogeno;
-import pe.edu.pucp.morapack.airscheduler.engine.flights.domain.model.OcupacionAlmacen;
-import pe.edu.pucp.morapack.airscheduler.engine.orders.adapters.io.ArchivoUtils;
-import pe.edu.pucp.morapack.airscheduler.engine.orders.adapters.io.CargarPedidos;
-import pe.edu.pucp.morapack.airscheduler.engine.orders.adapters.io.CargarPedidos.VentanaPedidos;
-import pe.edu.pucp.morapack.airscheduler.engine.orders.domain.model.Pedido;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.adapters.io.ImpresorSolucion;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.domain.model.OcupacionPorAeropuerto;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.domain.model.SolucionProgramacion;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.domain.service.VerificadorSLA;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.domain.service.alns.ALNS;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.domain.service.alns.operators.*;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.domain.service.ssp.SSPGeneradorSeed;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.model.ArriboExogeno;
+import pe.edu.pucp.morapack.airscheduler.engine.flights.model.OcupacionAlmacen;
+import pe.edu.pucp.morapack.airscheduler.engine.orders.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.ALNS;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.operators.*;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.OcupacionPorAeropuerto;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.SolucionProgramacion;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.service.VerificadorSLA;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.ssp.SSPGeneradorSeed;
+import pe.edu.pucp.morapack.airscheduler.infra.io.ArchivoUtils;
+import pe.edu.pucp.morapack.airscheduler.infra.io.CargarPedidos;
+import pe.edu.pucp.morapack.airscheduler.infra.io.ImpresorSolucion;
+import pe.edu.pucp.morapack.airscheduler.infra.io.CargarPedidos.VentanaPedidos;
+import pe.edu.pucp.morapack.airscheduler.infra.memory.AeropuertosMap;
+import pe.edu.pucp.morapack.airscheduler.infra.memory.EstadoAnteriorExtractor;
+import pe.edu.pucp.morapack.airscheduler.infra.memory.VuelosMap;
+import pe.edu.pucp.morapack.airscheduler.infra.memory.VuelosTEG;
+import pe.edu.pucp.morapack.airscheduler.infra.teg.TEGEventBuilder;
+import pe.edu.pucp.morapack.airscheduler.infra.teg.helpers.TEGParametros;
 
 public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
     // Parámetros de simulación (ajustables)
