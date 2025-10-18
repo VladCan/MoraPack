@@ -36,6 +36,9 @@ public class Pedido {
         this.cantidad = cantidad;
     }
 
+    public Instant getCreatedAtUtc() {
+        return createdAtUtc;
+    }
 
     /** Normaliza 'fecha' (LocalDateTime local en destino) a UTC dado un GMT entero. */
     public void computeUtcFromGmt(int gmtHours) {
