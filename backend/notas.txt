@@ -1,0 +1,81 @@
+       /*
+         * ============================================
+         * 3) NORMALIZACIÓN A UTC
+         * ============================================
+         */
+        /*
+         * FIJAS:
+         * buscar que los ratios del fitness estén  normalizado
+         * 
+         * 
+         * verificar disponibilidad de aereopuertos por RANGO de tiempo que vas a usar!!!!
+         * 1:04am - 5:04am x1    10:04pm-2:04am  x1
+         * validar con todo y fecha si no no sirve!!
+         * pasarlo primero a date con fecha y luego recién lo dejamos en UTC
+         * 
+         * COPYS:
+         * PEDIDOS DEL MISMO LUGAR
+         * MISMAS RUTAS XD
+         * puedes reutilizar rutas ya cargadas
+         * 
+         * Queso quesito= edam; //es solo un puntero
+         * Queso quesito2= deepcopy(quesito);
+         * 
+         * Queso a= new Queso();
+         * Queso b= new Queso();
+         * 
+         * a= b; //puntero
+         * a.clone(b); // (shallow copy)
+         * listas internas son las mismas!!
+         * lista1= new ArrayList<>();
+         * lista2= new ArrayList<>();
+         * 
+         * lita1=lista2; //puntero
+         * lista1=new ArrayList<>(lista2);
+         * 
+         * si cambias cualquier elemento compartido, se refleja en ambos solo si son clases
+         * 
+         * 
+         * deepCopy (nuevo objeto al 100%)
+         * es un clonado custom que no deja nada compartido
+         * halfdeepcopy?
+         * nos interesa una parte copiada de forma independiente y otra compartida
+         * esto para poder comparar bien las soluciones sin estar creando ni cambiando todo
+         * 
+         * 
+         * computeIfAbsent
+         * pool de aereopuertos, pool de rutas, etc
+         * 
+         * 
+         * 
+         */
+        // Lleva cada pedido a UTC usando el GMT del destino
+
+
+
+        
+/*
+ * 10am solucion1
+ * 10000 productos
+ * logramos planificar todo 10/10
+ * 
+ * 
+ * 
+ * 
+ * 
+ * enviamos 5000 productos (4000 ya llegaron y estan en aereopuetos y 1000 están
+ * en vuelo)
+ * 4pm solucion2
+ * 
+ * 
+ * 
+ * 
+ * 
+ * 
+ * OcupacionPorAeropuerto
+ * 
+ * 
+ * 
+ * 
+ * 
+ */
