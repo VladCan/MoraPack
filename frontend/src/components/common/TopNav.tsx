@@ -10,6 +10,7 @@ import { Clock3, SlidersHorizontal } from "lucide-react";
 
 // 👇 nuevo: sheet para móvil
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { ModeToggle } from "../ui/mode-toggle";
 
 const tabs = [
   { to: "/registrar", label: "Registrar envío" },
@@ -39,7 +40,7 @@ export default function TopNav() {
 
   return (
     <header className="fixed top-0 left-0 z-50 w-full h-16">
-      <div className={cx(showContent && "bg-amber-50/10 shadow-lg ring-1 ring-black/5 transition-all")}>
+      <div> {/*className={cx(showContent && "bg-card/20 shadow-lg ring-1 ring-border transition-all")} */}
         {/* Logo */}
         <a
           href="/"
@@ -85,10 +86,10 @@ export default function TopNav() {
                           cx(
                             "rounded-full inline-flex items-center justify-center",
                             "px-4 py-2 text-base transition-colors",
-                            "ring-1 ring-black/5",
+                            "ring-1 ring-border",
                             isActive
-                              ? "bg-primary text-white shadow"
-                              : "text-primary bg-white/10 hover:bg-blue-50/60"
+                              ? "bg-primary text-primary-foreground"
+                              : "text-foreground/80 bg-accent/30 hover:bg-accent/40"
                           )
                         }
                       >
@@ -101,7 +102,7 @@ export default function TopNav() {
             </div>
 
             {/* ======= DESKTOP ======= */}
-            <ul className="hidden md:flex rounded-full gap-1 overflow-hidden bg-white/10 shadow-lg ring-1 ring-black/5">
+            <ul className="hidden md:flex rounded-full gap-1 overflow-hidden bg-card/40 shadow-lg ring-1 ring-border backdrop-blur-md backdrop-saturate-150">
               {tabs.map((t, index) => (
                 <li key={t.to} className="flex-1">
                   <NavLink
@@ -112,8 +113,8 @@ export default function TopNav() {
                         "h-full w-full rounded-full flex items-center justify-center text-[20px] px-4 py-2 transition-colors",
                         "whitespace-nowrap",
                         isActive
-                          ? "bg-primary text-white shadow-lg ring-1 ring-black/2"
-                          : "text-primary hover:bg-blue-50/60",
+                          ? "bg-primary text-primary-foreground"
+                          : "text-foreground/80 hover:bg-accent/40",
                         index === 0 && isActive && "rounded-l-full",
                         index === tabs.length - 1 && isActive && "rounded-r-full"
                       )
@@ -125,8 +126,8 @@ export default function TopNav() {
               ))}
             </ul>
           </nav>
+          <ModeToggle/>
         </div>
-
         {/* Reloj + “Ver más” */}
         {currentPage !== "/registrar" && (
           <>
@@ -134,8 +135,6 @@ export default function TopNav() {
             <div className="hidden md:block">
               <NavClock className="fixed top-2 right-3 z-[50] shrink-0 whitespace-nowrap" />
             </div>
-            
-
 
             {/* ===== MÓVIL: FAB reloj (izquierda) ===== */}
             <MobileClockFab className="md:hidden fixed left-4 bottom-18 z-[60]" />
@@ -148,8 +147,8 @@ export default function TopNav() {
                   <button
                     className="md:hidden fixed left-4 bottom-32 z-[60]
                                inline-flex items-center gap-2 px-4 py-4 rounded-full
-                               bg-white/20 ring-1 ring-black/10 shadow-lg
-                               text-primary active:scale-95"
+                               bg-card/30 ring-1 ring-border shadow-lg
+                               text-foreground active:scale-95 backdrop-blur"
                     aria-label="Ver más"
                   >
                     <SlidersHorizontal className="h-4 w-4" />
@@ -160,13 +159,12 @@ export default function TopNav() {
                 <SheetContent
                   side="bottom"
                   className="
-                    h-[85vh] p-0 rounded-t-2xl
-                    border-t border-black/10
-                    !bg-white/20
-                    supports-[backdrop-filter]:!bg-white/20
+                    h-[85vh] p-0 rounded-t-2xl border-t border-border
+                    bg-popover/80 supports-[backdrop-filter]:bg-popover/60
+                    backdrop-blur-2xl backdrop-saturate-150
                   "
                 >
-                  <div className="h-full overflow-y-auto p-3">
+                  <div className="h-full overflow-y-auto p-1">
                     {CONTENT[currentPage] ?? <p>Selecciona una opción del menú</p>}
                   </div>
                 </SheetContent>
@@ -180,7 +178,7 @@ export default function TopNav() {
           {showButton && !showContent && (
             <button
               onClick={() => setShowContent(true)}
-              className="text-primary hover:text-black font-medium focus:outline-none ring-black/5"
+              className="text-foreground hover:text-foreground/70 font-medium focus:outline-none ring-border"
             >
               Ver más ↓
             </button>
@@ -188,13 +186,13 @@ export default function TopNav() {
 
           {showContent && (
             <>
-              <div className="mt-4 p-4 rounded-md text-white opacity-90 transform transition-transform duration-300 translate-y-2">
+              <div className="mt-1 p-2 rounded-md text-foreground">
                 {currentContent}
               </div>
-              <div className="mt-3">
+              <div className="mt-1">
                 <button
                   onClick={() => setShowContent(false)}
-                  className="text-primary hover:text-black font-medium focus:outline-none ring-black/5"
+                  className="text-foreground hover:text-foreground/70 font-medium focus:outline-none ring-border"
                 >
                   Ocultar ↑
                 </button>
@@ -215,13 +213,13 @@ function MobileClockFab({ className = "" }: { className?: string }) {
           size="icon"
           variant="secondary"
           className={cx(
-            "h-12 w-12 rounded-full shadow-lg ring-1 ring-black/10 bg-white/20 backdrop-blur",
+            "h-12 w-12 rounded-full shadow-lg ring-1 ring-border bg-card/30 backdrop-blur",
             "active:scale-100",
             className
           )}
           aria-label="Mostrar reloj"
         >
-          <Clock3 className=" text-primary" />
+          <Clock3 className="text-foreground" />
         </Button>
       </PopoverTrigger>
       <PopoverContent

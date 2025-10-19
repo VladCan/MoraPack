@@ -1,7 +1,7 @@
-// src/components/FlightPath.tsx
 import PlaneIcon from "@/assets/plane2.svg?react";
 import { Marker, Source, Layer } from "react-map-gl/maplibre";
 import { useMemo } from "react";
+import { useTheme } from "@/components/ui/theme-provider"; // ← para saber el tema
 
 // ==== Helpers matemáticos ====
 const toRad = (d: number) => (d * Math.PI) / 180;
@@ -70,17 +70,12 @@ function buildGreatCirclePath(
     slerpOnSphere(a, b, i / steps)
   );
 
-  // Detectar cruces de ±180° y partir la línea
   const segments: { lon: number; lat: number }[][] = [[]];
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i];
     const prev = segments[segments.length - 1].at(-1);
 
-    if (
-      prev &&
-      Math.abs(p.lon - prev.lon) > 180 // salto sospechoso → cruce del meridiano
-    ) {
-      // Inicia un nuevo segmento
+    if (prev && Math.abs(p.lon - prev.lon) > 180) {
       segments.push([]);
     }
     segments[segments.length - 1].push(p);
@@ -114,9 +109,22 @@ export default function FlightPath({
   origin,
   dest,
   progress,
-  pathColor = "#7f7f7f7f",
-  planeColor = "#2563eb",
+  pathColor,
+  planeColor,
 }: FlightPathProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+
+  // —— SOLO colores/estilos:
+  // Rutas: en dark un cian suave, en light mantenemos gris translúcido
+  const pathColorFinal =
+    pathColor ??
+    (isDark ? "rgba(56, 189, 248, 0.55)" /* cyan-400/55 */ : "rgba(127,127,127,0.5)");
+
+  // Avión: en dark un cian más vivo, en light tu azul original
+  const planeColorFinal =
+    planeColor ?? (isDark ? "#38bdf8" /* cyan-400 */ : "#2563eb" /* blue-600 */);
+
   const pathGeoJSON = useMemo(
     () => buildGreatCirclePath(origin, dest, 512),
     [origin, dest]
@@ -142,21 +150,34 @@ export default function FlightPath({
           id={`route-line-${id}`}
           type="line"
           paint={{
-            "line-color": pathColor,
-            "line-width": 0.5,
+            "line-color": pathColorFinal,
+            // sutil: un poco más gruesa cuando haces zoom
+            "line-width": [
+              "interpolate",
+              ["linear"],
+              ["zoom"],
+              0, 0.3,
+              3, 0.6,
+              6, 1.2,
+              10, 2
+            ],
+            // ligera suavidad para que no “corte”
+            "line-blur": isDark ? 0.3 : 0.15,
+            // opacidad cómoda por tema
+            "line-opacity": isDark ? 0.9 : 0.7,
           }}
         />
       </Source>
 
-      {/* Avioncito minimalista */}
+      {/* Avioncito */}
       <Marker longitude={planePos.lon} latitude={planePos.lat} anchor="center">
         <PlaneIcon
-            className="w-2 h-2 transition-transform duration-300"
-            style={{
-                color: planeColor, // ← Aplica directamente el color
-                transform: `rotate(${hdg + ROTATION_OFFSET}deg)`,
-                transformOrigin: "center center",
-            }}
+          className="w-3 h-3 transition-transform duration-300"
+          style={{
+            color: planeColorFinal,
+            transform: `rotate(${hdg + ROTATION_OFFSET}deg)`,
+            transformOrigin: "center center",
+          }}
         />
       </Marker>
     </>

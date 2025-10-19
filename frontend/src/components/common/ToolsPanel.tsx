@@ -13,11 +13,7 @@ import {
 } from "lucide-react";
 import { DateTimePicker } from "@/components/ui/DatetimePicker";
 import { es } from "date-fns/locale";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -39,8 +35,16 @@ type ApplyPayload = {
   almacen?: string | null;
   pedido?: string | null;
 };
-// ❶ — añade el tipo Variant y la prop en la firma
 type Variant = "simulacion" | "operacion" | "colapso";
+
+/** ===== utilidades de estilo (mismo lenguaje que tu reloj) ===== */
+const GLASS =
+  "ring-1 ring-border shadow-lg backdrop-blur-2xl backdrop-saturate-150 " +
+  "bg-card/80 supports-[backdrop-filter]:bg-card/50";
+
+const GLASS_SOFT =
+  "ring-1 ring-border shadow-sm backdrop-blur-xl backdrop-saturate-150 " +
+  "bg-card/70 supports-[backdrop-filter]:bg-card/40";
 
 export default function ToolsPanel({
   onApply,
@@ -52,8 +56,8 @@ export default function ToolsPanel({
   // Estado principal
   const [inicio, setInicio] = useState<Date | undefined>();
   const [fin, setFin] = useState<Date | undefined>();
-  const showStart = variant !== "operacion"; // en Operación NO hay inicio
-  const showEnd = variant === "simulacion"; // solo Simulación tiene fin
+  const showStart = variant !== "operacion";
+  const showEnd = variant === "simulacion";
 
   const [niveles, setNiveles] = useState<Record<NivelCarga, boolean>>({
     disponible: true,
@@ -66,24 +70,13 @@ export default function ToolsPanel({
 
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // NUEVO: selecciones desde las 3 tarjetas-botón
   const [vuelo, setVuelo] = useState<string | null>(null);
   const [almacen, setAlmacen] = useState<string | null>(null);
   const [pedido, setPedido] = useState<string | null>(null);
 
-  // Mock data (sustituye por tus fuentes reales luego)
-  const vuelos = useMemo(
-    () => ["AX123", "AX401", "AX777", "AX920", "AX333"],
-    []
-  );
-  const almacenes = useMemo(
-    () => ["WH-LIM01", "WH-BOG02", "WH-MEX03", "WH-SCL04"],
-    []
-  );
-  const pedidos = useMemo(
-    () => ["PED-000123", "PED-000301", "PED-000402", "PED-000777"],
-    []
-  );
+  const vuelos = useMemo(() => ["AX123", "AX401", "AX777", "AX920", "AX333"], []);
+  const almacenes = useMemo(() => ["WH-LIM01", "WH-BOG02", "WH-MEX03", "WH-SCL04"], []);
+  const pedidos = useMemo(() => ["PED-000123", "PED-000301", "PED-000402", "PED-000777"], []);
 
   const toggleNivel = (k: NivelCarga) =>
     setNiveles((prev) => ({ ...prev, [k]: !prev[k] }));
@@ -108,8 +101,8 @@ export default function ToolsPanel({
   const handleClear = () => {
     setInicio(undefined);
     setFin(undefined);
-    setRegion("");
-    setCiudad("");
+    setRegion(undefined);
+    setCiudad(undefined);
     setNiveles({ disponible: true, limitado: false, saturado: false });
     setVuelo(null);
     setAlmacen(null);
@@ -146,38 +139,34 @@ export default function ToolsPanel({
         />
       </div>
 
-      {/* Barra de control con contraste alto (menos “vidrio”) */}
-      <div className="rounded-2xl bg-white ring-1 ring-black/10 shadow-xl">
+      {/* Barra de control con glassmorphism “estilo reloj” */}
+      <div className={`rounded-2xl ${GLASS}`}>
         {/* encabezado */}
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-black/10">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-primary" />
-            <h3 className="text-primary font-semibold tracking-wide text-sm">
+            <h3 className="text-foreground font-semibold tracking-wide text-sm">
               Controles de simulación
             </h3>
           </div>
           <button
-            className="inline-flex items-center gap-1 text-xs text-primary hover:opacity-80"
+            className="inline-flex items-center gap-1 text-xs text-foreground/90 hover:opacity-80"
             onClick={() => setShowAdvanced((s) => !s)}
           >
-            <MapPin className="h-4 w-4" />
+            <MapPin className="h-4 w-4 text-primary" />
             {showAdvanced ? "Ocultar filtros" : "Más filtros"}
             <ChevronDown
-              className={`h-4 w-4 transition-transform ${
-                showAdvanced ? "rotate-180" : ""
-              }`}
+              className={`h-4 w-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`}
             />
           </button>
         </div>
 
         {/* contenido */}
-        <div className="p-4 sm:p-5 space-y-4">
+        <div className="p-4 sm:p-5 space-y-4 text-foreground">
           {/* rango de fechas */}
           {(showStart || showEnd) && (
             <div
-              className={`grid grid-cols-1 ${
-                showStart && showEnd ? "md:grid-cols-2" : ""
-              } gap-3 text-primary`}
+              className={`grid grid-cols-1 ${showStart && showEnd ? "md:grid-cols-2" : ""} gap-3`}
             >
               {showStart && (
                 <Field label="Fecha de inicio">
@@ -208,9 +197,9 @@ export default function ToolsPanel({
             </div>
           )}
 
-          {/* nivel de carga (chips con mayor contraste) */}
+          {/* nivel de carga */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-primary mr-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wide mr-1">
               Nivel de carga
             </span>
             <FilterChip
@@ -235,7 +224,7 @@ export default function ToolsPanel({
 
           {/* filtros avanzados */}
           {showAdvanced && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-primary">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               <Field label="Región">
                 <Select
                   value={region ?? "all"}
@@ -244,7 +233,7 @@ export default function ToolsPanel({
                   <SelectTrigger className="dense-select">
                     <SelectValue placeholder="Todas" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className={GLASS_SOFT}>
                     <SelectItem value="all">Todas</SelectItem>
                     <SelectItem value="andina">Andina</SelectItem>
                     <SelectItem value="amazonica">Amazónica</SelectItem>
@@ -261,7 +250,7 @@ export default function ToolsPanel({
                   <SelectTrigger className="dense-select">
                     <SelectValue placeholder="Todas" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className={GLASS_SOFT}>
                     <SelectItem value="all">Todas</SelectItem>
                     <SelectItem value="lima">Lima</SelectItem>
                     <SelectItem value="cusco">Cusco</SelectItem>
@@ -276,7 +265,7 @@ export default function ToolsPanel({
           <div className="flex items-center justify-end gap-2 pt-1">
             <button
               onClick={handleClear}
-              className="px-3 py-2 text-sm rounded-lg bg-white border border-black/10 text-primary hover:bg-blue-50/60 transition inline-flex items-center gap-1"
+              className={`px-3 py-2 text-sm rounded-full ${GLASS_SOFT} hover:brightness-105 transition inline-flex items-center gap-1`}
               title="Restablecer filtros"
             >
               <X className="h-4 w-4" /> Limpiar
@@ -284,16 +273,10 @@ export default function ToolsPanel({
             <button
               onClick={handleApply}
               disabled={!canApply}
-              className={`px-3 py-2 text-sm rounded-lg transition inline-flex items-center gap-1
-                ${
-                  canApply
-                    ? "bg-primary text-white hover:brightness-95"
-                    : "bg-primary/50 text-white/80 cursor-not-allowed"
-                }
+              className={`px-3 py-2 text-sm rounded-full transition inline-flex items-center gap-1
+                ${canApply ? "bg-primary text-primary-foreground hover:brightness-95" : "bg-primary/50 text-primary-foreground/80 cursor-not-allowed"}
               `}
-              title={
-                canApply ? "Aplicar filtros" : "Selecciona el rango de fechas"
-              }
+              title={canApply ? "Aplicar filtros" : "Selecciona el rango de fechas"}
             >
               <Check className="h-4 w-4" /> Aplicar
             </button>
@@ -303,13 +286,18 @@ export default function ToolsPanel({
 
       {/* utilidades de estilo */}
       <style>{`
-        .picker-trigger {
-          @apply bg-white text-primary border border-black/10 hover:bg-blue-50/60;
+        .picker-trigger{
+          @apply w-full rounded-lg text-foreground ring-1 ring-border
+                bg-card/70 supports-[backdrop-filter]:bg-card/40
+                backdrop-blur-xl backdrop-saturate-150
+                px-3 py-2 text-sm outline-none hover:brightness-105
+                focus:ring-2 focus:ring-ring transition;
         }
-        .dense-input{
-          @apply w-full rounded-lg bg-white text-primary border border-black/10
-                 px-3 py-2 text-sm outline-none
-                 focus:ring-2 focus:ring-primary/30 transition;
+        .dense-select{
+          @apply w-full rounded-lg text-foreground ring-1 ring-border
+                bg-card/70 supports-[backdrop-filter]:bg-card/40
+                backdrop-blur-xl backdrop-saturate-150
+                px-3 py-2 text-sm;
         }
       `}</style>
     </section>
@@ -345,21 +333,18 @@ function SelectCard({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="
-            group w-full text-left relative overflow-hidden
-            rounded-2xl bg-white text-primary
-            border border-black/10 shadow-md transition
-            hover:shadow-lg hover:-translate-y-[1px] focus:outline-none
-            focus:ring-2 focus:ring-primary/30 px-4 py-3
-          "
+          className={[
+            "group w-full text-left relative overflow-hidden rounded-2xl px-4 py-3",
+            "text-foreground",
+            GLASS,
+            "transition hover:shadow-xl hover:-translate-y-[1px] focus:outline-none focus:ring-2 focus:ring-ring",
+          ].join(" ")}
           aria-label={`Seleccionar ${label.toLowerCase()}`}
         >
           <div className="flex items-center gap-3">
-            <span className="opacity-90">{icon}</span>
+            <span className="opacity-90 text-primary">{icon}</span>
             <div className="min-w-0">
-              <p className="text-[12px] text-primary/80 leading-tight">
-                {label}
-              </p>
+              <p className="text-[12px] text-muted-foreground leading-tight">{label}</p>
               <p className="text-[17px] font-semibold leading-tight truncate">
                 {value ?? placeholder}
               </p>
@@ -367,22 +352,27 @@ function SelectCard({
           </div>
         </button>
       </PopoverTrigger>
+
       <PopoverContent
         align="start"
-        className="w-[min(320px,90vw)] p-3 bg-white border border-black/10 shadow-xl rounded-xl"
+        className={[
+          "w-[min(320px,90vw)] p-3 rounded-xl",
+          GLASS,
+          "animate-in fade-in-0 zoom-in-95",
+        ].join(" ")}
       >
         <div className="flex items-center gap-2 mb-2">
-          <Search className="h-4 w-4 text-primary/70" />
+          <Search className="h-4 w-4 text-muted-foreground" />
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={`Buscar ${label.toLowerCase()}…`}
-            className="h-8 text-sm"
+            className="h-8 text-sm ring-1 ring-border bg-card/70 supports-[backdrop-filter]:bg-card/20 supports-[backdrop-filter]:backdrop-blur-md"
           />
         </div>
         <div className="max-h-56 overflow-auto">
           {filtered.length === 0 && (
-            <p className="text-xs text-primary/70 px-1 py-2">Sin resultados</p>
+            <p className="text-xs text-muted-foreground px-1 py-2">Sin resultados</p>
           )}
           <ul className="space-y-1">
             {filtered.map((it) => (
@@ -393,7 +383,7 @@ function SelectCard({
                     setOpen(false);
                     setQ("");
                   }}
-                  className="w-full text-left px-2 py-2 rounded-md hover:bg-blue-50/80 text-sm"
+                  className="w-full text-left px-2 py-2 rounded-md hover:bg-accent/40 text-sm"
                 >
                   {it}
                 </button>
@@ -415,10 +405,8 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="block text-primary text-xs font-semibold mb-1.5">
-        {label}
-      </span>
-      <div className="rounded-lg bg-white p-2 border border-black/10">
+      <span className="block text-xs font-semibold mb-1.5">{label}</span>
+      <div className={["rounded-lg p-2", GLASS_SOFT].join(" ")}>
         {children}
       </div>
     </label>
@@ -438,23 +426,20 @@ function FilterChip({
 }) {
   const base =
     "text-xs px-3 py-1.5 rounded-full border transition-colors select-none cursor-pointer";
-
-  // ⬇️ CAMBIA ESTO
   const palette = active
     ? color === "emerald"
-      ? "bg-emerald-100/80 text-emerald-900 border-emerald-300"
+      ? "bg-emerald-100/80 text-emerald-900 border-emerald-300 dark:bg-emerald-200/30 dark:text-emerald-200 dark:border-emerald-300/40"
       : color === "amber"
-      ? "bg-amber-100/80 text-amber-900 border-amber-300"
-      : "bg-rose-100/80 text-rose-900 border-rose-300"
-    : "bg-white text-primary/85 border-black/10 hover:bg-blue-50/50";
-  // ⬆️ QUITA cualquier `shadow-[inset...]` o `bg-[inset...]`
-
+      ? "bg-amber-100/80 text-amber-900 border-amber-300 dark:bg-amber-200/30 dark:text-amber-200 dark:border-amber-300/40"
+      : "bg-rose-100/80 text-rose-900 border-rose-300 dark:bg-rose-200/30 dark:text-rose-200 dark:border-rose-300/40"
+    : "bg-card text-foreground/85 border-border hover:bg-accent/40";
   return (
     <button onClick={onClick} className={`${base} ${palette}`}>
       {label}
     </button>
   );
 }
+
 export function OperacionDiariaToolsPanel(
   props: Omit<React.ComponentProps<typeof ToolsPanel>, "variant">
 ) {
