@@ -35,7 +35,7 @@ public class RandomRemoval implements DestructionOperator {
                 continue;
             };
             plan.limpiarTramos();
-            System.out.println("Se removieron las rutas del pedido id:" + plan.getIdPedido());
+            //System.out.println("Se removieron las rutas del pedido id:" + plan.getIdPedido());
             continue;
         }
     }

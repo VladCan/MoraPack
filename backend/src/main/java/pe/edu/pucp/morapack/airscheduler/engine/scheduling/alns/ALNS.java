@@ -5,13 +5,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
-import pe.edu.pucp.morapack.airscheduler.engine.orders.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ImpresorSolucion;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.operators.DestructionOperator;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.operators.RepairOperator;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.OcupacionPorAeropuerto;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.SolucionProgramacion;
-import pe.edu.pucp.morapack.airscheduler.infra.io.ImpresorSolucion;
-import pe.edu.pucp.morapack.airscheduler.infra.memory.VuelosTEG;
 import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
@@ -38,7 +38,7 @@ public class ALNS {
         OcupacionPorAeropuerto ocupacionPorAeropuerto1 = new OcupacionPorAeropuerto(ocupacionPorAeropuerto);
 
         for (int iter = 0; iter < maxIter; iter++) {
-            System.out.println("Iteración ALNS " + iter);
+            //System.out.println("Iteración ALNS " + iter);
 
             // Seleccionar operadores aleatorios
             DestructionOperator destrOp = destructions.get(rnd.nextInt(destructions.size()));
@@ -74,7 +74,7 @@ public class ALNS {
 
             if (aceptar) {
                 //La ruta es aceptada, se confirman los cambios de ocupaciones
-                System.out.println("✔\uFE0F Nos estamos quedando con la nueva solución");
+                //System.out.println("✔\uFE0F Nos estamos quedando con la nueva solución");
                 journal.commit();
                 solucionActual = new SolucionProgramacion(nuevaSol); // copia profunda
 
@@ -84,7 +84,7 @@ public class ALNS {
             else {
 
                 //La ruta quedó descartada, no se confirman los cambios de ocupaciones
-                System.out.println("✔\uFE0F Nos estamos quedando con la solución inicial");
+                //System.out.println("✔\uFE0F Nos estamos quedando con la solución inicial");
                 journal.rollback();
 
                 /// Para prueba (esto no se usa en el algoritmo):
@@ -92,9 +92,9 @@ public class ALNS {
 
             }
 
-            ImpresorSolucion.imprimirEnArchivo(solucionActual, "out/solucionActualALNS.txt");
-            ImpresorSolucion.imprimirEnArchivo(nuevaSol, "out/solucionNuevaALNS.txt");
-            ImpresorSolucion.imprimirEnArchivo(mejorSolucion, "out/mejorSolucionALNS.txt");
+            //ImpresorSolucion.imprimirEnArchivo(solucionActual, "out/solucionActualALNS.txt",presenteUTC);
+            //ImpresorSolucion.imprimirEnArchivo(nuevaSol, "out/solucionNuevaALNS.txt",presenteUTC);
+            //ImpresorSolucion.imprimirEnArchivo(mejorSolucion, "out/mejorSolucionALNS.txt",presenteUTC);
 
         }
 

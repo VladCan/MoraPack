@@ -1,10 +1,10 @@
 package pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.operators;
 
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.ALNS;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.*;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.service.IndexVuelos;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.service.VueloFicha;
-import pe.edu.pucp.morapack.airscheduler.infra.memory.VuelosTEG;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -44,7 +44,7 @@ public class RegretRepair implements RepairOperator {
         for (PlanPedido plan : planos) {
             if (plan.getRutas() == null || plan.getRutas().isEmpty()) {
 
-                System.out.println("Vamos a intentar reconstruir el pedido id:" + plan.getIdPedido());
+                //System.out.println("Vamos a intentar reconstruir el pedido id:" + plan.getIdPedido());
 
                 if (plan.getIdPedido() == 3){
                     int x = 0;
@@ -120,7 +120,7 @@ public class RegretRepair implements RepairOperator {
 
                 s.getPlanPorPedido().put(nuevoPlan.getIdPedido(), nuevoPlan);
 
-                System.out.println("Se reconstruyó el pedido id:" + plan.getIdPedido());
+                //System.out.println("Se reconstruyó el pedido id:" + plan.getIdPedido());
             }
         }
 

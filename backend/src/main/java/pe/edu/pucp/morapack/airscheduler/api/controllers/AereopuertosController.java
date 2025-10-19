@@ -28,7 +28,7 @@ import jakarta.ws.rs.core.Response;
 import pe.edu.pucp.morapack.airscheduler.api.dto.AeropuertoDTO;
 import pe.edu.pucp.morapack.airscheduler.api.mapper.AeropuertoMapper;
 import pe.edu.pucp.morapack.airscheduler.api.service.AeropuertosService;
-import pe.edu.pucp.morapack.airscheduler.engine.flights.model.Aeropuerto;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Aeropuerto;
 
 @Path("/aereopuertos")
 @RequestScoped

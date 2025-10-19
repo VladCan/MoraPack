@@ -1,15 +1,15 @@
 package pe.edu.pucp.morapack.airscheduler.engine.scheduling.service;
 
-import pe.edu.pucp.morapack.airscheduler.engine.flights.model.ArriboExogeno;
-import pe.edu.pucp.morapack.airscheduler.engine.orders.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ImpresorSolucion;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosMap;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.TEGEventBuilder;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.helpers.TEGParametros;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.ArriboExogeno;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.*;
-import pe.edu.pucp.morapack.airscheduler.infra.io.CargarPedidos;
-import pe.edu.pucp.morapack.airscheduler.infra.io.ImpresorSolucion;
-import pe.edu.pucp.morapack.airscheduler.infra.memory.AeropuertosMap;
-import pe.edu.pucp.morapack.airscheduler.infra.memory.VuelosMap;
-import pe.edu.pucp.morapack.airscheduler.infra.memory.VuelosTEG;
-import pe.edu.pucp.morapack.airscheduler.infra.teg.TEGEventBuilder;
-import pe.edu.pucp.morapack.airscheduler.infra.teg.helpers.TEGParametros;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -193,7 +193,7 @@ public final class SimulacionVentanas {
             activos.values().removeIf(EstadoPedido::completado);
 
             // 7) Mostrar / guardar (opcional)
-            ImpresorSolucion.imprimirEnConsola(seed);
+            ImpresorSolucion.imprimirEnConsola(seed,finVentana);
             ImpresorSolucion.guardarTodo(seed, finVentana, "seed");
 
             // 8) Avanzar reloj

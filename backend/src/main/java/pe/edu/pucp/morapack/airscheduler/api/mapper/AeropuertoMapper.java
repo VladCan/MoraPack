@@ -1,7 +1,7 @@
 package pe.edu.pucp.morapack.airscheduler.api.mapper;
 
 import pe.edu.pucp.morapack.airscheduler.api.dto.AeropuertoDTO;
-import pe.edu.pucp.morapack.airscheduler.engine.flights.model.Aeropuerto;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Aeropuerto;
 
 public final class AeropuertoMapper {
     private AeropuertoMapper() {}

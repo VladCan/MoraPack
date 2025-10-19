@@ -1,8 +1,8 @@
 package pe.edu.pucp.morapack.airscheduler.engine.scheduling.service;
 
-import pe.edu.pucp.morapack.airscheduler.engine.flights.model.VuelosEdge;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.VuelosEdge;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.VueloProgramadoId;
-import pe.edu.pucp.morapack.airscheduler.infra.memory.VuelosTEG;
 
 import java.util.*;
 
