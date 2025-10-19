@@ -71,7 +71,7 @@ export default function Registrar() {
   return (
     <div className="mx-auto max-w-6xl px-4 pt-26 grid gap-6 md:grid-cols-2">
       {/* Cargas masivas (glass) */}
-      <Card className="backdrop-blur-lg bg-white/30 border-white/40 shadow-lg ring-1 ring-black/5">
+      <Card className="backdrop-blur-lg bg-background/30 border-white/40 shadow-lg ring-1 ring-black/5">
         <CardHeader>
           <CardTitle className="text-blue-900">Cargas masivas</CardTitle>
         </CardHeader>
@@ -90,7 +90,7 @@ export default function Registrar() {
       </Card>
 
       {/* Formulario (glass) */}
-      <Card className="backdrop-blur-lg bg-white/30 border-white/40 shadow-lg ring-1 ring-black/5">
+      <Card className="backdrop-blur-lg bg-background/30 border-white/40 shadow-lg ring-1 ring-black/5">
         <CardHeader>
           <CardTitle className="text-blue-900">Registro de pedido</CardTitle>
         </CardHeader>
