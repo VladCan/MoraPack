@@ -8,9 +8,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import pe.edu.pucp.morapack.airscheduler.engine.flights.model.Vuelo;
-import pe.edu.pucp.morapack.airscheduler.engine.orders.model.Pedido;
-import pe.edu.pucp.morapack.airscheduler.infra.memory.AeropuertosMap;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Vuelo;
 
 /**
  * Representa una solución candidata para el problema de asignación de vuelos.

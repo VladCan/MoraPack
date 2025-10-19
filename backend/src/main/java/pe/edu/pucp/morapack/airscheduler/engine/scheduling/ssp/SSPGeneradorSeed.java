@@ -1,11 +1,11 @@
 package pe.edu.pucp.morapack.airscheduler.engine.scheduling.ssp;
 
-import pe.edu.pucp.morapack.airscheduler.engine.flights.model.ArriboExogeno;
-import pe.edu.pucp.morapack.airscheduler.engine.orders.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.ArriboExogeno;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.*;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.service.IndexVuelos;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.service.VueloFicha;
-import pe.edu.pucp.morapack.airscheduler.infra.memory.VuelosTEG;
 
 import java.time.Duration;
 import java.time.Instant;

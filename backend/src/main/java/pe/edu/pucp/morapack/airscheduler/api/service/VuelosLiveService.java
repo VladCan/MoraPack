@@ -5,7 +5,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import pe.edu.pucp.morapack.airscheduler.api.dto.FlightLiveDTO;
-import pe.edu.pucp.morapack.airscheduler.engine.flights.model.Vuelo;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Vuelo;
 import io.smallrye.mutiny.Multi;
 
 import java.io.File;

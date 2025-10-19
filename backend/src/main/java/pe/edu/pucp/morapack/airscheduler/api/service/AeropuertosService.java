@@ -6,9 +6,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import pe.edu.pucp.morapack.airscheduler.engine.flights.model.Aeropuerto;
-import pe.edu.pucp.morapack.airscheduler.infra.io.ArchivoUtils;
-import pe.edu.pucp.morapack.airscheduler.infra.memory.AeropuertosMap;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Aeropuerto;
 
 @ApplicationScoped
 public class AeropuertosService {

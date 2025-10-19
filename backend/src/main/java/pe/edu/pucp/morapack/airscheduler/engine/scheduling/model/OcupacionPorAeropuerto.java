@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
 
-import pe.edu.pucp.morapack.airscheduler.infra.memory.AeropuertosMap;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
 
 /**
  * Esto es el Gestor global de ocupación aeroportuaria.
@@ -125,15 +125,16 @@ public class OcupacionPorAeropuerto {
         }
 
         if (inicio.equals(fin)){
-            System.out.println("Inicio y fin iguales.");
+            //System.out.println("Inicio y fin iguales.");
             return;
         }
 
         int maxQ = maxReservable(idAeropuerto, inicio, fin);
         if (q > maxQ){ //Si queremos asignar más de lo que realmente se puede.
+            /*
             System.out.println("Reserva excede holgura. aeropuerto=" + idAeropuerto +
                     " q=" + q + " > maxReservable=" + maxQ +
-                    " en [" + inicio + ", " + fin + ")");
+                    " en [" + inicio + ", " + fin + ")"); */
             return;
         }
 
@@ -191,9 +192,9 @@ public class OcupacionPorAeropuerto {
         // Esto es más como un cinturón, obviamente solo se debería de liberar lo que hemos reservado. Por precaución
         // igual lo colocamos.
         int qEfectivo = Math.min(q, Math.max(0, minOcc));
-        if (qEfectivo != q) System.out.println("qEfectivo != q: " + qEfectivo + " != " + q);
+        //if (qEfectivo != q) System.out.println("qEfectivo != q: " + qEfectivo + " != " + q);
         if (qEfectivo == 0) {
-            System.out.println("No podemos liberar de forma segura");
+            //System.out.println("No podemos liberar de forma segura");
             // Nada que liberar de forma segura; salimos sin tocar eventos
             return;
         }
