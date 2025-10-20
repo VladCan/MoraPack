@@ -81,32 +81,34 @@ public class RegretRepair implements RepairOperator {
                     List<TramoAsignado> tramoAsignados = ruta.getTramos();
                     int q = ruta.getCantidad();
 
-                    //1) Primero reservamos las esperas en todas las escalas
+                    // (A) ORIGEN: [creado o llegada_prev, salida)
+                    for (int j = 0; j < tramoAsignados.size(); j++) {
+                        TramoAsignado t = tramoAsignados.get(j);
+                        VueloProgramadoId v = t.getVuelo();
+                        Instant iniOri = (j == 0) ? plan.getCreadoUtc() : tramoAsignados.get(j - 1).getVuelo().getLlegadaUtc();
+                        Instant finOri = v.getSalidaUtc();
+                        if (iniOri != null && finOri != null && !finOri.isBefore(iniOri)) {
+                            journal.reservar(v.getOrigen(), iniOri, finOri, q);
+                        }
+                    }
+
+                    // (B) ESCALAS: [llegada, salida_siguiente)
                     for (int j = 0; j < tramoAsignados.size() - 1; j++) {
                         TramoAsignado tramoPrev = tramoAsignados.get(j);
                         TramoAsignado tramoNext = tramoAsignados.get(j+1);
-
                         Instant arrPrev = tramoPrev.getVuelo().getLlegadaUtc();
                         Instant depNext = tramoNext.getVuelo().getSalidaUtc();
-
                         journal.reservar(tramoPrev.getVuelo().getDestino(), arrPrev, depNext, q);
                     }
 
-                    //2) Reservamos las 2h de ocupación final
+                    // (C) +2h FINAL
                     Instant llegadaFinal = tramoAsignados.get(tramoAsignados.size() - 1).getLlegadaUtc();
                     journal.reservar(plan.getAeropuertoDestino(), llegadaFinal, llegadaFinal.plus(Duration.ofHours(2)), q);
 
-                    // 3) Asignamos carga a los vuelos en la solución
+                    // (D) CARGA EN VUELOS
                     for (TramoAsignado t : tramoAsignados) {
-                        ///%%%%%Failing aquí
                         s.getCargaPorVuelo().asignar(t.getVuelo(), q);
                     }
-
-                    Instant objetivo = Instant.parse("2025-10-10T06:18:00Z");
-                    if (plan.getAeropuertoDestino().equals("LOWW") && !llegadaFinal.isAfter(objetivo) && !llegadaFinal.isBefore(objetivo)){
-                        int a = 0;
-                    }
-
                 }
 
                 //Construimos el plan y posteriormente actualizamos la solución
