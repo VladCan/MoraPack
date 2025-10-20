@@ -69,7 +69,9 @@ public class ALNS {
             }
 
             // Aceptar nueva solución (según criterio)
-            boolean aceptar = (costoNueva < costoActual);
+            boolean aceptar = (costoNueva < costoActual)
+                || (costoNueva == costoActual && rnd.nextDouble() < 0.25)
+                || (rnd.nextDouble() < tasaCambio);
             //boolean aceptar = (costoNueva < costoActual) || (rnd.nextDouble() < tasaCambio);
 
             if (aceptar) {
