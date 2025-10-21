@@ -94,3 +94,46 @@ export const del = async (url: string): Promise<boolean> => {
   await api.delete(url);
   return true;
 };
+
+/** get de texto plano (por ahora para el preview del archivo) y BLOB (para descargar archivo)**/
+
+export const getText = async (
+  url: string,
+  searchParams?: Record<string, unknown>
+): Promise<string> => {
+  const params = searchParams
+    ? new URLSearchParams(
+      Object.entries(searchParams).reduce<Record<string, string>>((acc, [k, v]) => {
+        acc[k] = v != null ? String(v) : "";
+        return acc;
+      }, {})
+    )
+    : undefined;
+
+    return api.get(url, { searchParams: params }).text();
+}
+
+export const downloadFile = async (url: string, suggestedName : string) => {
+  const blob = await api.get(url).blob();
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+
+  a.href = href;
+  a.download = suggestedName || "download";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(href);
+
+}
+
+/*Por si en algun momento la estructura ya no es con toast, mismo formato de respuesta (por ahora no se usa) */
+export const postMultipart = async <T>(
+  url: string,
+  file: File,
+  fieldName = "file"
+): Promise<T> => {
+  const fd = new FormData();
+  fd.append(fieldName, file);
+  return api.post(url, { body: fd }).json<T>();
+};
