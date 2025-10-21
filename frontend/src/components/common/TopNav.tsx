@@ -102,7 +102,7 @@ export default function TopNav() {
             </div>
 
             {/* ======= DESKTOP ======= */}
-            <ul className="hidden md:flex rounded-full gap-1 overflow-hidden bg-card/40 shadow-lg ring-1 ring-border backdrop-blur-md backdrop-saturate-150">
+            <ul className="hidden md:flex rounded-full gap-1 overflow-hidden bg-card/40 shadow-lg ring-1 ring-border backdrop-blur-md backdrop-saturate-150 mt-2">
               {tabs.map((t, index) => (
                 <li key={t.to} className="flex-1">
                   <NavLink
@@ -174,7 +174,7 @@ export default function TopNav() {
         )}
 
         {/* Ver más inline (solo desktop) */}
-        <div className="hidden md:block text-center">
+        <div className="hidden md:block text-center mt-2">
           {showButton && !showContent && (
             <button
               onClick={() => setShowContent(true)}
