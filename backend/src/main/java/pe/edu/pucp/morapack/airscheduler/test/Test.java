@@ -133,7 +133,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
 
             SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of(), ocupacionPorAeropuerto);
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
-            ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt",presenteUTC);
+            //ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt",presenteUTC);
             // ALNS
             List<DestructionOperator> destructores = new ArrayList<>();
             destructores.add(new RandomRemoval(20));
@@ -166,7 +166,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                         Locale.forLanguageTag("es-ES"))
                         .withZone(ZoneOffset.UTC).format(presenteUTC)));
 
-            VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46));
+            VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46),mapa);
         }
         System.out.println("─────────────────────────────────────────────");
         System.out.println("📄 Reporte de simulación guardado en: out/reporteSimulacion.txt");

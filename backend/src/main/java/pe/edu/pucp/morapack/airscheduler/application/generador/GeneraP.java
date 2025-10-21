@@ -25,7 +25,7 @@ public class GeneraP {
     // ====== KNOBS (ajusta intensidades aquí) ======
     // Cantidad por pedido
     private static final int PISO_CANT = 250;     // mínimo
-    private static final int CANT_MAX = 999;      // máximo duro del archivo (3 dígitos)
+    private static final int CANT_MAX = 500;      // máximo duro del archivo (3 dígitos)
     private static final double QUANTITY_DAY_BOOST_MAX = 0.35; // +35% al final del horizonte (sobre tu logística)
 
     // Ritmo de llegadas (pedidos/día): el factor final vs el inicial (p.e. 3.0 => 3x más rápido al final)
@@ -249,6 +249,6 @@ public class GeneraP {
         } catch (IOException e) {
             throw new RuntimeException("No pude crear carpeta: " + out, e);
         }
-        generarArchivo(out, 2000, 168);
+        generarArchivo(out, 5000, 1168);
     }
 }
