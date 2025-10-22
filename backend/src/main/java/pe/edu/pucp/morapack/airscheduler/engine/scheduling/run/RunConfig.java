@@ -1,0 +1,103 @@
+package pe.edu.pucp.morapack.airscheduler.engine.scheduling.run;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Set;
+
+/** Esta clase es para representar los parámetros efectivos del run como tal**/
+public class RunConfig {
+    public enum Scenario{
+        OPERACION,
+        SIM_SEMANAL,
+        COLAPSO
+    }
+
+    private final Scenario scenario;
+    private final Instant fechaInicio;
+    private final Instant fechaFin;
+    private final Duration horasVentana;
+    private final Duration horizon;
+    /// Nota: podemos considerar eliminar sedes y que sean fijas en el algoritmo a ejecutarse.
+    private final Set<String> sedes;
+
+    // Parámetros opcionales
+    private final long seedRandom;
+    private final Duration maxTiempoALNS;
+
+    public RunConfig(
+            Scenario scenario,
+            Instant fechaInicio,
+            Instant fechaFin,
+            Duration horasVentana,
+            Duration horizon,
+            Set<String> sedes,
+            long seedRandom,
+            Duration maxTiempoALNS
+    ) {
+        this.scenario = scenario;
+        this.fechaInicio = fechaInicio;
+        this.fechaFin = fechaFin;
+        this.horasVentana = horasVentana;
+        this.horizon = horizon;
+        this.sedes = sedes;
+        this.seedRandom = seedRandom;
+        this.maxTiempoALNS = maxTiempoALNS;
+    }
+
+    /** Getters **/
+    public Scenario scenario() { return scenario; }
+    public Instant fechaInicio() { return fechaInicio; }
+    public Instant fechaFin() { return fechaFin; }
+    public Duration horasVentana() { return horasVentana; }
+    public Duration horizon() { return horizon; }
+    public Set<String> sedes() { return sedes; }
+    public long seedRandom() { return seedRandom; }
+    public Duration maxTiempoALNS() { return maxTiempoALNS; }
+
+    /** Acá implementamos 3 factories, donde cada uno representa los parámetros de cada operación **/
+
+    public static RunConfig operacion(Set<String> sedes) {
+        return new RunConfig(
+                Scenario.OPERACION,
+                Instant.now(),
+                null,
+                Duration.ofHours(2),
+                Duration.ofHours(48),
+                sedes,
+                System.nanoTime(),
+                Duration.ofSeconds(60)
+        );
+    }
+
+    public static RunConfig simSemanal(Instant inicio, Instant fin, Set<String> sedes){
+        return new RunConfig(
+                Scenario.SIM_SEMANAL,
+                inicio,
+                fin,
+                Duration.ofHours(6),
+                Duration.ofHours(48),
+                sedes,
+                System.nanoTime(),
+                Duration.ofSeconds(60)
+        );
+    }
+
+    public static RunConfig colapso(Instant inicio, Instant fin, Set<String> sedes) {
+        return new RunConfig(
+                Scenario.COLAPSO,
+                inicio,
+                fin,
+                Duration.ofHours(6),
+                Duration.ofHours(48),
+                sedes,
+                System.nanoTime(),
+                Duration.ofSeconds(60)
+        );
+    }
+
+    @Override
+    public String toString() {
+        return "RunConfig[" + scenario + ", inicio=" + fechaInicio + ", fin=" + fechaFin + "]";
+    }
+
+}
