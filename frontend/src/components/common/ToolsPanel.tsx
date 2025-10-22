@@ -22,6 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { buildStartRunRequest } from "@/services/buildStartRunRequest";
+import { handleApi, postJson } from "@/services/api";
+import type { StartRunResponse } from "@/types/runs";
 
 type NivelCarga = "disponible" | "limitado" | "saturado";
 
@@ -84,6 +87,36 @@ export default function ToolsPanel({
   const canApply =
     (showStart ? Boolean(inicio) : true) && (showEnd ? Boolean(fin) : true);
 
+
+  const [loading, setLoading] = useState(false);
+
+  const handleRun = async () => {
+    setLoading(true);
+    try {
+      const req = buildStartRunRequest(variant, {inicio, fin});
+
+      console.log("el req es:", req);
+
+      const [data, error] = await handleApi(
+        postJson<StartRunResponse>("runs", req)
+      )
+
+      if (error) {
+        // aquí tu toast o UI de error
+        console.error("Error al iniciar la simulación", error);
+      } else if (data) {
+        // éxito: puedes guardar el runId o navegar, etc.
+        console.log("Simulación iniciada", data.runId);
+      }
+    }
+    finally {
+      setLoading(false);
+    }
+
+  }
+
+
+  /*PROBABLY DEPRECATED */
   const handleApply = () => {
     const payload: ApplyPayload = {
       inicio: showStart ? inicio : undefined,
@@ -97,6 +130,7 @@ export default function ToolsPanel({
     };
     onApply?.(payload);
   };
+  /*PROBABLY DEPRECATED */
 
   const handleClear = () => {
     setInicio(undefined);
@@ -271,7 +305,7 @@ export default function ToolsPanel({
               <X className="h-4 w-4" /> Limpiar
             </button>
             <button
-              onClick={handleApply}
+              onClick={handleRun}
               disabled={!canApply}
               className={`px-3 py-2 text-sm rounded-full transition inline-flex items-center gap-1
                 ${canApply ? "bg-primary text-primary-foreground hover:brightness-95" : "bg-primary/50 text-primary-foreground/80 cursor-not-allowed"}
