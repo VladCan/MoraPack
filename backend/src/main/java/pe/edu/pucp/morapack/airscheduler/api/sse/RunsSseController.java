@@ -127,7 +127,7 @@ public class RunsSseController {
     public static final class FinishedEvt {
         public final String type = "FINISHED";
         public final String runId;
-        public final String reason; // NORMAL | COLAPSO | MANUAL | ERROR
+        public final String reason; // MANUAL | FIN_DE_RANGO | COLAPSE | ERROR (StopReason.java)
         public FinishedEvt(String runId, String reason) { this.runId = runId; this.reason = reason; }
     }
 }
