@@ -120,9 +120,13 @@ public class RunsController {
         RunContext runContext = new RunContext(runId, config);
         runManager.addContext(runId.value(), runContext);
 
+        /*
         System.out.println("Estamos en RunsController y vamos a dar 30 sec para que coloques el link del SSE y " +
                 "veas los datos enviados. El url es: http://localhost:8080/runs/" + runId.value() + "/stream");
         try { Thread.sleep(30000); } catch (InterruptedException ignored) {}
+         */
+
+        System.out.println("Revisa: http://localhost:8080/runs/" + runId.value() + "/stream ");
 
         //Delegamos al motor
         runManager.start(runId, config);

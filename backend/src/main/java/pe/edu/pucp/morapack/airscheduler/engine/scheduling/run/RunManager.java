@@ -118,6 +118,7 @@ public class RunManager {
                 Instant wEnd = wStart.plus(config.horasVentana());
                 int idx = 0;
 
+                System.out.println("En esta iteración, wStart es: " + wStart + ", wEnd es: " + wEnd);
                 System.out.println("Voy a entrar al bucle, mi id es:" + id);
 
                 while (!cancelled.get(id).get() && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
@@ -134,9 +135,43 @@ public class RunManager {
                     //listener.onWindow(new WindowPacket(id, idx, wStart, wEnd, vuelos));
                     broadcastWindow(new WindowPacket(id, idx, wStart, wEnd /* ... */));
 
-                    System.out.println("Vamos a dormir 6 segundos, mi id es:" + id);
+                    //Acá vamos a que el reloj simulado cruce el fin de ventana
+                    while (true){
+                        //En caso de existir pausa o cancelación (por ahora, esto no ocurrirá)
+                        if (cancelled.get(id).get()) break;
+
+                        while (paused.get(id).get() && !cancelled.get(id).get()) {
+                            sleepQuietly(Duration.ofMillis(100)); // dormimos cortito mientras esté pausado
+                        }
+                        if (cancelled.get(id).get()) break;
+
+                        Instant simNow = currentSimNow(id);
+
+                        //Verificamos si ya cruzó el fin de ventana
+                        if (!simNow.isBefore(wEnd)){
+                            break;
+                        }
+
+                        //Lo que viene acá abajo es para evitar busy-wait, osea
+                        //que el CPU no este ejecutando a cada rato lo de arriba
+
+                        long remainingSimMs = Duration.between(simNow, wEnd).toMillis();
+                        if (remainingSimMs <= 0) break;
+
+                        //Acá calculamos lo que falta simular a "cuanto dormir"
+                        RunContext ctx = requireContext(id);
+                        double speed = ctx.speed();
+                        long remainingRealMs = (long) Math.ceil(remainingSimMs / speed);
+
+                        //Dormimos por tramos cortos para poder reaccionar a pausa o cancel
+                        long napMs = Math.min(Math.max(remainingRealMs, 50L), 500L);
+                        sleepQuietly(Duration.ofMillis(napMs));
+
+                    }
+
+                    /*System.out.println("Vamos a dormir 6 segundos, mi id es:" + id);
                     sleepQuietly(Duration.ofSeconds(6));
-                    System.out.println("Ya desperté 6, mi id es:" + id);
+                    System.out.println("Ya desperté 6, mi id es:" + id);*/
 
 
                     // Siguiente ventana

@@ -35,9 +35,9 @@ public class RunContext {
         this.runConfig = Objects.requireNonNull(config, "config");
         this.relojActual = config.fechaInicio();
         this.ventanaIndex = 0L;
-        this.simStartUtc = config.fechaFin();
+        this.simStartUtc = config.fechaInicio();
         this.wallAnchor = Instant.now();
-        this.speed = 10;
+        this.speed = 144;
     }
 
     /** Getters **/
