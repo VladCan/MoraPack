@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import Logo from "@/assets/Logo-de-AirExpress-Distribution.svg";
 import LogoMark from "@/assets/airexpress2.svg";
-import { useState, type JSX } from "react";
+import { useEffect, useState, type JSX } from "react";
 import ToolsPanel, { ColapsoToolsPanel, OperacionDiariaToolsPanel } from "./ToolsPanel";
 import NavClock from "./NavClock";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -11,6 +11,8 @@ import { Clock3, SlidersHorizontal } from "lucide-react";
 // 👇 nuevo: sheet para móvil
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ModeToggle } from "../ui/mode-toggle";
+import { useRunSession } from "@/lib/runSession";
+import { useRunSSE } from "@/hooks/useRunSSE";
 
 const tabs = [
   { to: "/registrar", label: "Registrar envío" },
@@ -37,6 +39,35 @@ export default function TopNav() {
 
   const showButton = SHOW_BTN_PAGES.has(currentPage);
   const currentContent = CONTENT[currentPage] ?? <p>Selecciona una opción del menú</p>;
+
+  //Esto es para la conexión SSE de la solución
+
+  //Traemos el contexto
+  const { runId, status, begin, end, setSimNow, setWindow } = useRunSession();
+  
+  //Acá expone connect(url, handlers) -> () => void
+  const { connected, simNowUtc, windows, finished, error } = useRunSSE(
+    status === "running" && runId ? runId : undefined
+  );
+
+  //Propagamos los TICKs al contexto
+  useEffect(() => {
+    if (simNowUtc) setSimNow(simNowUtc);
+  }, [simNowUtc, setSimNow]);
+
+  //Propagamos la última WINDOW al contexto
+  useEffect(() => {
+    if (windows.length > 0) {
+      const w = windows[windows.length - 1];
+      setWindow({ index: w.index, startUtc: w.startUtc, endUtc: w.endUtc });
+    }
+  }, [windows, setWindow]);
+
+  useEffect(() => {
+    if (finished) end("finished");
+  }, [finished, end]);
+
+    
 
   return (
     <header className="fixed top-0 left-0 z-50 w-full h-16">
