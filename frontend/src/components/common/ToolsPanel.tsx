@@ -25,6 +25,8 @@ import {
 import { buildStartRunRequest } from "@/services/buildStartRunRequest";
 import { handleApi, postJson } from "@/services/api";
 import type { StartRunResponse } from "@/types/runs";
+import { useRunSession } from "@/lib/runSession";
+import { useNavigate } from "react-router-dom";
 
 type NivelCarga = "disponible" | "limitado" | "saturado";
 
@@ -89,6 +91,8 @@ export default function ToolsPanel({
 
 
   const [loading, setLoading] = useState(false);
+  const {begin} = useRunSession();
+  const navigate = useNavigate();
 
   const handleRun = async () => {
     setLoading(true);
@@ -105,7 +109,13 @@ export default function ToolsPanel({
         // aquí tu toast o UI de error
         console.error("Error al iniciar la simulación", error);
       } else if (data) {
-        // éxito: puedes guardar el runId o navegar, etc.
+        // éxito
+        
+        //Colocamos lo necesario en el hook
+        begin(data.runId);
+
+        //navigate("/simulacion");
+
         console.log("Simulación iniciada", data.runId);
       }
     }

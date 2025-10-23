@@ -1,12 +1,10 @@
 // src/pages/Simulacion.tsx
 "use client";
-import { useMemo, useState } from "react";
-import { z } from "zod";
-import FlightPath from "@/components/common/FlightPath";
 import MainMap from "@/components/common/MainMap";
-import AirportMarkers, { type AirportPoint } from "@/components/common/map/AirportMarkers";
-import { useAirports } from "@/hooks/useAirports";
-import { useFlightsSSE } from "@/hooks/useFlightsSSE";
+import { useRunSSE } from "@/hooks/useRunSSE";
+import { useRunSession } from "@/lib/runSession";
+import { useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 
 const COLOR_SEDE   = "#005097";
 const COLOR_NORMAL = "#38bdf8"; // 👈 más suave que #0ea5e9
@@ -35,40 +33,47 @@ type FlightDto = {
 };
 
 export default function Simulacion() {
-  const { data: airportsDtoRaw } = useAirports();
-  const [hoveredAirportId, setHoveredAirportId] = useState<string | null>(null);
-  const [activeAirportId, setActiveAirportId] = useState<string | null>(null);
+  
+  //El runId únicamente debería de existir luego de darle a "Aplicar"
+  //al ToolsPanel
+  const {runId} = useRunSession();
 
-  const airports: AirportPoint[] = useMemo(() => {
-    const parsed = AirportsDtoSchema.safeParse(airportsDtoRaw);
-    if (!parsed.success) return [];
-    return parsed.data.map((a) => ({
-      id: a.codigo,
-      name: `${a.ciudad ?? a.codigo} (${a.codigo})`,
-      lon: a.lon,
-      lat: a.lat,
-      color: a.sede ? COLOR_SEDE : COLOR_NORMAL,
-      isSede: !!a.sede, 
-    }));
-  }, [airportsDtoRaw]);
+  //Conectamos al SSE si hay runId
+  const { connected, simNowUtc, windows, finished, error } = 
+    useRunSSE(runId ?? undefined);
 
-  // SSE vuelos
-  const { data: liveFlights } = useFlightsSSE("/vuelos/live?limit=200");
-  const flightPaths = useMemo(() => {
-    const arr = (liveFlights ?? []) as FlightDto[];
-    return arr.map((f) => ({
-      id: f.id,
-      origin: { lat: f.originLat, lon: f.originLon },
-      dest: { lat: f.destLat, lon: f.destLon },
-      progress: f.progress,
-      pathColor: f.pathColor,
-      planeColor: f.planeColor,
-    }));
-  }, [liveFlights]);
+  //Acá debería de ir la lógica de calcular el progress, filtrar, etc.
+
+  //Por ahora estoy colocando unos logs para verificar que llegue todo
+
+  useEffect(() => {
+    console.log("[SSE] connected:", connected, "error:", error);
+  }, [connected, error]);
+
+  useEffect(() => {
+    if (simNowUtc) console.log("[SSE] TICK simNowUtc:", simNowUtc);
+  }, [simNowUtc]);
+
+  useEffect(() => {
+    if (windows.length > 0) {
+      const last = windows[windows.length - 1];
+      console.log("[SSE] WINDOW", last.index, last.startUtc, "→", last.endUtc);
+    }
+  }, [windows]);
+
+  useEffect(() => {
+    if (finished) console.log("[SSE] FINISHED:", finished.reason);
+  }, [finished]);
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <MainMap>
+      <MainMap />
+    </div>
+  );
+}
+
+{/*
+  <MainMap>
         {flightPaths.map((fp) => (
           <FlightPath
             key={fp.id}
@@ -94,7 +99,4 @@ export default function Simulacion() {
           }
           iconSize={16}
         />
-      </MainMap>
-    </div>
-  );
-}
+      </MainMap> */}
