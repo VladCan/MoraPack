@@ -46,5 +46,15 @@ public class VuelosCancelados {
 
         return dias != null ? List.copyOf(dias) : List.of();
     }
+
+    public Map<String, List<Integer>> getCanceladosMap() {
+        return canceladosMap;
+    }
+    public void setCanceladosMap(Map<String, List<Integer>> mapa) {
+        if (mapa != null) {
+            canceladosMap.clear();
+            canceladosMap.putAll(mapa);
+        }
+    }
 }
 

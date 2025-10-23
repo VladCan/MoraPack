@@ -143,6 +143,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                     .reservasWaitIniciales(reservas) // <— ocupa bodega por pickup 2h
                     // .stockInicial(stockInicial) //en caso sea conveniente para el modelo (en
                     // evaluacion)
+                    .vuelosCancelados(cancelados.getCanceladosMap())
                     .build();
 
             VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, mapa).construir(params);

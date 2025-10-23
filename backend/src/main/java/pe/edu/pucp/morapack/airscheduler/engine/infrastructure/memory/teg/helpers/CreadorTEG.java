@@ -8,6 +8,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosCancelados;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosMap;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.AereopuertoNode;
@@ -98,8 +99,16 @@ public final class CreadorTEG {
 
     public static void crearFlights(VuelosTEG teg, VuelosMap vuelosMap, TEGParametros p,
             AeropuertosMap aeropuertosMap) {
+        VuelosCancelados cancelados = new VuelosCancelados();
+        cancelados.setCanceladosMap(p.getVuelosCancelados());
+
         for (String origen : vuelosMap.origenes()) {
             for (Vuelo v : vuelosMap.vuelosDesde(origen)) {
+                List<Integer> diasCancelados = cancelados.diasCancelado(v);
+                if(diasCancelados!=null && !diasCancelados.isEmpty()){
+                    System.out.printf("✈️  Vuelo cancelado: %s en días %s%n",
+                            v.getHoraOrigen(), diasCancelados);
+                }
                 for (Instant salida : instantesDiariosEnVentana(p.getInicioUtc(), p.getFinUtc(),
                         v.getHoraGMTOrigen())) {
                     Instant llegada = combinarFechaYHora(salida, v.getHoraGMTDestino()); 
