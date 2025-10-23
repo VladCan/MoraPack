@@ -1,3 +1,4 @@
+//src/services/buildStartRunRequest.ts
 type Variant = "simulacion" | "operacion" | "colapso";
 
 type StartRunRequest = {
