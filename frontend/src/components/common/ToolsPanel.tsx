@@ -114,7 +114,8 @@ export default function ToolsPanel({
         //Colocamos lo necesario en el hook
         begin(data.runId);
 
-        //navigate("/simulacion");
+        //setShowContent(false); //opcional para cerrar el panel
+        //navigate("/simulacion"); 
 
         console.log("Simulación iniciada", data.runId);
       }

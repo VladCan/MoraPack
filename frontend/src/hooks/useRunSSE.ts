@@ -37,6 +37,8 @@ export function useRunSSE(runId?: string){
 
         const es = new EventSource(url, {withCredentials: false});
         esRef.current = es;
+        
+        //Evita "setState on unmounted component" (no actualiza estado si el efecto ya fue limpiado)
         let alive = true;
 
         es.onopen = () => {

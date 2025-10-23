@@ -1,6 +1,8 @@
 // src/pages/Simulacion.tsx
 "use client";
 import MainMap from "@/components/common/MainMap";
+import AirportMarkers, { type AirportPoint } from "@/components/common/map/AirportMarkers";
+import { useAirports } from "@/hooks/useAirports";
 import { useRunSSE } from "@/hooks/useRunSSE";
 import { useRunSession } from "@/lib/runSession";
 import { useEffect, useMemo, useState } from "react";
@@ -33,41 +35,72 @@ type FlightDto = {
 };
 
 export default function Simulacion() {
-  
+
+  /**Esta parte de abajo es para mostrar los almacenes (nada nuevo hasta acá)**/
+  const { data: airportsDtoRaw } = useAirports();
+  const [hoveredAirportId, setHoveredAirportId] = useState<string | null>(null);
+  const [activeAirportId, setActiveAirportId] = useState<string | null>(null);
+
+  const airports: AirportPoint[] = useMemo(() => {
+      const parsed = AirportsDtoSchema.safeParse(airportsDtoRaw);
+      if (!parsed.success) return [];
+      return parsed.data.map((a) => ({
+        id: a.codigo,
+        name: `${a.ciudad ?? a.codigo} (${a.codigo})`,
+        lon: a.lon,
+        lat: a.lat,
+        color: a.sede ? COLOR_SEDE : COLOR_NORMAL,
+        isSede: !!a.sede, 
+      }));
+    }, [airportsDtoRaw]);
+  /**Esta parte de arriba es para mostrar los almacenes (nada nuevo hasta acá)**/
+
+  /*Acá viene lo nuevo:*/
+
   //El runId únicamente debería de existir luego de darle a "Aplicar"
   //al ToolsPanel
   const {runId} = useRunSession();
 
   //Conectamos al SSE si hay runId
-  const { connected, simNowUtc, windows, finished, error } = 
-    useRunSSE(runId ?? undefined);
+  const { status, simNow, lastWindow } = useRunSession();
 
   //Acá debería de ir la lógica de calcular el progress, filtrar, etc.
 
   //Por ahora estoy colocando unos logs para verificar que llegue todo
 
   useEffect(() => {
-    console.log("[SSE] connected:", connected, "error:", error);
-  }, [connected, error]);
+    console.log("[CTX] status:", status, "simNow:", simNow, "lastWindow:", lastWindow);
+  }, [status, simNow, lastWindow]);
 
   useEffect(() => {
-    if (simNowUtc) console.log("[SSE] TICK simNowUtc:", simNowUtc);
-  }, [simNowUtc]);
+    if (simNow) console.log("[CTX] TICK simNow:", simNow);
+  }, [simNow]);
 
   useEffect(() => {
-    if (windows.length > 0) {
-      const last = windows[windows.length - 1];
-      console.log("[SSE] WINDOW", last.index, last.startUtc, "→", last.endUtc);
+    if (lastWindow) {
+      console.log("[CTX] WINDOW", lastWindow.index, lastWindow.startUtc, "->", lastWindow.endUtc);
     }
-  }, [windows]);
-
-  useEffect(() => {
-    if (finished) console.log("[SSE] FINISHED:", finished.reason);
-  }, [finished]);
+  }, [lastWindow]);
 
   return (
     <div className="min-h-screen bg-neutral-50">
-      <MainMap />
+      <MainMap>
+        <AirportMarkers
+        items={airports}
+        activeId={activeAirportId}
+        hoveredId={hoveredAirportId}
+        baseColor={COLOR_NORMAL}
+        activeColor={ACTIVE_COLOR}
+        hoverColor={HOVER_COLOR}
+        onHoverChange={setHoveredAirportId}
+        onClick={(id) =>
+          setActiveAirportId((prev) => (prev === id ? null : id))
+        }
+        iconSize={16}
+      />
+      </MainMap>
+
+      
     </div>
   );
 }
