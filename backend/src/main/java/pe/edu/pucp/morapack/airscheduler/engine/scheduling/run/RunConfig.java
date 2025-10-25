@@ -57,11 +57,15 @@ public class RunConfig {
     /** Acá implementamos 3 factories, donde cada uno representa los parámetros de cada operación **/
 
     public static RunConfig operacion(Set<String> sedes) {
+        return operacion(sedes, Duration.ofHours(2));
+    }
+    
+    public static RunConfig operacion(Set<String> sedes, Duration windowSize) {
         return new RunConfig(
                 Scenario.OPERACION,
                 Instant.now(),
                 null,
-                Duration.ofHours(2),
+                windowSize,
                 Duration.ofHours(48),
                 sedes,
                 System.nanoTime(),
@@ -70,11 +74,15 @@ public class RunConfig {
     }
 
     public static RunConfig simSemanal(Instant inicio, Instant fin, Set<String> sedes){
+        return simSemanal(inicio, fin, sedes, Duration.ofHours(6));
+    }
+    
+    public static RunConfig simSemanal(Instant inicio, Instant fin, Set<String> sedes, Duration windowSize){
         return new RunConfig(
                 Scenario.SIM_SEMANAL,
                 inicio,
                 fin,
-                Duration.ofHours(6),
+                windowSize,
                 Duration.ofHours(48),
                 sedes,
                 System.nanoTime(),
@@ -83,11 +91,15 @@ public class RunConfig {
     }
 
     public static RunConfig colapso(Instant inicio, Instant fin, Set<String> sedes) {
+        return colapso(inicio, fin, sedes, Duration.ofHours(6));
+    }
+    
+    public static RunConfig colapso(Instant inicio, Instant fin, Set<String> sedes, Duration windowSize) {
         return new RunConfig(
                 Scenario.COLAPSO,
                 inicio,
                 fin,
-                Duration.ofHours(6),
+                windowSize,
                 Duration.ofHours(48),
                 sedes,
                 System.nanoTime(),
