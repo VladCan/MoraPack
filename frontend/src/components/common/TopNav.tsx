@@ -59,7 +59,13 @@ export default function TopNav() {
   useEffect(() => {
     if (windows.length > 0) {
       const w = windows[windows.length - 1];
-      setWindow({ index: w.index, startUtc: w.startUtc, endUtc: w.endUtc });
+      setWindow({ 
+        index: w.index, 
+        startUtc: w.startUtc, 
+        endUtc: w.endUtc,
+        vuelos: w.vuelos,
+        pedidos: w.pedidos
+      });
     }
   }, [windows, setWindow]);
 
