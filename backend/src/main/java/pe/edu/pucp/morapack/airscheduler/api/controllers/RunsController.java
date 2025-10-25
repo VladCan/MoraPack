@@ -9,6 +9,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunContext;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunId;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -77,15 +78,17 @@ public class RunsController {
         final Instant end = (body.endUtc == null || body.endUtc.isBlank()) ? null : Instant.parse(body.endUtc);
         final int windowHours = body.windowHours;
 
-        //Construimos el RunConfig
+        //Construimos el RunConfig con el tamaño de ventana configurable
         RunConfig config;
+        Duration windowSize = Duration.ofHours(windowHours);
+        
         if (end != null) {
             switch (scenario) {
                 case SIM_SEMANAL:
-                    config = RunConfig.simSemanal(start, end, sedes);
+                    config = RunConfig.simSemanal(start, end, sedes, windowSize);
                     break;
                 case COLAPSO:
-                    config = RunConfig.colapso(start, end, sedes);
+                    config = RunConfig.colapso(start, end, sedes, windowSize);
                     break;
                 case OPERACION:
                     throw new BadRequestException("OPERACION no requiere endUtc.");
@@ -99,7 +102,7 @@ public class RunsController {
                 case COLAPSO:
                     throw new BadRequestException("COLAPSO requiere endUtc.");
                 case OPERACION:
-                    config = RunConfig.operacion(sedes);
+                    config = RunConfig.operacion(sedes, windowSize);
                     break;
                 default:
                     throw new BadRequestException("Scenario no soportado.");

@@ -8,11 +8,16 @@ import jakarta.ws.rs.core.MediaType;
 import org.jboss.resteasy.reactive.RestStreamElementType;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+
+import javax.print.attribute.standard.MediaSize.ISO;
+
+import java.time.format.DateTimeFormatter;
 
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunContext;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunId;
@@ -31,7 +36,8 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.StopReason;
 public class RunsSseController {
 
     @Inject RunManager runManager;
-
+    private static final DateTimeFormatter ISO = DateTimeFormatter.ISO_INSTANT;
+    
     @GET
     @Path("/{id}/stream")
     @Produces(MediaType.SERVER_SENT_EVENTS)
@@ -57,7 +63,7 @@ public class RunsSseController {
             RunManager.RunListener listener = new RunManager.RunListener() {
                 @Override
                 public void onWindow(pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.WindowPacket p) {
-                    emitter.emit(new WindowEvt(p.runId, p.windowId, p.windowStartUTC, p.windowEndUTC));
+                    emitter.emit(new WindowEvt(p.runId, p.windowId, p.windowStartUTC, p.windowEndUTC, p.vuelos, p.pedidos));
                 }
                 @Override
                 public void onFinished(String id, StopReason reason) {
@@ -67,13 +73,19 @@ public class RunsSseController {
             };
             // Suscribimos al run
             runManager.registerListener(runId, listener);
-
+            
             //Tick cada 1s real (esto es simNowUtc)
             ScheduledExecutorService tickExec = Executors.newSingleThreadScheduledExecutor();
             ScheduledFuture<?> tickFuture = tickExec.scheduleAtFixedRate(() -> {
                 try {
-                    System.out.println("Tick executed at " + Instant.now());
+                   Instant now = Instant.now();
                     Instant simNow = runManager.currentSimNow(runId.value());
+
+                    // Imprime una sola línea, bien formateada
+                    System.out.printf("Tick executed at %s | simNow=%s%n",
+                            ISO.format(now),
+                            ISO.format(simNow));
+
                     emitter.emit(new TickEvt(runId.value(), simNow.toString()));
                 }
                 catch (Exception e) {
@@ -119,8 +131,18 @@ public class RunsSseController {
         public final int windowIndex;
         public final Instant windowStartUtc;
         public final Instant windowEndUtc;
-        public WindowEvt(String runId, int idx, Instant s, Instant e) {
-            this.runId = runId; this.windowIndex = idx; this.windowStartUtc = s; this.windowEndUtc = e;
+        public final List<Object> vuelos;
+        public final List<Object> pedidos;
+        public final String windowIdISO;
+        
+        public WindowEvt(String runId, int idx, Instant s, Instant e, List<Object> vuelos, List<Object> pedidos) {
+            this.runId = runId; 
+            this.windowIndex = idx; 
+            this.windowStartUtc = s; 
+            this.windowEndUtc = e;
+            this.vuelos = vuelos != null ? vuelos : List.of();
+            this.pedidos = pedidos != null ? pedidos : List.of();
+            this.windowIdISO = s.toString();
         }
     }
 
