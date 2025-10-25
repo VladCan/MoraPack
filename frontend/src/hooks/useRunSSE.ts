@@ -2,16 +2,55 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+// Tipos de carga en un vuelo
+export type CargaItem = {
+    pedidoId: number;
+    cantidad: number;
+    destinoFinal: string;
+    esConexion: boolean;
+    creadoUtc?: string;
+};
+
+// Vuelo con su manifiesto de carga
+export type VueloDTO = {
+    id: string;
+    origen: string;
+    destino: string;
+    salidaUtc: string;
+    llegadaUtc: string;
+    cantidadAsignada: number;
+    capacidad: number;
+    residual: number;
+    costo: number;
+    carga: CargaItem[];
+};
+
+// Pedido con su origen asignado
+export type PedidoDTO = {
+    id: number;
+    idCliente: number;
+    destino: string;
+    cantidad: number;
+    origen: string | string[] | null;  // Puede ser string, array o null
+    cantidadAsignada: number;
+    estadoAsignacion: "COMPLETO" | "PARCIAL" | "PENDIENTE";
+    fechaCreacion: string;
+    fechaLocal?: string;
+    continenteDestino?: string;
+};
+
 export type RunEvt = 
 | {type:"RUN_STARTED"; runId: string; simStartUtc: string; wallAnchorUtc: string; speed: number }
 | { type: "TICK";        runId: string; simNowUtc:  string }
-| { type: "WINDOW";      runId: string; windowIndex: number; windowStartUtc: string; windowEndUtc: string }
+| { type: "WINDOW";      runId: string; windowIndex: number; windowStartUtc: string; windowEndUtc: string; vuelos: VueloDTO[]; pedidos: PedidoDTO[] }
 | { type: "FINISHED";    runId: string; reason: string };
 
-export type WindowMeta = {
+export type WindowData = {
     index: number;
     startUtc: string;
     endUtc: string;
+    vuelos: VueloDTO[];
+    pedidos: PedidoDTO[];
 }
 
 export function useRunSSE(runId?: string){
@@ -21,7 +60,7 @@ export function useRunSSE(runId?: string){
     const [speed, setSpeed] = useState<number|undefined>();
     const [simNowUtc, setSimNow]  = useState<string|undefined>();
     const [simStartUtc, setSimStart] = useState<string|undefined>();
-    const [windows, setWindows]   = useState<WindowMeta[]>([]);
+    const [windows, setWindows]   = useState<WindowData[]>([]);
     const [finished, setFinished] = useState<{reason:string}|null>(null);
 
     const esRef = useRef<EventSource | null>(null);
@@ -68,6 +107,8 @@ export function useRunSSE(runId?: string){
                             index: evt.windowIndex,
                             startUtc: evt.windowStartUtc,
                             endUtc:   evt.windowEndUtc,
+                            vuelos: evt.vuelos || [],
+                            pedidos: evt.pedidos || [],
                         }];
                         });
                         break;
