@@ -4,13 +4,11 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.Scanner;
 
 // Imports para la lógica de planificación
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
@@ -27,8 +25,13 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.OcupacionAl
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.ALNS;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.operators.*;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.CargaPorVuelo;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.OcupacionPorAeropuerto;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.PlanPedido;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.RutaAsignada;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.SolucionProgramacion;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.TramoAsignado;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.VueloProgramadoId;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.ssp.SSPGeneradorSeed;
 
 @ApplicationScoped
@@ -238,7 +241,8 @@ public class RunManager {
                             System.out.println("[RunManager] No hay pedidos en la ventana " + idx);
                             // Marcar ventana como enviada aunque esté vacía
                             ventanasEnviadasRun.add(windowIdISO);
-                            broadcastWindow(new WindowPacket(id, idx, wStart, wEnd, List.of(), List.of()));
+                            broadcastWindow(new WindowPacket(id, idx, wStart, wEnd, List.of(), 
+                                convertirPedidosADTO(List.of(), null)));
                             // Avanzar a la siguiente ventana antes de continuar
                             idx++;
                             wStart = wEnd;
@@ -290,7 +294,7 @@ public class RunManager {
                         
                         // 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
                         List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStart, wEnd);
-                        List<Object> pedidosVentanaDTO = convertirPedidosADTO(pedidosVentana);
+                        List<Object> pedidosVentanaDTO = convertirPedidosADTO(pedidosVentana, solucionOptima);
                         
                         // 8. Marcar ventana como enviada y hacer broadcast
                         ventanasEnviadasRun.add(windowIdISO);
@@ -391,22 +395,131 @@ public class RunManager {
     }
     
     /**
-     * Extrae los vuelos que caen dentro de la ventana temporal especificada
+     * Extrae los vuelos que caen dentro de la ventana temporal especificada,
+     * incluyendo el manifiesto de carga (qué pedidos van en cada vuelo)
      */
     private List<Object> extraerVuelosDeVentana(SolucionProgramacion solucion, Instant wStart, Instant wEnd) {
         List<Object> vuelosVentana = new ArrayList<>();
         
-        // Por ahora retornamos una lista vacía, pero aquí se implementaría
-        // la lógica para extraer vuelos de la solución que caen en [wStart, wEnd)
-        // Esto requeriría examinar la estructura de SolucionProgramacion y CargaPorVuelo
+        if (solucion == null || solucion.getCargaPorVuelo() == null) {
+            return vuelosVentana;
+        }
+        
+        CargaPorVuelo cargaPorVuelo = solucion.getCargaPorVuelo();
+        
+        // Iterar sobre todos los vuelos asignados
+        for (Map.Entry<VueloProgramadoId, Integer> entry : cargaPorVuelo.getAsignado().entrySet()) {
+            VueloProgramadoId vueloId = entry.getKey();
+            int cantidadAsignada = entry.getValue();
+            
+            // Solo incluir vuelos que tienen carga asignada
+            if (cantidadAsignada > 0) {
+                // Verificar si el vuelo cae dentro de la ventana temporal
+                // Un vuelo cae en la ventana si su salida está dentro de [wStart, wEnd)
+                if (vueloId.getSalidaUtc() != null && 
+                    !vueloId.getSalidaUtc().isBefore(wStart) && 
+                    vueloId.getSalidaUtc().isBefore(wEnd)) {
+                    
+                    // Generar ID único para el vuelo
+                    String vueloIdStr = vueloId.getOrigen() + "-" + 
+                                       vueloId.getDestino() + "-" + 
+                                       vueloId.getSalidaUtc().toString().replace(":", "");
+                    
+                    // Crear DTO del vuelo para el frontend
+                    Map<String, Object> vueloDTO = new HashMap<>();
+                    vueloDTO.put("id", vueloIdStr);
+                    vueloDTO.put("origen", vueloId.getOrigen());
+                    vueloDTO.put("destino", vueloId.getDestino());
+                    vueloDTO.put("salidaUtc", vueloId.getSalidaUtc().toString());
+                    vueloDTO.put("llegadaUtc", vueloId.getLlegadaUtc() != null ? vueloId.getLlegadaUtc().toString() : null);
+                    vueloDTO.put("cantidadAsignada", cantidadAsignada);
+                    vueloDTO.put("capacidad", cargaPorVuelo.capacidad(vueloId));
+                    vueloDTO.put("residual", cargaPorVuelo.residual(vueloId));
+                    vueloDTO.put("costo", vueloId.getCosto());
+                    
+                    // NUEVO: Extraer manifiesto de carga (qué pedidos van en este vuelo)
+                    List<Map<String, Object>> carga = extraerCargaDelVuelo(solucion, vueloId);
+                    vueloDTO.put("carga", carga);
+                    
+                    vuelosVentana.add(vueloDTO);
+                }
+            }
+        }
         
         return vuelosVentana;
     }
     
     /**
-     * Convierte los pedidos a DTOs para el frontend
+     * Extrae el manifiesto de carga de un vuelo específico:
+     * qué pedidos van en ese vuelo y cuánta cantidad de cada uno
      */
-    private List<Object> convertirPedidosADTO(List<Pedido> pedidos) {
+    private List<Map<String, Object>> extraerCargaDelVuelo(SolucionProgramacion solucion, VueloProgramadoId vuelo) {
+        List<Map<String, Object>> carga = new ArrayList<>();
+        
+        if (solucion == null || solucion.getPlanPorPedido() == null) {
+            return carga;
+        }
+        
+        // Iterar sobre todos los planes de pedidos
+        for (Map.Entry<Integer, PlanPedido> entry : solucion.getPlanPorPedido().entrySet()) {
+            PlanPedido plan = entry.getValue();
+            
+            if (plan == null || plan.getRutas() == null) {
+                continue;
+            }
+            
+            // Para cada ruta del pedido
+            for (RutaAsignada ruta : plan.getRutas()) {
+                if (ruta.getTramos() == null) {
+                    continue;
+                }
+                
+                // Buscar si algún tramo de esta ruta usa este vuelo
+                for (int i = 0; i < ruta.getTramos().size(); i++) {
+                    TramoAsignado tramo = ruta.getTramos().get(i);
+                    
+                    // Comparar si este tramo corresponde al vuelo actual
+                    if (esElMismoVuelo(tramo.getVuelo(), vuelo)) {
+                        
+                        // Determinar si es una conexión o el destino final
+                        boolean esConexion = i < ruta.getTramos().size() - 1;
+                        
+                        // Crear entrada de carga
+                        Map<String, Object> itemCarga = new HashMap<>();
+                        itemCarga.put("pedidoId", plan.getIdPedido());
+                        itemCarga.put("cantidad", tramo.getCantidad());
+                        itemCarga.put("destinoFinal", plan.getAeropuertoDestino());
+                        itemCarga.put("esConexion", esConexion);
+                        
+                        // Información adicional útil para el frontend
+                        itemCarga.put("creadoUtc", plan.getCreadoUtc() != null ? plan.getCreadoUtc().toString() : null);
+                        
+                        carga.add(itemCarga);
+                        break; // Un tramo por ruta en este vuelo
+                    }
+                }
+            }
+        }
+        
+        return carga;
+    }
+    
+    /**
+     * Compara dos vuelos para ver si son el mismo
+     */
+    private boolean esElMismoVuelo(VueloProgramadoId v1, VueloProgramadoId v2) {
+        if (v1 == null || v2 == null) return false;
+        
+        // Comparar origen, destino y hora de salida
+        return Objects.equals(v1.getOrigen(), v2.getOrigen()) &&
+               Objects.equals(v1.getDestino(), v2.getDestino()) &&
+               Objects.equals(v1.getSalidaUtc(), v2.getSalidaUtc());
+    }
+    
+    /**
+     * Convierte los pedidos a DTOs para el frontend, incluyendo información de orígenes desde la solución
+     */
+    private List<Object> convertirPedidosADTO(List<Pedido> pedidos, SolucionProgramacion solucion) {
         List<Object> pedidosDTO = new ArrayList<>();
         
         for (Pedido pedido : pedidos) {
@@ -414,11 +527,54 @@ public class RunManager {
             pedidoDTO.put("id", pedido.getIdPedido());
             pedidoDTO.put("idCliente", pedido.getIdCliente());
             pedidoDTO.put("destino", pedido.getDestino());
-            pedidoDTO.put("origen", pedido.getOrigen());
             pedidoDTO.put("cantidad", pedido.getCantidad());
             pedidoDTO.put("fechaCreacion", pedido.getCreatedAtUtc() != null ? pedido.getCreatedAtUtc().toString() : null);
             pedidoDTO.put("fechaLocal", pedido.getFecha() != null ? pedido.getFecha().toString() : null);
-            pedidoDTO.put("continenteDestino", pedido.getContinenteDestino());
+            
+            // Calcular continenteDestino si no está establecido
+            String continenteDestino = pedido.getContinenteDestino();
+            if (continenteDestino == null && aeropuertosMap != null) {
+                var aeropuerto = aeropuertosMap.obtener(pedido.getDestino());
+                if (aeropuerto != null) {
+                    continenteDestino = aeropuerto.getContinente();
+                }
+            }
+            pedidoDTO.put("continenteDestino", continenteDestino);
+            
+            // Extraer orígenes desde la solución (un pedido puede tener múltiples orígenes si se divide)
+            List<String> origenes = new ArrayList<>();
+            int cantidadAsignada = 0;
+            
+            if (solucion != null) {
+                var plan = solucion.planDe(pedido.getIdPedido());
+                if (plan != null && plan.getRutas() != null) {
+                    for (var ruta : plan.getRutas()) {
+                        if (ruta.getTramos() != null && !ruta.getTramos().isEmpty()) {
+                            // El primer tramo de cada ruta contiene el origen (sede)
+                            var primerTramo = ruta.getTramos().get(0);
+                            String origen = primerTramo.getVuelo().getOrigen();
+                            if (origen != null && !origenes.contains(origen)) {
+                                origenes.add(origen);
+                            }
+                            cantidadAsignada += ruta.getCantidad();
+                        }
+                    }
+                }
+            }
+            
+            // Si hay un solo origen, ponerlo como string; si hay múltiples, como array
+            if (origenes.isEmpty()) {
+                pedidoDTO.put("origen", null);
+            } else if (origenes.size() == 1) {
+                pedidoDTO.put("origen", origenes.get(0));
+            } else {
+                pedidoDTO.put("origen", origenes); // Múltiples sedes
+            }
+            
+            // Información adicional útil
+            pedidoDTO.put("cantidadAsignada", cantidadAsignada);
+            pedidoDTO.put("estadoAsignacion", cantidadAsignada >= pedido.getCantidad() ? "COMPLETO" : 
+                                              cantidadAsignada > 0 ? "PARCIAL" : "PENDIENTE");
             
             pedidosDTO.add(pedidoDTO);
         }

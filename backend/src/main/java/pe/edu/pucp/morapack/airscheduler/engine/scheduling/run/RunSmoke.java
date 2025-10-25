@@ -38,8 +38,8 @@ public class RunSmoke {
         String body = """
         {
           "scenario": "SIM_SEMANAL",
-          "startUtc": "2025-08-18T10:00:00Z",
-          "endUtc":   "2025-08-18T12:00:00Z",
+          "startUtc": "2025-10-19T10:45:00Z",
+          "endUtc":   "2025-10-19T11:45:00Z",
           "windowHours": 1
         }
         """;
