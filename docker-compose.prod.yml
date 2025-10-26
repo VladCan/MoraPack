@@ -1,21 +1,18 @@
 version: '3.8'
 
+
 services:
   # --- 1. Servicio de Backend (API) ---
-  # No se accede directamente, solo a través de caddy-proxy
   backend:
-    # IMPORTANTE: docker-compose build espera que el ejecutable nativo
-    # Debes correr "./mvnw package -Dnative" en la carpeta 'backend'
-    build:
-      context: ./backend
-      dockerfile: src/main/docker/Dockerfile.native-micro
-    image: morapack-backend:latest
+    # Ya no usamos 'build:', ahora usamos 'image:' para jalar de GHCR
+    image: ghcr.io/wolgank/morapack-backend:latest
+    pull_policy: always # Opcional: asegura que siempre baje la última
     container_name: morapack-backend
     restart: unless-stopped
     networks:
       - morapack-net
     expose:
-      - 8080 # El puerto interno de Quarkus
+      - 8080
     environment:
       # - QUARKUS_DATASOURCE_JDBC_URL=...
       # - QUARKUS_DATASOURCE_USERNAME=...
@@ -23,33 +20,27 @@ services:
       - TZ=America/Lima
 
   # --- 2. Servicio de Frontend (App Web) ---
-  # No se accede directamente, solo a través de caddy-proxy
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    image: morapack-frontend:latest
+    # Ya no usamos 'build:', ahora usamos 'image:'
+    image: ghcr.io/wolgank/morapack-frontend:latest
+    pull_policy: always
     container_name: morapack-frontend
     restart: unless-stopped
     networks:
       - morapack-net
     expose:
-      - 80 # El puerto interno del Caddy del frontend
+      - 80
 
   # --- 3. Reverse Proxy (Caddy Principal) ---
-  # Esta es la única puerta de entrada a tu aplicación
   caddy-proxy:
     image: caddy:2-alpine
     container_name: morapack-caddy-proxy
     restart: unless-stopped
     ports:
-      # Puertos públicos para HTTP y HTTPS
       - "80:80"
       - "443:443"
     volumes:
-      # Montamos el Caddyfile principal
       - ./Caddyfile:/etc/caddy/Caddyfile
-      # Volúmenes persistentes para los certificados SSL
       - caddy_data:/data
       - caddy_config:/config
     networks:
@@ -58,12 +49,10 @@ services:
       - backend
       - frontend
 
-# Red que usan los contenedores para comunicarse por nombre
 networks:
   morapack-net:
     driver: bridge
 
-# Volúmenes para que Caddy guarde los certificados y la config
 volumes:
   caddy_data:
   caddy_config:
