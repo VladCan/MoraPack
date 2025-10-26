@@ -1,0 +1,12 @@
+# Escucha en el puerto 80 (dentro del contenedor)
+:80 {
+    # Establece el directorio raíz donde están nuestros archivos
+    root * /srv
+    
+    # Habilita el servidor de archivos
+    file_server
+
+    # Redirige todas las peticiones no encontradas (las rutas de tu SPA)
+    # de vuelta a index.html
+    try_files {path} /index.html
+}
