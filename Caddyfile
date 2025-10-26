@@ -1,38 +1,30 @@
-# -------------------------------------------------
-# Caddyfile de Producción para MoraPack
-# -------------------------------------------------
-# Reemplaza la siguiente línea con tu dominio real
-# y cambia el email por uno tuyo (importante para Let's Encrypt)
-1inf54-981-3c.inf.pucp.edu.pe {
+# Activa la compresión para acelerar la carga
+encode zstd gzip
 
-    # Activa la compresión para acelerar la carga
-    encode zstd gzip
-
-    # --- 1. Enrutamiento de la API ---
-    #
-    # Todas las peticiones que empiecen con /api/...
-    # se redirigen al servicio 'backend' en el puerto 8080.
-    #
-    # IMPORTANTE: handle_path elimina el prefijo /api.
-    # Ejemplo: Petición a /api/usuarios
-    # Se redirige a -> backend:8080/usuarios
-    #
-    handle_path /api/* {
-        reverse_proxy backend:8080
-    }
-
-    # --- 2. Enrutamiento del Frontend ---
-    #
-    # Todas las demás peticiones (/*) se consideran
-    # parte del frontend.
-    #
-    handle {
-        # Se redirigen al servicio 'frontend' en el puerto 80
-        # (que es el Caddy interno del frontend)
-        reverse_proxy frontend:80
-    }
-
-    # Opcional: Configura tu email para los certificados
-    # Descomenta la línea de abajo y pon tu email
-    gutierrez.daniel@pucp.edu.pe
+# --- 1. Enrutamiento de la API ---
+#
+# Todas las peticiones que empiecen con /api/...
+# se redirigen al servicio 'backend' en el puerto 8080.
+#
+# IMPORTANTE: handle_path elimina el prefijo /api.
+# Ejemplo: Petición a /api/usuarios
+# Se redirige a -> backend:8080/usuarios
+#
+handle_path /api/* {
+    reverse_proxy backend:8080
 }
+
+# --- 2. Enrutamiento del Frontend ---
+#
+# Todas las demás peticiones (/*) se consideran
+# parte del frontend.
+#
+handle {
+    # Se redirigen al servicio 'frontend' en el puerto 80
+    # (que es el Caddy interno del frontend)
+    reverse_proxy frontend:80
+}
+
+# --- Configuración de Email para HTTPS (Let's Encrypt) ---
+# Esta es la línea corregida:
+tls gutierrez.daniel@pucp.edu.pe
