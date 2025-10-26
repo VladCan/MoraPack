@@ -1,0 +1,35 @@
+services:
+  # --- BACKEND ---
+  # Se accederá desde http://localhost:8080
+  backend:
+    build:
+      context: ./backend
+      dockerfile: src/main/docker/Dockerfile.native-micro
+    image: morapack-backend:latest
+    container_name: morapack-backend
+    restart: unless-stopped
+    ports:
+      # Expone el puerto 8080 del contenedor en el puerto 8080 de tu máquina
+      - "8080:8080"
+    networks:
+      - morapack-net
+  # --- FRONTEND ---
+  # Se accederá desde http://localhost:5000
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: morapack-frontend:latest
+    container_name: morapack-frontend
+    restart: unless-stopped
+    ports:
+      # Expone el puerto 80 del contenedor (de Caddy) en el puerto 5000 de tu máquina
+      - "5000:80"
+    networks:
+      - morapack-net
+    depends_on:
+      - backend
+networks:
+  morapack-net:
+    driver: bridge
+
