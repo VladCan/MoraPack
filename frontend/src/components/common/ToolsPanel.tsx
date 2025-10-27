@@ -22,6 +22,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { buildStartRunRequest } from "@/services/buildStartRunRequest";
+import { handleApi, postJson } from "@/services/api";
+import type { StartRunResponse } from "@/types/runs";
+import { useRunSession } from "@/lib/runSession";
 
 type NivelCarga = "disponible" | "limitado" | "saturado";
 
@@ -84,19 +88,50 @@ export default function ToolsPanel({
   const canApply =
     (showStart ? Boolean(inicio) : true) && (showEnd ? Boolean(fin) : true);
 
-  const handleApply = () => {
-    const payload: ApplyPayload = {
-      inicio: showStart ? inicio : undefined,
-      fin: showEnd ? fin : undefined,
-      niveles,
-      region,
-      ciudad,
-      vuelo,
-      almacen,
-      pedido,
-    };
-    onApply?.(payload);
-  };
+
+  const [loading, setLoading] = useState(false);
+  const {begin} = useRunSession();
+
+  const handleRun = async () => {
+    console.log("🚀 [ToolsPanel] Iniciando run...");
+    console.log("📅 [ToolsPanel] Fechas seleccionadas:", { inicio, fin });
+    console.log("📊 [ToolsPanel] Variant:", variant);
+    
+    setLoading(true);
+    try {
+      const req = buildStartRunRequest(variant, {inicio, fin});
+
+      console.log("📤 [ToolsPanel] Request construido:", req);
+      console.log("🌐 [ToolsPanel] API URL:", import.meta.env.VITE_API_BASE_URL);
+
+      const [data, error] = await handleApi(
+        postJson<StartRunResponse>("runs", req)
+      )
+
+      if (error) {
+        // aquí tu toast o UI de error
+        console.error("❌ [ToolsPanel] Error al iniciar la simulación:", error);
+        alert(`Error al iniciar simulación: ${error.message}`);
+      } else if (data) {
+        // éxito
+        console.log("✅ [ToolsPanel] Simulación iniciada exitosamente:", data);
+        
+        //Colocamos lo necesario en el hook
+        begin(data.runId);
+
+        //setShowContent(false); //opcional para cerrar el panel
+        //navigate("/simulacion"); 
+
+        console.log("🎯 [ToolsPanel] Run iniciado con ID:", data.runId);
+      }
+    } catch (err) {
+      console.error("💥 [ToolsPanel] Error inesperado:", err);
+    }
+    finally {
+      setLoading(false);
+    }
+
+  }
 
   const handleClear = () => {
     setInicio(undefined);
@@ -271,14 +306,19 @@ export default function ToolsPanel({
               <X className="h-4 w-4" /> Limpiar
             </button>
             <button
-              onClick={handleApply}
-              disabled={!canApply}
+              onClick={handleRun}
+              disabled={!canApply || loading}
               className={`px-3 py-2 text-sm rounded-full transition inline-flex items-center gap-1
-                ${canApply ? "bg-primary text-primary-foreground hover:brightness-95" : "bg-primary/50 text-primary-foreground/80 cursor-not-allowed"}
+                ${canApply && !loading ? "bg-primary text-primary-foreground hover:brightness-95" : "bg-primary/50 text-primary-foreground/80 cursor-not-allowed"}
               `}
-              title={canApply ? "Aplicar filtros" : "Selecciona el rango de fechas"}
+              title={
+                loading ? "Iniciando simulación..." : 
+                canApply ? "Aplicar filtros" : 
+                "Selecciona el rango de fechas"
+              }
             >
-              <Check className="h-4 w-4" /> Aplicar
+              <Check className="h-4 w-4" /> 
+              {loading ? "Iniciando..." : "Aplicar"}
             </button>
           </div>
         </div>

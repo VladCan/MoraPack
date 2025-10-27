@@ -215,7 +215,7 @@ const renderDropzoneFooter = (
               { duration: Infinity }
             )
             } />
-          <Dropzone label="Carga masiva de pedidos" onFiles={(fs) => handleFileUpload(fs[0], "pedidos/upload")} />
+          <Dropzone label="" onFiles={(fs) => handleFileUpload(fs[0], "pedidos/upload")} />
         </CardContent>
       </Card>
 
