@@ -20,7 +20,7 @@ public class VueloController {
     @ConfigProperty(name = "morapack.upload.dir")
     String uploadDir;
     private final String DIRECTORY = uploadDir;
-    private static final String FILENAME  = "planesDeVuelo.txt";
+    private static final String FILENAME  = "/planesDeVuelo.txt";
 
     // Endpoint para recibir el archivo y guardarlo
     @POST
