@@ -2,12 +2,10 @@ package pe.edu.pucp.morapack.airscheduler.api.controllers;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.MediaType;
-
-import java.io.BufferedReader;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.Buffer;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
@@ -19,8 +17,9 @@ import java.util.Map;
 
 @Path("/vuelos")
 public class VueloController {
-
-    private static final String DIRECTORY = "src/main/resources/";
+    @ConfigProperty(name = "morapack.upload.dir")
+    String uploadDir;
+    private final String DIRECTORY = uploadDir;
     private static final String FILENAME  = "planesDeVuelo.txt";
 
     // Endpoint para recibir el archivo y guardarlo
