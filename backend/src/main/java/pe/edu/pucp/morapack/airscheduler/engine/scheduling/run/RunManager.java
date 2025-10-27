@@ -284,7 +284,7 @@ public class RunManager {
                         
                         List<RepairOperator> reparadores = new ArrayList<>();
                         reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
-                        reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg, 50));
+                        reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
                         
                         ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto);
                         SolucionProgramacion solucionOptima = alns.ejecutar(seed);
