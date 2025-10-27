@@ -1,5 +1,5 @@
 package pe.edu.pucp.morapack.airscheduler.api.controllers;
-
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,13 +16,16 @@ import jakarta.ws.rs.core.Response;
 @Path("/pedidos")
 public class PedidosController {
     // Endpoint para recibir el archivo y guardarlo
+    @ConfigProperty(name = "morapack.upload.dir")
+    String uploadDir;
+
     @POST
     @Path("/upload")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     public Response uploadPedidos(
             @FormParam("file") InputStream fileInputStream) {
         // Directorio donde se guardará el archivo
-        String directory = "src/main/resources/";
+        String directory = uploadDir;
         File outputFile = new File(directory + "pedidos.txt");
 
         // Crear el archivo y escribir los datos

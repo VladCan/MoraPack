@@ -1,6 +1,3 @@
-version: '3.8'
-
-
 services:
   # --- 1. Servicio de Backend (API) ---
   backend:
@@ -18,6 +15,9 @@ services:
       # - QUARKUS_DATASOURCE_USERNAME=...
       # - QUARKUS_DATASOURCE_PASSWORD=...
       - TZ=America/Lima
+    volumes: # <--- CAMBIO AQUÍ (Sección nueva)
+      # Conecta el volumen 'morapack-data' a la ruta '/uploads' del contenedor
+      - morapack-data:/uploads
 
   # --- 2. Servicio de Frontend (App Web) ---
   frontend:
@@ -56,3 +56,4 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
+  morapack-data: # <--- CAMBIO AQUÍ (Línea nueva)

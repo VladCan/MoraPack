@@ -10,7 +10,6 @@ dist
 
 # Archivos de entorno (deben manejarse como secretos)
 .env
-.env.*
 
 # Logs y archivos del sistema
 npm-debug.log*

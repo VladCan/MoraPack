@@ -15,6 +15,9 @@ RUN bun install --frozen-lockfile
 # Copiamos el resto del código fuente del proyecto
 COPY . .
 
+# el archivo .env.production por defecto.
+RUN mv .env.prod .env.production
+
 # Corremos el script de build (usualmente "build" en package.json para Vite)
 # Esto generará la carpeta /app/dist
 RUN bun run build

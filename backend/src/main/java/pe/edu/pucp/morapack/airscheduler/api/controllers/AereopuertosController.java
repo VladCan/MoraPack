@@ -12,6 +12,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
@@ -30,12 +32,14 @@ import pe.edu.pucp.morapack.airscheduler.api.mapper.AeropuertoMapper;
 import pe.edu.pucp.morapack.airscheduler.api.service.AeropuertosService;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Aeropuerto;
 
+
 @Path("/aereopuertos")
 @RequestScoped
 @Produces(MediaType.APPLICATION_JSON)
 public class AereopuertosController {
-
-    private static final String DIRECTORY = "src/main/resources/";
+    @ConfigProperty(name = "morapack.upload.dir")
+    String uploadDir;
+    private final String DIRECTORY = uploadDir;
     private static final String FILENAME  = "aereopuertos.txt";
 
     @Inject
@@ -135,11 +139,11 @@ public class AereopuertosController {
     private java.nio.file.Path filePath(){
         return Paths.get(DIRECTORY, FILENAME);
     }
-
+/*
     private void ensureDirExists() throws IOException{
         Files.createDirectories(Paths.get(DIRECTORY));
     }
-
+ */
     private String lastModifiedIso(java.nio.file.Path p) throws IOException{
         FileTime ft = Files.getLastModifiedTime(p);
         return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ft.toInstant().atOffset(ZoneOffset.UTC));
