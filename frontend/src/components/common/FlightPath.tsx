@@ -102,6 +102,8 @@ interface FlightPathProps {
   progress: number; // 0..1
   pathColor?: string;
   planeColor?: string;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
 export default function FlightPath({
@@ -111,6 +113,8 @@ export default function FlightPath({
   progress,
   pathColor,
   planeColor,
+  onMouseEnter,
+  onMouseLeave,
 }: FlightPathProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -171,14 +175,20 @@ export default function FlightPath({
 
       {/* Avioncito */}
       <Marker longitude={planePos.lon} latitude={planePos.lat} anchor="center">
-        <PlaneIcon
-          className="w-3 h-3 transition-transform duration-300"
-          style={{
-            color: planeColorFinal,
-            transform: `rotate(${hdg + ROTATION_OFFSET}deg)`,
-            transformOrigin: "center center",
-          }}
-        />
+        <div
+          onMouseEnter={onMouseEnter}
+          onMouseLeave={onMouseLeave}
+          className="cursor-pointer"
+        >
+          <PlaneIcon
+            className="w-3 h-3 transition-transform duration-300"
+            style={{
+              color: planeColorFinal,
+              transform: `rotate(${hdg + ROTATION_OFFSET}deg)`,
+              transformOrigin: "center center",
+            }}
+          />
+        </div>
       </Marker>
     </>
   );
