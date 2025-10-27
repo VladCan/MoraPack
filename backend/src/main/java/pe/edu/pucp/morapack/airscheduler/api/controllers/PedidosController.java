@@ -26,7 +26,7 @@ public class PedidosController {
             @FormParam("file") InputStream fileInputStream) {
         // Directorio donde se guardará el archivo
         String directory = uploadDir;
-        File outputFile = new File(directory + "pedidos.txt");
+        File outputFile = new File(directory + "/pedidos.txt");
 
         // Crear el archivo y escribir los datos
         try {

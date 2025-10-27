@@ -40,7 +40,7 @@ public class AereopuertosController {
     @ConfigProperty(name = "morapack.upload.dir")
     String uploadDir;
     private final String DIRECTORY = uploadDir;
-    private static final String FILENAME  = "aereopuertos.txt";
+    private static final String FILENAME  = "/aereopuertos.txt";
 
     @Inject
     AeropuertosService service;
