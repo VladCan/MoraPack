@@ -13,75 +13,89 @@ public class RandomRemoval implements DestructionOperator {
 
     @Override
     public void destroy(SolucionProgramacion s, ALNS.Journal journal, Instant presenteUTC) {
-
-        //System.out.println("Destroying RandomRemoval " + presenteUTC);
-
-        Map<Integer, PlanPedido> planes = s.asMap();  // << usar asMap()
+        Map<Integer, PlanPedido> planes = s.asMap();
         List<Integer> pedidos = new ArrayList<>(planes.keySet());
-
         if (pedidos.isEmpty()) return;
 
-        int n = Math.max(1, pedidos.size() * porcentaje / 100); // al menos 1
-        //Collections.shuffle(pedidos, rnd); // evitar repetidos
+        // Mezclar para no “siempre lo mismo”
+        Collections.shuffle(pedidos, new Random());
 
-        for (int i = 0; i < n; i++) {
+        int n = Math.max(1, pedidos.size() * porcentaje / 100);
+
+        for (int i = 0; i < n && i < pedidos.size(); i++) {
             int id = pedidos.get(i);
             PlanPedido plan = planes.get(id);
-
             if (plan == null) continue;
 
-            boolean liberado = liberarRecursosDePlan(plan, presenteUTC, s, journal);
-            if (!liberado){
-                continue;
-            };
-            plan.limpiarTramos();
-            //System.out.println("Se removieron las rutas del pedido id:" + plan.getIdPedido());
-            continue;
+            List<RutaAsignada> rutas = plan.getRutas();
+            if (rutas == null || rutas.isEmpty()) continue;
+
+            List<RutaAsignada> keep = new ArrayList<>();
+            boolean cambio = false;
+
+            for (int rIdx = 0; rIdx < rutas.size(); rIdx++) {
+                RutaAsignada ruta = rutas.get(rIdx);
+                if (ruta.getTramos() == null || ruta.getTramos().isEmpty()) {
+                    // nada que liberar -> la dejamos
+                    keep.add(ruta);
+                    continue;
+                }
+
+                TramoAsignado primero = ruta.getTramos().get(0);
+                Instant salidaPrimero = primero.getVuelo().getSalidaUtc();
+
+                // Si YA despegó, no toques esa ruta (déjala)
+                if (!salidaPrimero.isAfter(presenteUTC)) {
+                    keep.add(ruta);
+                    continue;
+                }
+
+                // Esta ruta sí puede eliminarse -> liberar bodega y vuelos
+                liberarRuta(plan, ruta, journal, s);
+                cambio = true;
+            }
+
+            if (cambio) {
+                // Construimos un nuevo plan con solo las rutas que quedan
+                PlanPedido nuevo = PlanPedido.builder()
+                        .idPedido(plan.getIdPedido())
+                        .aeropuertoDestino(plan.getAeropuertoDestino())
+                        .creadoUtc(plan.getCreadoUtc())
+                        .demanda(plan.getDemanda())
+                        .rutas(keep)
+                        .build();
+                s.getPlanPorPedido().put(nuevo.getIdPedido(), nuevo);
+            }
         }
     }
 
-    public boolean liberarRecursosDePlan(PlanPedido plan, Instant presenteUTC, SolucionProgramacion s, ALNS.Journal journal){
-        List<RutaAsignada> rutas = plan.getRutas();
+    /** Libera SIMÉTRICAMENTE lo que fue reservado: origen, escalas y +2h final; y carga de vuelos. */
+    private void liberarRuta(PlanPedido plan, RutaAsignada ruta, ALNS.Journal journal, SolucionProgramacion s) {
+        int q = ruta.getCantidad();
+        List<TramoAsignado> tr = ruta.getTramos();
 
-        if (rutas == null || rutas.isEmpty()) return false;
+        for (int i = 0; i < tr.size(); i++) {
+            TramoAsignado t = tr.get(i);
+            VueloProgramadoId v = t.getVuelo();
 
-        for (RutaAsignada ruta : rutas) {
-            // 1) si no hay tramos, no hay nada que liberar en esta ruta
-            if (ruta.getTramos() == null || ruta.getTramos().isEmpty()) continue;
-
-            TramoAsignado primero = ruta.getTramos().get(0);
-            Instant salida = primero.getVuelo().getSalidaUtc();
-
-            //Toda la ruta ya despegó, confirmamos que no se destruye
-            if (!salida.isAfter(presenteUTC)) return false;
-
-            int q = ruta.getCantidad();
-
-            // 1) liberaramos las escalas
-            for (int i = 0; i < ruta.getTramos().size() - 1; i++){
-                TramoAsignado tPrev = ruta.getTramos().get(i);
-                TramoAsignado tNext = ruta.getTramos().get(i + 1);
-                String apEscala = tPrev.getVuelo().getDestino();
-                Instant arrPrev = tPrev.getVuelo().getLlegadaUtc();
-                Instant depNext = tNext.getVuelo().getSalidaUtc();
-
-                journal.liberar(apEscala, arrPrev, depNext, q);
+            // ORIGEN de este tramo: [creado o llegada_prev, salida)
+            Instant esperaIniOri = (i == 0) ? plan.getCreadoUtc() : tr.get(i - 1).getVuelo().getLlegadaUtc();
+            Instant esperaFinOri = v.getSalidaUtc();
+            if (esperaIniOri != null && esperaFinOri != null && !esperaFinOri.isBefore(esperaIniOri)) {
+                journal.liberar(v.getOrigen(), esperaIniOri, esperaFinOri, q);
             }
 
-            // 2) liberamos las 2h de espera en el destino final
-            TramoAsignado ultimo = ruta.getTramos().get(ruta.getTramos().size() - 1);
-            Instant llegadaFinal = ultimo.getVuelo().getLlegadaUtc();
-
-            journal.liberar(plan.getAeropuertoDestino(), llegadaFinal, llegadaFinal.plus(java.time.Duration.ofHours(2)), q);
-
-            // 3) liberamos los vuelos (tramos) de la ruta
-            for (TramoAsignado t : ruta.getTramos()) {
-                s.getCargaPorVuelo().asignar(t.getVuelo(), -q);
+            // ESCALA / DESTINO intermedio o final
+            Instant esperaIniDst = v.getLlegadaUtc();
+            Instant esperaFinDst = (i + 1 < tr.size())
+                    ? tr.get(i + 1).getVuelo().getSalidaUtc()
+                    : (esperaIniDst == null ? null : esperaIniDst.plus(java.time.Duration.ofHours(2)));
+            if (esperaIniDst != null && esperaFinDst != null && !esperaFinDst.isBefore(esperaIniDst)) {
+                journal.liberar(v.getDestino(), esperaIniDst, esperaFinDst, q);
             }
 
+            // VUELO (carga asignada)
+            s.getCargaPorVuelo().asignar(v, -q);
         }
-
-        return true;
     }
-
 }

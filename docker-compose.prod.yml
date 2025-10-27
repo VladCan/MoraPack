@@ -1,0 +1,59 @@
+services:
+  # --- 1. Servicio de Backend (API) ---
+  backend:
+    # Ya no usamos 'build:', ahora usamos 'image:' para jalar de GHCR
+    image: ghcr.io/wolgank/morapack-backend:latest
+    pull_policy: always # Opcional: asegura que siempre baje la última
+    container_name: morapack-backend
+    restart: unless-stopped
+    networks:
+      - morapack-net
+    expose:
+      - 8080
+    environment:
+      # - QUARKUS_DATASOURCE_JDBC_URL=...
+      # - QUARKUS_DATASOURCE_USERNAME=...
+      # - QUARKUS_DATASOURCE_PASSWORD=...
+      - TZ=America/Lima
+    volumes: # <--- CAMBIO AQUÍ (Sección nueva)
+      # Conecta el volumen 'morapack-data' a la ruta '/uploads' del contenedor
+      - morapack-data:/uploads
+
+  # --- 2. Servicio de Frontend (App Web) ---
+  frontend:
+    # Ya no usamos 'build:', ahora usamos 'image:'
+    image: ghcr.io/wolgank/morapack-frontend:latest
+    pull_policy: always
+    container_name: morapack-frontend
+    restart: unless-stopped
+    networks:
+      - morapack-net
+    expose:
+      - 80
+
+  # --- 3. Reverse Proxy (Caddy Principal) ---
+  caddy-proxy:
+    image: caddy:2-alpine
+    container_name: morapack-caddy-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - morapack-net
+    depends_on:
+      - backend
+      - frontend
+
+networks:
+  morapack-net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  morapack-data: # <--- CAMBIO AQUÍ (Línea nueva)

@@ -1,5 +1,8 @@
 package pe.edu.pucp.morapack.airscheduler.api.controllers;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
+@RegisterForReflection
 public class JsonResponse {
     public String status;
     public String message;

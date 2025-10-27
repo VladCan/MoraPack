@@ -388,7 +388,9 @@ public final class ImpresorSolucion {
                 sb.append(String.format(
                                 "Capacidades vuelos: %s  |  SLA llegada≤46h (todos): %s  |  SLA 48h (todos): %s%n%n",
                                 capOK ? "OK" : "FALLA", sla46OK ? "OK" : "FALLA", sla48OK ? "OK" : "FALLA"));
-
+                System.out.print(String.format("Demanda total: %,d  |  Asignado: %,d  (%.1f%%)%n",
+                                demandaTotal, asignadoTotal,
+                                (demandaTotal == 0 ? 100.0 : 100.0 * asignadoTotal / demandaTotal)));
                 // ───────────────────────────────────────────────────────────
                 // Encabezado PEDIDOS
                 // ───────────────────────────────────────────────────────────

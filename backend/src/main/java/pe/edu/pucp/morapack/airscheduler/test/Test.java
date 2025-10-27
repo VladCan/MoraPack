@@ -153,18 +153,19 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
 
             SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of(), ocupacionPorAeropuerto);
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
-            ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt",presenteUTC);
-            // VerificadorSLA.assertBasicos(seed, Duration.ofHours(46));
-            // solucionAnterior = seed;
+            //ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt",presenteUTC);
             // ALNS
             List<DestructionOperator> destructores = new ArrayList<>();
             destructores.add(new RandomRemoval(20));
             destructores.add(new WorstRemoval(20));
             List<RepairOperator> reparadores = new ArrayList<>();
             reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
-            reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg, 50));
+            reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
             ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC, ocupacionPorAeropuerto);
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
+            //SEQM    410
+            //48
+            //24x410=9840
             // System.out.println("ALNS");
             // ImpresorSolucion.imprimirEnArchivo(solucionOptima);
             ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
@@ -185,7 +186,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                         Locale.forLanguageTag("es-ES"))
                         .withZone(ZoneOffset.UTC).format(presenteUTC)));
 
-            VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46));
+            VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46),mapa);
         }
         System.out.println("─────────────────────────────────────────────");
         System.out.println("📄 Reporte de simulación guardado en: out/reporteSimulacion.txt");

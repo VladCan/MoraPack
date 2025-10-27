@@ -1,0 +1,18 @@
+# Dependencias locales (no las necesitamos en el contenedor)
+node_modules
+
+# Archivos de build locales (los generaremos dentro de Docker)
+dist
+
+# Git
+.git
+.gitignore
+
+# Archivos de entorno (deben manejarse como secretos)
+.env
+
+# Logs y archivos del sistema
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
