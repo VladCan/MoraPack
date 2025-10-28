@@ -43,10 +43,10 @@ export default function TopNav() {
   //Esto es para la conexión SSE de la solución
 
   //Traemos el contexto
-  const { runId, status, begin, end, setSimNow, setWindow } = useRunSession();
+  const { runId, status, end, setSimNow, setWindow } = useRunSession();
   
   //Acá expone connect(url, handlers) -> () => void
-  const { connected, simNowUtc, windows, finished, error } = useRunSSE(
+  const { simNowUtc, windows, finished } = useRunSSE(
     status === "running" && runId ? runId : undefined
   );
 
