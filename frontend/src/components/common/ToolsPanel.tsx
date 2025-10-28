@@ -51,7 +51,6 @@ const GLASS_SOFT =
   "bg-card/70 supports-[backdrop-filter]:bg-card/40";
 
 export default function ToolsPanel({
-  onApply,
   variant = "simulacion",
 }: {
   onApply?: (filters: ApplyPayload) => void;
