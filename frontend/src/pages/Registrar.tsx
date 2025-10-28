@@ -87,7 +87,7 @@ const onUpload = async (file: File, kind: "vuelos" | "aereopuertos" | "cancelaci
     if (!ok) return;
   }
 
-  const [data, error] = await uploadFile(`/${kind}/upload`, file);
+  const [data, error] = await uploadFile(`${kind}/upload`, file);
   if (data){
     //Refrescamos 
     qc.invalidateQueries({queryKey: ["status", kind]})

@@ -39,7 +39,6 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Aeropuerto;
 public class AereopuertosController {
     @ConfigProperty(name = "morapack.upload.dir")
     String uploadDir;
-    private final String DIRECTORY = uploadDir;
     private static final String FILENAME  = "/aereopuertos.txt";
 
     @Inject
@@ -51,7 +50,7 @@ public class AereopuertosController {
     public Response uploadPedidos(
             @FormParam("file") InputStream fileInputStream) {
         // Directorio donde se guardará el archivo
-        File outputFile = new File(DIRECTORY + FILENAME);
+        File outputFile = new File(uploadDir + FILENAME);
 
         // Crear el archivo y escribir los datos
         try {
@@ -71,7 +70,7 @@ public class AereopuertosController {
     @Produces(MediaType.APPLICATION_JSON)
     public Response getStatus() {
         /// Hay que poner java.nio.file.Path para que no se confunda con el Path de Jakarta (There's no other way)
-        java.nio.file.Path p = java.nio.file.Paths.get("src/main/resources/aereopuertos.txt");
+        java.nio.file.Path p = java.nio.file.Paths.get(uploadDir + FILENAME);
         boolean exists = Files.exists(p);
 
         Map<String, Object> body  = new HashMap<>();
@@ -137,7 +136,7 @@ public class AereopuertosController {
 
     /// Privados para rutas:
     private java.nio.file.Path filePath(){
-        return Paths.get(DIRECTORY, FILENAME);
+        return Paths.get(uploadDir + FILENAME);
     }
 /*
     private void ensureDirExists() throws IOException{
