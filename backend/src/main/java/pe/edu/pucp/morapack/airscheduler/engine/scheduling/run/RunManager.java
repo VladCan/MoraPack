@@ -204,7 +204,7 @@ public class RunManager {
 
                 System.out.println("En esta iteración, wStart es: " + wStart + ", wEnd es: " + wEnd);
                 System.out.println("Voy a entrar al bucle, mi id es:" + id);
-
+                pedidosCargados.normalizarUtc(aeropuertosMap);
                 while (!cancelled.get(id).get() && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
                     /// Revisar esto:
                     // Pausa cooperativa entre ventanas
