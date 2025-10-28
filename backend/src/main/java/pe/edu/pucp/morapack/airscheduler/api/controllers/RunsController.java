@@ -1,5 +1,6 @@
 package pe.edu.pucp.morapack.airscheduler.api.controllers;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -40,7 +41,7 @@ public class RunsController {
             public String fileId; // requerido si type == "FILE"
         }
     }
-
+    @RegisterForReflection
     public static final class StartRunResponse {
         public String runId;
         public String status; // "STARTED"
