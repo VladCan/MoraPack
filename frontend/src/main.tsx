@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from './components/ui/theme-provider.tsx';
 
 // Crea un único QueryClient para toda la app
+console.log(import.meta.env.VITE_API_BASE_URL)
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
