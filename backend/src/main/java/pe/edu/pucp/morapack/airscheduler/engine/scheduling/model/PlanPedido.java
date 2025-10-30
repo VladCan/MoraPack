@@ -48,7 +48,10 @@ public class PlanPedido {
         return (rutas == null) ? 0 : rutas.stream().mapToInt(RutaAsignada::getCantidad).sum();
     }
 
-
+    /** Cuanto falta asignar en alguna ruta para dicho PlanPedido */
+    public int demandaRestante() {
+        return Math.max(0, demanda - totalAsignado());
+    }
 
     /** ¿El pedido está completo? */
     public boolean estaCompleto() {
