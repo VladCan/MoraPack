@@ -9,10 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Dropzone } from "@/components/common/Dropzone";
-import { downloadFile, getJson, getText, postJson } from "@/services/api";
+import { downloadFile, getJson, getText, handleApi, postJson, type ApiError } from "@/services/api";
 import { uploadFile } from "@/services/fileUpload";
 import toast from "react-hot-toast";
 import ToastCustom from "@/components/common/ToastCustom";
+import { airportsMap } from "@/types/airportsMap";
+import { buildPedidoRequest } from "@/services/buildPedidoRequest";
+import type { PedidoResponse } from "@/types/pedidos";
 
 /**Esto es para mostrar la información del archivo al cargarlo (nombre, peso, etc.)**/
 type Status = {
@@ -49,7 +52,7 @@ type FormValues = z.infer<typeof schema>;
 const resolver = zodResolver(schema) as Resolver<FormValues>;
 export default function Registrar() {
 
-  console.log("🧠 Componente Registrar montado");
+  //console.log("🧠 Componente Registrar montado");
 
   const qc = useQueryClient();
 
@@ -167,34 +170,62 @@ const renderDropzoneFooter = (
 
   const form = useForm<FormValues>({
     resolver,
-    defaultValues: { clienteId: "", aeropuerto: "LIM", cantidad: 1 },
+    defaultValues: { clienteId: "", aeropuerto: "SPIM", cantidad: 1 },
     mode: "onTouched",
   });
 
   const createPedido = useMutation({
-    mutationFn: (v: FormValues) => postJson("/pedidos", v),
-    onSuccess: (message) => {
+    mutationFn: async (v: FormValues) => {
+      const req = buildPedidoRequest({
+        clienteId: v.clienteId,
+        aeropuerto: v.aeropuerto,
+        cantidad: v.cantidad,
+      });
+
+      const [data, error] = await handleApi(
+        postJson<PedidoResponse>("pedidos/crear", req)
+      );
+
+      console.log(data);
+
+      if (error){
+        //Si hubo error, vamos directamente al onError de más abajo
+        throw error;
+      }
+
+      //Si todo salió bien, esto llegará como 'data' al onSuccess de abajo
+      return data!;
+
+
+    },
+    
+    onSuccess: (data) => {
       toast.custom((t) => (
         <ToastCustom
           t={t}
-          message={message+"✅"}
+          message={data.message +"✅"}
           type="success"
         />),
-      { duration: Infinity });
-      form.reset({ clienteId: "", aeropuerto: "LIM", cantidad: 1 });
+      { duration: 5000});
+      form.reset({ clienteId: "", aeropuerto: "SPIM", cantidad: 1 });
     },
-    onError: (error) => {
+    onError: (err: ApiError | Error) => {
+      const msg =
+        (err as ApiError)?.message ??
+        (err as Error)?.message ??
+      "Ocurrió un error.";
+
       toast.custom((t) => (
         <ToastCustom
           t={t}
-          message={error+"❗"}
+          message={msg+"❗"}
           type="error"
         />),
-      { duration: Infinity });
+      { duration: 5000});
     },
   });
 
-  console.log("Hola")
+  //console.log("Hola")
 
   return (
     <div className="mx-auto max-w-6xl px-4 pt-26 grid gap-6 md:grid-cols-2">
@@ -259,8 +290,11 @@ const renderDropzoneFooter = (
                         <SelectValue placeholder="Selecciona" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="LIM">LIM – Lima</SelectItem>
-                        <SelectItem value="MAD">MAD – Madrid</SelectItem>
+                        {airportsMap.map((a) => (
+                          <SelectItem key={a.codigo} value={a.codigo}>
+                            {a.codigo} – {a.ciudad} ({a.pais})
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
