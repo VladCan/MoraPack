@@ -9,6 +9,10 @@ import java.nio.file.StandardCopyOption;
 
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import pe.edu.pucp.morapack.airscheduler.api.mapper.PedidoMapper;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
+
+import static org.hibernate.internal.util.StringHelper.isBlank;
 
 @Path("/pedidos")
 public class PedidosController {
@@ -45,16 +49,30 @@ public class PedidosController {
         }
     }
 
+    //Dado que la creación de un pedido sí o sí está conectada solamente a la operación diaria, podemos llamar
+    //a runManager dentro del método
     @POST
     @Path("/crear")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response crearPedido(PedidoRequest request) {
-        try{
-            int idGenerado = (int) (Math.random() * 1000) + 1;
+        try {
+            //int idGenerado = (int) (Math.random() * 1000) + 1;
 
-            String msg = "Pedido del cliente (" + request.idCliente +") con destino " +
-                    "a " + request.destino + " creado correctamente con id " + idGenerado + "a las " + request.fecha;
+            //Primero, validamos
+            if (request == null) return bad("Body requerido");
+            if (isBlank(String.valueOf(request.idCliente))) return bad("scenario es requerido");
+            if (isBlank(request.destino)) return bad("scenario es requerido");
+            if (isBlank(request.fecha)) return bad("scenario es requerido");
+            if (isBlank(String.valueOf(request.cantidad))) return bad("scenario es requerido");
+
+            //Si todo0 ok, convertimos a pedido
+            Pedido pedido = PedidoMapper.toPedido(request);
+            int idGenerado = pedido.getIdPedido();
+
+
+            String msg = "Pedido del cliente (" + request.idCliente + ") con destino " +
+                    "a " + request.destino + " creado correctamente con id " + idGenerado + " a las " + request.fecha;
 
             return Response
                     .ok(new JsonResponse("success", msg, null))
@@ -68,6 +86,11 @@ public class PedidosController {
         }
     }
 
+    private static boolean isBlank(String s) { return s == null || s.isEmpty(); }
+    private static Response bad(String msg) {
+        return Response.status(Response.Status.BAD_REQUEST).entity(new PedidosController.ErrorDTO(msg)).build();
+    }
     private static final class ErrorDTO { public final String message; ErrorDTO(String m){ this.message = m; } }
+
 
 }
