@@ -1,4 +1,5 @@
 package pe.edu.pucp.morapack.airscheduler.api.controllers;
+import jakarta.ws.rs.*;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.File;
 import java.io.IOException;
@@ -6,10 +7,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.FormParam;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
@@ -18,6 +15,13 @@ public class PedidosController {
     // Endpoint para recibir el archivo y guardarlo
     @ConfigProperty(name = "morapack.upload.dir")
     String uploadDir;
+
+    public static final class PedidoRequest{
+        public Integer idCliente;
+        public String destino;
+        public String fecha;
+        public Integer cantidad;
+    }
 
     @POST
     @Path("/upload")
@@ -40,4 +44,30 @@ public class PedidosController {
                     .build();
         }
     }
+
+    @POST
+    @Path("/crear")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response crearPedido(PedidoRequest request) {
+        try{
+            int idGenerado = (int) (Math.random() * 1000) + 1;
+
+            String msg = "Pedido del cliente (" + request.idCliente +") con destino " +
+                    "a " + request.destino + " creado correctamente con id " + idGenerado + "a las " + request.fecha;
+
+            return Response
+                    .ok(new JsonResponse("success", msg, null))
+                    .build();
+        }
+        catch(Exception e){
+            return Response
+                    .status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(new JsonResponse("error", "Error al crear pedido: " + e.getMessage(), null))
+                    .build();
+        }
+    }
+
+    private static final class ErrorDTO { public final String message; ErrorDTO(String m){ this.message = m; } }
+
 }
