@@ -26,6 +26,8 @@ import { buildStartRunRequest } from "@/services/buildStartRunRequest";
 import { handleApi, postJson } from "@/services/api";
 import type { StartRunResponse } from "@/types/runs";
 import { useRunSession } from "@/lib/runSession";
+import toast from "react-hot-toast";
+import ToastCustom from "@/components/common/ToastCustom";
 
 type NivelCarga = "disponible" | "limitado" | "saturado";
 
@@ -110,10 +112,25 @@ export default function ToolsPanel({
       if (error) {
         // aquí tu toast o UI de error
         console.error("❌ [ToolsPanel] Error al iniciar la simulación:", error);
-        alert(`Error al iniciar simulación: ${error.message}`);
+        //alert(`Error al iniciar simulación: ${error.message}`);
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={error+"❗"}
+            type="error"
+          />),
+        { duration: 5000});
+
       } else if (data) {
         // éxito
         console.log("✅ [ToolsPanel] Simulación iniciada exitosamente:", data);
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={"¡Simulación iniciada exitosamente!"+"✅"}
+            type="success"
+          />),
+        { duration: 5000});
         
         //Colocamos lo necesario en el hook
         begin(data.runId);
