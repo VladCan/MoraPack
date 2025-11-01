@@ -1,5 +1,5 @@
 export type PedidoResponse = {
-  filePath?: null
+  runId: string;
   message: string;
   status: "success" | "error"
 }
