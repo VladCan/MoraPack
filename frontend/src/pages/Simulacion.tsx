@@ -87,10 +87,21 @@ export default function Simulacion() {
     const now = new Date(simNowUtc).getTime();
     const allFlights: FlightForRender[] = [];
 
-    // ⚠️ IMPORTANTE: Solo procesar la ventana más reciente para evitar duplicados
-    const latestWindow = windows[windows.length - 1];
+    // Crear un Set para evitar duplicados (mismo vuelo en múltiples ventanas)
+    const vuelosUnicos = new Map<string, typeof windows[0]['vuelos'][0]>();
 
-    latestWindow.vuelos.forEach(vuelo => {
+    // Acumular vuelos de TODAS las ventanas para tener el panorama completo
+    windows.forEach(window => {
+      window.vuelos.forEach(vuelo => {
+        // Solo agregar si no existe o si queremos actualizar con info más reciente
+        if (!vuelosUnicos.has(vuelo.id)) {
+          vuelosUnicos.set(vuelo.id, vuelo);
+        }
+      });
+    });
+
+    // Ahora procesamos todos los vuelos únicos
+    vuelosUnicos.forEach(vuelo => {
         const origen = airportsMap.get(vuelo.origen);
         const destino = airportsMap.get(vuelo.destino);
 

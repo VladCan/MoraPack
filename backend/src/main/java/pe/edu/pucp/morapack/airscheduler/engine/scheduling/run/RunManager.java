@@ -332,7 +332,19 @@ public class RunManager {
             System.out.println("[RunManager] Procesando ventana " + idx + ": " + wStart + " - " + wEnd);
 
             try {
-                // 1. Obtener pedidos de la ventana actual
+                // 1. Preparar estado anterior si existe
+                SolucionProgramacion solucionAnterior = solucionesAnteriores.get(id);
+                Map<String, List<ArriboExogeno>> enVuelo = Map.of();
+                List<OcupacionAlmacen> reservas = List.of();
+
+                // Actualizar pedidos: eliminar completados y ajustar cantidades de los en progreso
+                if (solucionAnterior != null) {
+                    pedidosCargados.eliminarYActualizarCumplidosHasta(wStart, solucionAnterior);
+                    enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior, wStart);
+                    reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior, wStart, Duration.ofHours(2));
+                }
+
+                // 2. Obtener pedidos de la ventana actual (ya actualizados)
                 VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wEnd);
                 List<Pedido> pedidosVentana = ventana.pedidos();
 
@@ -347,16 +359,6 @@ public class RunManager {
                     wStart = wEnd;
                     wEnd = wEnd.plus(config.horasVentana());
                     continue;
-                }
-
-                // 2. Preparar estado anterior si existe
-                SolucionProgramacion solucionAnterior = solucionesAnteriores.get(id);
-                Map<String, List<ArriboExogeno>> enVuelo = Map.of();
-                List<OcupacionAlmacen> reservas = List.of();
-
-                if (solucionAnterior != null) {
-                    enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior, wStart);
-                    reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior, wStart, Duration.ofHours(2));
                 }
 
                 // 3. Construir TEG para la ventana
