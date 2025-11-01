@@ -57,7 +57,7 @@ public class RunConfig {
     /** Acá implementamos 3 factories, donde cada uno representa los parámetros de cada operación **/
 
     public static RunConfig operacion(Set<String> sedes) {
-        return operacion(sedes, Duration.ofHours(2));
+        return operacion(sedes, Duration.ofHours(1));
     }
     
     public static RunConfig operacion(Set<String> sedes, Duration windowSize) {
@@ -66,7 +66,7 @@ public class RunConfig {
                 Instant.now(),
                 null,
                 windowSize,
-                Duration.ofHours(48),
+                Duration.ofHours(24),
                 sedes,
                 System.nanoTime(),
                 Duration.ofSeconds(60)
