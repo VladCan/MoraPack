@@ -1,4 +1,5 @@
 package pe.edu.pucp.morapack.airscheduler.api.controllers;
+import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import java.io.File;
@@ -11,6 +12,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import pe.edu.pucp.morapack.airscheduler.api.mapper.PedidoMapper;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 
 import static org.hibernate.internal.util.StringHelper.isBlank;
 
@@ -19,6 +21,8 @@ public class PedidosController {
     // Endpoint para recibir el archivo y guardarlo
     @ConfigProperty(name = "morapack.upload.dir")
     String uploadDir;
+    @Inject
+    RunManager runManager;
 
     public static final class PedidoRequest{
         public Integer idCliente;
@@ -70,12 +74,18 @@ public class PedidosController {
             Pedido pedido = PedidoMapper.toPedido(request);
             int idGenerado = pedido.getIdPedido();
 
-
             String msg = "Pedido del cliente (" + request.idCliente + ") con destino " +
                     "a " + request.destino + " creado correctamente con id " + idGenerado + " a las " + request.fecha;
 
+            //Ahora vamos a ver si hay un run de OperaciónDiaria activo.
+            //Si existe, devuelve el runId. Caso contrario, lo crea y lo devuelve.
+            String runId = runManager.ensureOperacionStarted();
+
+            //Ahora, encolamos el pedido
+            runManager.pushOrder(runId, pedido);
+
             return Response
-                    .ok(new JsonResponse("success", msg, null))
+                    .ok(new PedidoResponse("success", msg, runId))
                     .build();
         }
         catch(Exception e){
