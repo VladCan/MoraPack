@@ -68,7 +68,7 @@ public class RunManager {
 
         System.out.printf(
                 "[RunManager] Pedido agregado a cola (runId=%s). Tamaño actual: %d%n",
-                runId, queues.entrySet().size()
+                runId, queue.size()
         );
     }
 
@@ -304,7 +304,6 @@ public class RunManager {
         System.out.println("En esta iteración, wStart es: " + wStart + ", wEnd es: " + wEnd);
         System.out.println("Voy a entrar al bucle, mi id es:" + id);
 
-        pedidosCargados.normalizarUtc(aeropuertosMap);
         while (!cancelled.get(id).get() && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
             /// Revisar esto:
             // Pausa cooperativa entre ventanas
@@ -452,6 +451,7 @@ public class RunManager {
             wStart = wEnd;
             wEnd   = wEnd.plus(config.horasVentana());
         }
+
 
     }
 
