@@ -192,8 +192,31 @@ public class RunManager {
         //Acá calculamos la velocidad en segundos simulados por segundo real
         long simDeltaMs = (long) Math.floor(deltaMs * ctx.speed());
 
-        //Retornamos el ahora simulado
-        return ctx.simStartUtc().plusMillis(simDeltaMs);
+        // Retornamos el ahora simulado
+        Instant simulatedNow = ctx.simStartUtc().plusMillis(simDeltaMs);
+        
+        // Limitar el simNow al final de la última llegada de vuelo
+        SolucionProgramacion ultimaSolucion = solucionesAnteriores.get(runId);
+        if (ultimaSolucion != null) {
+            Instant ultimaLlegada = obtenerUltimaLlegada(ultimaSolucion);
+            if (ultimaLlegada != null && simulatedNow.isAfter(ultimaLlegada)) {
+                return ultimaLlegada;
+            }
+        }
+        
+        return simulatedNow;
+    }
+    
+    private Instant obtenerUltimaLlegada(SolucionProgramacion solucion) {
+        if (solucion == null || solucion.getCargaPorVuelo() == null) {
+            return null;
+        }
+        
+        return solucion.getCargaPorVuelo().getAsignado().keySet().stream()
+                .map(VueloProgramadoId::getLlegadaUtc)
+                .filter(Objects::nonNull)
+                .max(Instant::compareTo)
+                .orElse(null);
     }
 
     /** Obtiene el contexto o lanza un error claro si no existe. */
@@ -301,8 +324,8 @@ public class RunManager {
         Instant wEnd = wStart.plus(config.horasVentana());
         int idx = 0;
 
-        System.out.println("En esta iteración, wStart es: " + wStart + ", wEnd es: " + wEnd);
-        System.out.println("Voy a entrar al bucle, mi id es:" + id);
+        System.out.println("[RunManager] Config: fechaInicio=" + config.fechaInicio() + ", fechaFin=" + config.fechaFin());
+        System.out.println("[RunManager] Ventana inicial: wStart=" + wStart + ", wEnd=" + wEnd);
 
         while (!cancelled.get(id).get() && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
             /// Revisar esto:
@@ -339,7 +362,11 @@ public class RunManager {
 
                 // Actualizar pedidos: eliminar completados y ajustar cantidades de los en progreso
                 if (solucionAnterior != null) {
+                    System.out.println("[RunManager] Antes de eliminarYActualizarCumplidosHasta: " + 
+                        pedidosCargados.getLista().size() + " pedidos en cola");
                     pedidosCargados.eliminarYActualizarCumplidosHasta(wStart, solucionAnterior);
+                    System.out.println("[RunManager] Después de eliminarYActualizarCumplidosHasta: " + 
+                        pedidosCargados.getLista().size() + " pedidos en cola");
                     enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior, wStart);
                     reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior, wStart, Duration.ofHours(2));
                 }
@@ -394,7 +421,13 @@ public class RunManager {
                 solucionesAnteriores.put(id, solucionOptima);
 
                 // 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
-                List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStart, wEnd);
+                final Instant wStartFinal = wStart;
+                final Instant wEndFinal = wEnd;
+                
+                List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStartFinal, wEndFinal);
+                
+                // IMPORTANTE: Enviar TODOS los pedidos procesados (incluye parciales de ventanas anteriores)
+                // para que el frontend vea el estado actualizado de cada pedido
                 List<Object> pedidosVentanaDTO = convertirPedidosADTO(pedidosVentana, solucionOptima);
 
                 // 8. Marcar ventana como enviada y hacer broadcast
