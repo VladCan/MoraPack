@@ -16,6 +16,7 @@ import ToastCustom from "@/components/common/ToastCustom";
 import { airportsMap } from "@/types/airportsMap";
 import { buildPedidoRequest } from "@/services/buildPedidoRequest";
 import type { PedidoResponse } from "@/types/pedidos";
+import { useRunSession } from "@/lib/runSession";
 
 /**Esto es para mostrar la información del archivo al cargarlo (nombre, peso, etc.)**/
 type Status = {
@@ -174,6 +175,8 @@ const renderDropzoneFooter = (
     mode: "onTouched",
   });
 
+  const {begin} = useRunSession();
+
   const createPedido = useMutation({
     mutationFn: async (v: FormValues) => {
       const req = buildPedidoRequest({
@@ -208,6 +211,15 @@ const renderDropzoneFooter = (
         />),
       { duration: 5000});
       form.reset({ clienteId: "", aeropuerto: "SPIM", cantidad: 1 });
+
+      //Colocamos lo necesario en el hook
+      begin(data.runId);
+
+      //setShowContent(false); //opcional para cerrar el panel
+      //navigate("/simulacion"); 
+
+      console.log("🎯 [Registrar] Run iniciado con ID:", data.runId);
+
     },
     onError: (err: ApiError | Error) => {
       const msg =
