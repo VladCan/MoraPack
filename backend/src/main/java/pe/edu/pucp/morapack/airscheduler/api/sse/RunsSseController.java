@@ -68,7 +68,7 @@ public class RunsSseController {
                 @Override
                 public void onFinished(String id, StopReason reason) {
                     emitter.emit(new FinishedEvt(id, reason.name()));
-                    emitter.complete(); // cerramos el SSE
+                    // NO cerramos el SSE aquí: los vuelos deben continuar hasta llegar
                 }
             };
             // Suscribimos al run
