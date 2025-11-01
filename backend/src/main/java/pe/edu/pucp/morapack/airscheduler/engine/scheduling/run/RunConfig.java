@@ -19,6 +19,7 @@ public class RunConfig {
     private final Duration horizon;
     /// Nota: podemos considerar eliminar sedes y que sean fijas en el algoritmo a ejecutarse.
     private final Set<String> sedes;
+    private final double speed;
 
     // Parámetros opcionales
     private final long seedRandom;
@@ -32,7 +33,8 @@ public class RunConfig {
             Duration horizon,
             Set<String> sedes,
             long seedRandom,
-            Duration maxTiempoALNS
+            Duration maxTiempoALNS,
+            double speed
     ) {
         this.scenario = scenario;
         this.fechaInicio = fechaInicio;
@@ -42,6 +44,7 @@ public class RunConfig {
         this.sedes = sedes;
         this.seedRandom = seedRandom;
         this.maxTiempoALNS = maxTiempoALNS;
+        this.speed = speed;
     }
 
     /** Getters **/
@@ -53,9 +56,11 @@ public class RunConfig {
     public Set<String> sedes() { return sedes; }
     public long seedRandom() { return seedRandom; }
     public Duration maxTiempoALNS() { return maxTiempoALNS; }
+    public double speed() { return speed; }
 
     /** Acá implementamos 3 factories, donde cada uno representa los parámetros de cada operación **/
 
+    /// Estamos usando horas, deberían ser minutos.
     public static RunConfig operacion(Set<String> sedes) {
         return operacion(sedes, Duration.ofHours(1));
     }
@@ -69,7 +74,8 @@ public class RunConfig {
                 Duration.ofHours(24),
                 sedes,
                 System.nanoTime(),
-                Duration.ofSeconds(60)
+                Duration.ofSeconds(60),
+                1
         );
     }
 
@@ -86,7 +92,8 @@ public class RunConfig {
                 Duration.ofHours(48),
                 sedes,
                 System.nanoTime(),
-                Duration.ofSeconds(60)
+                Duration.ofSeconds(60),
+                144
         );
     }
 
@@ -103,7 +110,8 @@ public class RunConfig {
                 Duration.ofHours(48),
                 sedes,
                 System.nanoTime(),
-                Duration.ofSeconds(60)
+                Duration.ofSeconds(60),
+                144
         );
     }
 

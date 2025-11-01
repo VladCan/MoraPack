@@ -37,7 +37,7 @@ public class RunContext {
         this.ventanaIndex = 0L;
         this.simStartUtc = config.fechaInicio();
         this.wallAnchor = Instant.now();
-        this.speed = 144;
+        this.speed = config.speed();
     }
 
     /** Getters **/
