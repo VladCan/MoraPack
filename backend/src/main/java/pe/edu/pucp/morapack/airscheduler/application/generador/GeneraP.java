@@ -249,6 +249,6 @@ public class GeneraP {
         } catch (IOException e) {
             throw new RuntimeException("No pude crear carpeta: " + out, e);
         }
-        generarArchivo(out, 5000, 1168);
+        generarArchivo(out, 10000, 8760);
     }
 }
