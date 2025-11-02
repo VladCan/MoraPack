@@ -216,6 +216,28 @@ export default function Simulacion() {
               <p className="font-semibold text-lg">{activeAirportData.disponible} uds</p>
             </div>
 
+            {/* Eventos en tiempo real */}
+            {(activeAirportData.cargaLlegando !== undefined && activeAirportData.cargaLlegando > 0) ||
+             (activeAirportData.cargaSaliendo !== undefined && activeAirportData.cargaSaliendo > 0) ? (
+              <div className="border-t border-border pt-3 mt-3">
+                <p className="text-xs font-semibold mb-2 text-muted-foreground">En este momento</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {activeAirportData.cargaLlegando !== undefined && activeAirportData.cargaLlegando > 0 && (
+                    <div className="bg-green-500/10 rounded p-2 border border-green-500/20">
+                      <p className="text-green-600 dark:text-green-400 font-semibold">Llegando</p>
+                      <p className="text-sm font-bold text-green-700 dark:text-green-300">+{activeAirportData.cargaLlegando} uds</p>
+                    </div>
+                  )}
+                  {activeAirportData.cargaSaliendo !== undefined && activeAirportData.cargaSaliendo > 0 && (
+                    <div className="bg-orange-500/10 rounded p-2 border border-orange-500/20">
+                      <p className="text-orange-600 dark:text-orange-400 font-semibold">Saliendo</p>
+                      <p className="text-sm font-bold text-orange-700 dark:text-orange-300">-{activeAirportData.cargaSaliendo} uds</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
             {/* Estadísticas futuras (24h) */}
             {activeAirportData.estadisticasFuturas && (
               <div className="border-t border-border pt-3 mt-3">
