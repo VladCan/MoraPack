@@ -591,8 +591,116 @@ public class RunManager {
         return new Status(id.value(), st, 0);
     }
 
+    /**
+     * Calcula la ocupación actual de todos los aeropuertos para un run específico
+     */
+    public Map<String, Map<String, Object>> getCurrentAirportOccupancy(String runId) {
+        Map<String, Map<String, Object>> result = new HashMap<>();
+        
+        if (aeropuertosMap == null || aeropuertosMap.size() == 0) {
+            return result;
+        }
+        
+        // Obtener ocupación por aeropuerto para este run
+        OcupacionPorAeropuerto ocupacion = ocupacionesPorRun.get(runId);
+        if (ocupacion == null) {
+            System.out.println("[RunManager.getCurrentAirportOccupancy] Ocupacion null para runId: " + runId);
+            return result;
+        }
+        
+        // Obtener el tiempo simulado actual
+        Instant simNow = currentSimNow(runId);
+        
+        // Iterar sobre todos los aeropuertos
+        for (String codigo : aeropuertosMap.keys()) {
+            try {
+                int ocupacionActual = ocupacion.ocupacion(codigo, simNow);
+                int capacidadTotal = aeropuertosMap.getCapBodega(codigo);
+                int disponible = ocupacionActual < capacidadTotal ? capacidadTotal - ocupacionActual : 0;
+                double porcentaje = capacidadTotal > 0 ? (double) ocupacionActual / capacidadTotal : 0.0;
+                
+                // Calcular estadísticas de vuelos futuros (próximas 24 horas)
+                Instant simNow24h = simNow.plus(24, java.time.temporal.ChronoUnit.HOURS);
+                Map<String, Object> estadisticasFuturas = calcularEstadisticasFuturas(runId, codigo, simNow, simNow24h);
+                
+                Map<String, Object> airportData = new HashMap<>();
+                airportData.put("ocupacionActual", ocupacionActual);
+                airportData.put("capacidadTotal", capacidadTotal);
+                airportData.put("disponible", disponible);
+                airportData.put("porcentaje", porcentaje);
+                airportData.put("estadisticasFuturas", estadisticasFuturas);
+                
+                result.put(codigo, airportData);
+            } catch (Exception e) {
+                // Ignorar errores individuales de aeropuertos
+                System.err.println("[RunManager] Error calculando ocupación para " + codigo + ": " + e.getMessage());
+            }
+        }
+        
+        return result;
+    }
+
     private static void sleepQuietly(Duration d) {
         try { Thread.sleep(d.toMillis()); } catch (InterruptedException ignored) {}
+    }
+    
+    /**
+     * Calcula estadísticas de vuelos futuros para un aeropuerto específico
+     */
+    private Map<String, Object> calcularEstadisticasFuturas(String runId, String codigoAeropuerto, Instant simNow, Instant simNow24h) {
+        Map<String, Object> stats = new HashMap<>();
+        int llegadasPrevistas = 0;
+        int salidasPrevistas = 0;
+        int cargaEntrante = 0;
+        int cargaSaliente = 0;
+        
+        try {
+            // Obtener la solución actual
+            SolucionProgramacion solucion = solucionesAnteriores.get(runId);
+            if (solucion == null || solucion.getCargaPorVuelo() == null) {
+                stats.put("llegadasPrevistas", 0);
+                stats.put("salidasPrevistas", 0);
+                stats.put("cargaEntrante", 0);
+                stats.put("cargaSaliente", 0);
+                return stats;
+            }
+            
+            CargaPorVuelo cargaPorVuelo = solucion.getCargaPorVuelo();
+            
+            // Iterar sobre todos los vuelos asignados en la solución
+            for (java.util.Map.Entry<VueloProgramadoId, Integer> entry : cargaPorVuelo.getAsignado().entrySet()) {
+                VueloProgramadoId vueloId = entry.getKey();
+                int cantidadAsignada = entry.getValue();
+                
+                // Solo contar vuelos con carga asignada que están en el futuro
+                if (cantidadAsignada > 0 && vueloId.getSalidaUtc() != null && vueloId.getLlegadaUtc() != null) {
+                    // Contar salidas futuras desde este aeropuerto
+                    if (codigoAeropuerto.equals(vueloId.getOrigen()) && 
+                        !vueloId.getSalidaUtc().isBefore(simNow) && 
+                        !vueloId.getSalidaUtc().isAfter(simNow24h)) {
+                        salidasPrevistas++;
+                        cargaSaliente += cantidadAsignada;
+                    }
+                    
+                    // Contar llegadas futuras a este aeropuerto
+                    if (codigoAeropuerto.equals(vueloId.getDestino()) && 
+                        !vueloId.getLlegadaUtc().isBefore(simNow) && 
+                        !vueloId.getLlegadaUtc().isAfter(simNow24h)) {
+                        llegadasPrevistas++;
+                        cargaEntrante += cantidadAsignada;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[RunManager] Error calculando estadísticas futuras para " + codigoAeropuerto + ": " + e.getMessage());
+        }
+        
+        stats.put("llegadasPrevistas", llegadasPrevistas);
+        stats.put("salidasPrevistas", salidasPrevistas);
+        stats.put("cargaEntrante", cargaEntrante);
+        stats.put("cargaSaliente", cargaSaliente);
+        
+        return stats;
     }
     
     /**

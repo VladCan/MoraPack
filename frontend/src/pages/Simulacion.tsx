@@ -76,7 +76,7 @@ export default function Simulacion() {
 
   // Conectar al SSE
   const { runId } = useRunSession();
-  const { simNowUtc, windows } = useRunSSE(runId || undefined);
+  const { simNowUtc, windows, airportOccupancy } = useRunSSE(runId || undefined);
 
   // Procesar vuelos para renderizar
   const flightsToRender = useMemo<FlightForRender[]>(() => {
@@ -156,10 +156,90 @@ export default function Simulacion() {
     return allFlights;
   }, [windows, simNowUtc, airportsMap]);
 
+  // Obtener datos del aeropuerto activo
+  const activeAirportData = activeAirportId && airportOccupancy[activeAirportId]
+    ? airportOccupancy[activeAirportId]
+    : null;
+
   return (
     <div className="min-h-screen bg-neutral-50 relative">
+      {/* Tooltip de aeropuerto */}
+      {activeAirportData && (
+        <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
+          <div className="space-y-3">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeAirportData.porcentaje > 0.8 ? "#f97316" : activeAirportData.porcentaje > 0.5 ? "#facc15" : "#38bdf8" }}></div>
+                <h3 className="font-semibold text-lg">
+                  {activeAirportId}
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {Math.round(activeAirportData.porcentaje * 100)}%
+                </span>
+                <button
+                  onClick={() => setActiveAirportId(null)}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Capacidad */}
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-muted-foreground">Ocupación</span>
+                <span className="font-semibold">
+                  {activeAirportData.ocupacionActual} / {activeAirportData.capacidadTotal}
+                </span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <div
+                  className="h-full transition-all"
+                  style={{
+                    width: `${activeAirportData.porcentaje * 100}%`,
+                    backgroundColor: activeAirportData.porcentaje > 0.8 ? "#f97316" : activeAirportData.porcentaje > 0.5 ? "#facc15" : "#38bdf8",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Disponible */}
+            <div>
+              <p className="text-muted-foreground text-xs">Disponible</p>
+              <p className="font-semibold text-lg">{activeAirportData.disponible} uds</p>
+            </div>
+
+            {/* Estadísticas futuras (24h) */}
+            {activeAirportData.estadisticasFuturas && (
+              <div className="border-t border-border pt-3 mt-3">
+                <p className="text-xs font-semibold mb-2 text-muted-foreground">Próximas 24 horas</p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-muted-foreground">Llegadas</p>
+                    <p className="font-semibold">{activeAirportData.estadisticasFuturas.llegadasPrevistas} vuelos</p>
+                    <p className="text-[10px] text-muted-foreground">+{activeAirportData.estadisticasFuturas.cargaEntrante} uds</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Salidas</p>
+                    <p className="font-semibold">{activeAirportData.estadisticasFuturas.salidasPrevistas} vuelos</p>
+                    <p className="text-[10px] text-muted-foreground">-{activeAirportData.estadisticasFuturas.cargaSaliente} uds</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Tooltip de vuelo */}
-      {hoveredFlight && (
+      {hoveredFlight && !activeAirportId && (
         <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-none">
           <div className="space-y-3">
             {/* Header */}
