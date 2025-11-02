@@ -312,6 +312,42 @@ public class RunManager {
         });
     }
 
+    private void sleepToEndWindow(String id, Instant wEnd){
+        //Acá vamos a que el reloj simulado cruce el fin de ventana
+        while (true){
+            //En caso de existir pausa o cancelación (por ahora, esto no ocurrirá)
+            if (cancelled.get(id).get()) break;
+
+            while (paused.get(id).get() && !cancelled.get(id).get()) {
+                sleepQuietly(Duration.ofMillis(100)); // dormimos cortito mientras esté pausado
+            }
+            if (cancelled.get(id).get()) break;
+
+            Instant simNow = currentSimNow(id);
+
+            //Verificamos si ya cruzó el fin de ventana
+            if (!simNow.isBefore(wEnd)){
+                break;
+            }
+
+            //Lo que viene acá abajo es para evitar busy-wait, osea
+            //que el CPU no este ejecutando a cada rato lo de arriba
+
+            long remainingSimMs = Duration.between(simNow, wEnd).toMillis();
+            if (remainingSimMs <= 0) break;
+
+            //Acá calculamos lo que falta simular a "cuanto dormir"
+            RunContext ctx = requireContext(id);
+            double speed = ctx.speed();
+            long remainingRealMs = (long) Math.ceil(remainingSimMs / speed);
+
+            //Dormimos por tramos cortos para poder reaccionar a pausa o cancel
+            long napMs = Math.min(Math.max(remainingRealMs, 50L), 500L);
+            sleepQuietly(Duration.ofMillis(napMs));
+
+        }
+    }
+
     /// Funciones para cada escenario.
 
     /// 1. Run de Simulación
@@ -381,6 +417,10 @@ public class RunManager {
                     ventanasEnviadasRun.add(windowIdISO);
                     broadcastWindow(new WindowPacket(id, idx, wStart, wEnd, List.of(),
                             convertirPedidosADTO(List.of(), null)));
+
+                    //Llamamos al sleep (para que el reloj simulado cruce fin de ventana):
+                    sleepToEndWindow(id, wEnd);
+
                     // Avanzar a la siguiente ventana antes de continuar
                     idx++;
                     wStart = wEnd;
@@ -442,44 +482,8 @@ public class RunManager {
                 // Continuar con la siguiente ventana en caso de error
             }
 
-            //Acá vamos a que el reloj simulado cruce el fin de ventana
-            while (true){
-                //En caso de existir pausa o cancelación (por ahora, esto no ocurrirá)
-                if (cancelled.get(id).get()) break;
-
-                while (paused.get(id).get() && !cancelled.get(id).get()) {
-                    sleepQuietly(Duration.ofMillis(100)); // dormimos cortito mientras esté pausado
-                }
-                if (cancelled.get(id).get()) break;
-
-                Instant simNow = currentSimNow(id);
-
-                //Verificamos si ya cruzó el fin de ventana
-                if (!simNow.isBefore(wEnd)){
-                    break;
-                }
-
-                //Lo que viene acá abajo es para evitar busy-wait, osea
-                //que el CPU no este ejecutando a cada rato lo de arriba
-
-                long remainingSimMs = Duration.between(simNow, wEnd).toMillis();
-                if (remainingSimMs <= 0) break;
-
-                //Acá calculamos lo que falta simular a "cuanto dormir"
-                RunContext ctx = requireContext(id);
-                double speed = ctx.speed();
-                long remainingRealMs = (long) Math.ceil(remainingSimMs / speed);
-
-                //Dormimos por tramos cortos para poder reaccionar a pausa o cancel
-                long napMs = Math.min(Math.max(remainingRealMs, 50L), 500L);
-                sleepQuietly(Duration.ofMillis(napMs));
-
-            }
-
-                    /*System.out.println("Vamos a dormir 6 segundos, mi id es:" + id);
-                    sleepQuietly(Duration.ofSeconds(6));
-                    System.out.println("Ya desperté 6, mi id es:" + id);*/
-
+            //Llamamos al sleep (para que el reloj simulado cruce fin de ventana):
+            sleepToEndWindow(id, wEnd);
 
             // Siguiente ventana
             idx++;
