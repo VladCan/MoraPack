@@ -55,9 +55,26 @@ export type PedidoDTO = {
     rutas?: RutaDetalle[];  // NUEVO: desglose de rutas
 };
 
+// Datos de ocupación de un aeropuerto
+export type AeropuertoOcupacion = {
+    ocupacionActual: number;
+    capacidadTotal: number;
+    disponible: number;
+    porcentaje: number;
+    estadisticasFuturas?: EstadisticasFuturas;
+};
+
+// Estadísticas de vuelos futuros para un aeropuerto
+export type EstadisticasFuturas = {
+    llegadasPrevistas: number;
+    salidasPrevistas: number;
+    cargaEntrante: number;
+    cargaSaliente: number;
+};
+
 export type RunEvt = 
 | {type:"RUN_STARTED"; runId: string; simStartUtc: string; wallAnchorUtc: string; speed: number }
-| { type: "TICK";        runId: string; simNowUtc:  string }
+| { type: "TICK";        runId: string; simNowUtc:  string; aeropuertos: Record<string, AeropuertoOcupacion> }
 | { type: "WINDOW";      runId: string; windowIndex: number; windowStartUtc: string; windowEndUtc: string; vuelos: VueloDTO[]; pedidos: PedidoDTO[] }
 | { type: "FINISHED";    runId: string; reason: string };
 
@@ -78,6 +95,7 @@ export function useRunSSE(runId?: string){
     const [simStartUtc, setSimStart] = useState<string|undefined>();
     const [windows, setWindows]   = useState<WindowData[]>([]);
     const [finished, setFinished] = useState<{reason:string}|null>(null);
+    const [airportOccupancy, setAirportOccupancy] = useState<Record<string, AeropuertoOcupacion>>({});
 
     const esRef = useRef<EventSource | null>(null);
 
@@ -114,6 +132,9 @@ export function useRunSSE(runId?: string){
                         break;
                     case "TICK":
                         setSimNow(evt.simNowUtc);
+                        if (evt.aeropuertos) {
+                            setAirportOccupancy(evt.aeropuertos);
+                        }
                         break;
                     case "WINDOW":
                         setWindows((prev) => {
@@ -167,6 +188,7 @@ export function useRunSSE(runId?: string){
         simNowUtc,
         windows,
         finished,
+        airportOccupancy,
         disconnect, //<- opcional por ahora
     };
 
