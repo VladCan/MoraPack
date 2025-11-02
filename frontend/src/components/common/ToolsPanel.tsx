@@ -107,6 +107,9 @@ export default function ToolsPanel({
     
     const resultado = Array.from(vuelosEnAire.values());
     console.log('[ToolsPanel] Vuelos EN EL AIRE:', resultado.length);
+    console.log('[ToolsPanel] simNowUtc:', simNowUtc);
+    console.log('[ToolsPanel] windows.length:', windows.length);
+    console.log('[ToolsPanel] Total vuelos en windows:', windows.reduce((sum, w) => sum + w.vuelos.length, 0));
     return resultado;
   }, [windows, simNowUtc]);
 
@@ -136,10 +139,28 @@ export default function ToolsPanel({
     const lastWindow = windows[windows.length - 1];
     const resultado = (lastWindow?.pedidos || []).filter(p => pedidosEnVueloSet.has(p.id));
     console.log('[ToolsPanel] Pedidos EN VUELO:', resultado.length);
+    console.log('[ToolsPanel] Pedidos IDs en vuelo:', Array.from(pedidosEnVueloSet));
+    console.log('[ToolsPanel] Total pedidos en último window:', lastWindow?.pedidos?.length || 0);
     return resultado;
   }, [windows, simNowUtc]);
 
   const almacenes = useMemo(() => ["WH-LIM01", "WH-BOG02", "WH-MEX03", "WH-SCL04"], []);
+
+  // Calcular cantidad EN EL AIRE del pedido seleccionado
+  const cantidadEnVuelo = useMemo(() => {
+    if (!pedido || !pedido.rutas || !simNowUtc) return 0;
+    
+    const now = new Date(simNowUtc).getTime();
+    return pedido.rutas.reduce((sum, ruta) => {
+      // Solo contar si la ruta tiene AL MENOS un vuelo en el aire
+      const tieneVueloEnAire = ruta.vuelos.some(vuelo => {
+        const salida = new Date(vuelo.salidaUtc).getTime();
+        const llegada = new Date(vuelo.llegadaUtc).getTime();
+        return now >= salida && now <= llegada;
+      });
+      return tieneVueloEnAire ? sum + ruta.cantidad : sum;
+    }, 0);
+  }, [pedido, simNowUtc]);
 
   const toggleNivel = (k: NivelCarga) =>
     setNiveles((prev) => ({ ...prev, [k]: !prev[k] }));
@@ -325,23 +346,24 @@ export default function ToolsPanel({
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-muted-foreground">Estado</span>
                 <span className={`font-semibold ${
-                  pedido.estadoAsignacion === "COMPLETO" ? "text-emerald-600" :
-                  pedido.estadoAsignacion === "PARCIAL" ? "text-amber-600" : "text-rose-600"
+                  cantidadEnVuelo >= pedido.cantidad ? "text-emerald-600" :
+                  cantidadEnVuelo > 0 ? "text-amber-600" : "text-rose-600"
                 }`}>
-                  {pedido.estadoAsignacion}
+                  {cantidadEnVuelo >= pedido.cantidad ? "COMPLETO" :
+                   cantidadEnVuelo > 0 ? "PARCIAL" : "PENDIENTE"}
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div
                   className={`h-full transition-all ${
-                    pedido.estadoAsignacion === "COMPLETO" ? "bg-emerald-600" :
-                    pedido.estadoAsignacion === "PARCIAL" ? "bg-amber-600" : "bg-rose-600"
+                    cantidadEnVuelo >= pedido.cantidad ? "bg-emerald-600" :
+                    cantidadEnVuelo > 0 ? "bg-amber-600" : "bg-rose-600"
                   }`}
-                  style={{ width: `${(pedido.cantidadAsignada / pedido.cantidad) * 100}%` }}
+                  style={{ width: `${(cantidadEnVuelo / pedido.cantidad) * 100}%` }}
                 />
               </div>
               <p className="text-center text-xs text-muted-foreground mt-1">
-                {pedido.cantidadAsignada} / {pedido.cantidad} unidades
+                {cantidadEnVuelo} / {pedido.cantidad} unidades
               </p>
             </div>
             {pedido.fechaCreacion && (
@@ -351,41 +373,62 @@ export default function ToolsPanel({
               </div>
             )}
             {/* NUEVO: Desglose de rutas de entrega */}
-            {pedido.rutas && pedido.rutas.length > 0 && (
-              <div className="border-t border-border pt-2">
-                <p className="text-sm font-semibold mb-2">
-                  Rutas de entrega ({pedido.rutas.length} {pedido.rutas.length === 1 ? 'ruta' : 'rutas'})
-                </p>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {pedido.rutas.map((ruta, idx) => (
-                    <div key={idx} className="p-2 rounded-lg bg-muted/50 border border-border/50">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-xs">{ruta.cantidad} uds</span>
-                          <span className="text-xs text-muted-foreground">
-                            {ruta.origen} → {ruta.destinoFinal}
-                          </span>
-                        </div>
-                      </div>
-                      {ruta.vuelos.length > 0 && (
-                        <div className="ml-2 space-y-1 border-l-2 border-primary/30 pl-2">
-                          {ruta.vuelos.map((vuelo, vIdx) => (
-                            <div key={vIdx} className="flex items-center justify-between text-xs bg-card/50 rounded px-2 py-1">
-                              <div>
-                                <span className="font-mono">{vuelo.origen}→{vuelo.destino}</span>
-                              </div>
-                              <div className="text-muted-foreground">
-                                {new Date(vuelo.salidaUtc).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}
-                              </div>
+            {pedido.rutas && pedido.rutas.length > 0 && (() => {
+              // Filtrar rutas que tienen vuelos EN EL AIRE AHORA
+              const now = new Date(simNowUtc || Date.now()).getTime();
+              const rutasVisibles = pedido.rutas.filter(ruta => {
+                return ruta.vuelos.some(vuelo => {
+                  const salida = new Date(vuelo.salidaUtc).getTime();
+                  const llegada = new Date(vuelo.llegadaUtc).getTime();
+                  return now >= salida && now <= llegada;
+                });
+              });
+              
+              return rutasVisibles.length > 0 && (
+                <div className="border-t border-border pt-2">
+                  <p className="text-sm font-semibold mb-2">
+                    Rutas activas ({rutasVisibles.length} {rutasVisibles.length === 1 ? 'ruta' : 'rutas'})
+                  </p>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {rutasVisibles.map((ruta, idx) => {
+                      // Filtrar vuelos de esta ruta que están EN EL AIRE
+                      const vuelosActivos = ruta.vuelos.filter(vuelo => {
+                        const salida = new Date(vuelo.salidaUtc).getTime();
+                        const llegada = new Date(vuelo.llegadaUtc).getTime();
+                        return now >= salida && now <= llegada;
+                      });
+                      
+                      return (
+                        <div key={idx} className="p-2 rounded-lg bg-muted/50 border border-border/50">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-xs">{ruta.cantidad} uds</span>
+                              <span className="text-xs text-muted-foreground">
+                                {ruta.origen} → {ruta.destinoFinal}
+                              </span>
                             </div>
-                          ))}
+                          </div>
+                          {vuelosActivos.length > 0 && (
+                            <div className="ml-2 space-y-1 border-l-2 border-primary/30 pl-2">
+                              {vuelosActivos.map((vuelo, vIdx) => (
+                                <div key={vIdx} className="flex items-center justify-between text-xs bg-card/50 rounded px-2 py-1">
+                                  <div>
+                                    <span className="font-mono">{vuelo.origen}→{vuelo.destino}</span>
+                                  </div>
+                                  <div className="text-muted-foreground">
+                                    {new Date(vuelo.salidaUtc).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       )}
@@ -415,6 +458,7 @@ export default function ToolsPanel({
           value={pedido}
           items={pedidosActivos}
           onSelect={setPedido}
+          simNowUtc={simNowUtc}
         />
       </div>
 
@@ -782,6 +826,7 @@ function OrderSelectCard({
   value,
   items,
   onSelect,
+  simNowUtc,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -789,6 +834,7 @@ function OrderSelectCard({
   value: PedidoDTO | null;
   items: PedidoDTO[];
   onSelect: (val: PedidoDTO) => void;
+  simNowUtc?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -797,6 +843,31 @@ function OrderSelectCard({
     () => items.filter((p) => p.id.toString().includes(q)),
     [items, q]
   );
+
+  // Función para calcular el estado basado en cantidadEnVuelo
+  const calcularEstado = (pedido: PedidoDTO): string => {
+    if (!pedido.rutas || !simNowUtc) {
+      console.log('[calcularEstado] Sin rutas o simNowUtc, usando estado backend:', pedido.estadoAsignacion);
+      return pedido.estadoAsignacion;
+    }
+    
+    const now = new Date(simNowUtc).getTime();
+    const cantidadEnVuelo = pedido.rutas.reduce((sum, ruta) => {
+      const tieneVueloEnAire = ruta.vuelos.some(vuelo => {
+        const salida = new Date(vuelo.salidaUtc).getTime();
+        const llegada = new Date(vuelo.llegadaUtc).getTime();
+        return now >= salida && now <= llegada;
+      });
+      return tieneVueloEnAire ? sum + ruta.cantidad : sum;
+    }, 0);
+
+    const estado = cantidadEnVuelo >= pedido.cantidad ? "COMPLETO" :
+                   cantidadEnVuelo > 0 ? "PARCIAL" : "PENDIENTE";
+    
+    console.log(`[calcularEstado] Pedido ${pedido.id}: cantidadEnVuelo=${cantidadEnVuelo}, cantidad=${pedido.cantidad}, estado=${estado}`);
+    
+    return estado;
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -856,13 +927,18 @@ function OrderSelectCard({
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-mono">PED-{p.id}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      p.estadoAsignacion === "COMPLETO" ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200" :
-                      p.estadoAsignacion === "PARCIAL" ? "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200" :
-                      "bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-200"
-                    }`}>
-                      {p.estadoAsignacion}
-                    </span>
+                    {(() => {
+                      const estado = calcularEstado(p);
+                      return (
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          estado === "COMPLETO" ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200" :
+                          estado === "PARCIAL" ? "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200" :
+                          "bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-200"
+                        }`}>
+                          {estado}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </button>
               </li>
