@@ -25,6 +25,21 @@ export type VueloDTO = {
     carga: CargaItem[];
 };
 
+// Ruta de entrega de un pedido
+export type RutaDetalle = {
+    cantidad: number;
+    origen: string;
+    destinoFinal: string;
+    vuelos: Array<{
+        id: string;
+        origen: string;
+        destino: string;
+        salidaUtc: string;
+        llegadaUtc: string;
+        cantidad: number;
+    }>;
+};
+
 // Pedido con su origen asignado
 export type PedidoDTO = {
     id: number;
@@ -37,6 +52,7 @@ export type PedidoDTO = {
     fechaCreacion: string;
     fechaLocal?: string;
     continenteDestino?: string;
+    rutas?: RutaDetalle[];  // NUEVO: desglose de rutas
 };
 
 export type RunEvt = 
