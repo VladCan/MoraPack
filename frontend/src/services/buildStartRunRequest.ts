@@ -21,7 +21,7 @@ const SCENARIO_MAP: Record<Variant, StartRunRequest["scenario"]> = {
 //Acá estamos fijando la duración de las ventanas y eso, por escenario
 const PRESETS = {
     simulacion: { windowHours: 4, uses: "range" as const },     // pide inicio+fin
-    colapso:    { windowHours: 6, uses: "horizon" as const, horizonHours: 24 }, // pide inicio
+    colapso:    { windowHours: 4, uses: "horizon" as const, horizonHours: 24 }, // pide inicio
     operacion:  { uses: "none" as const }, 
 }
 
