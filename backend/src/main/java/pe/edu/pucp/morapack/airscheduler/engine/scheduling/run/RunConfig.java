@@ -97,15 +97,15 @@ public class RunConfig {
         );
     }
 
-    public static RunConfig colapso(Instant inicio, Instant fin, Set<String> sedes) {
-        return colapso(inicio, fin, sedes, Duration.ofHours(6));
+    public static RunConfig colapso(Instant inicio, Set<String> sedes) {
+        return colapso(inicio, sedes, Duration.ofHours(6));
     }
     
-    public static RunConfig colapso(Instant inicio, Instant fin, Set<String> sedes, Duration windowSize) {
+    public static RunConfig colapso(Instant inicio, Set<String> sedes, Duration windowSize) {
         return new RunConfig(
                 Scenario.COLAPSO,
                 inicio,
-                fin,
+                null,
                 windowSize,
                 Duration.ofHours(48),
                 sedes,
