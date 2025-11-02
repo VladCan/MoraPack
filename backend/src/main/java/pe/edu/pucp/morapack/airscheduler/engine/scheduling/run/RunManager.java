@@ -517,9 +517,33 @@ public class RunManager {
             }
             if (cancelled.get(id).get()) break;
 
+            /// 1. Inicializar catálogos (vuelos + aeropuertos ONLY)
+
+            System.out.println("[RunManager] Procesando ventana " + idx + ": " + wStart + " - " + wEnd);
+
             try {
-                /// Acá debería de ir toda la lógica de operación diaria. Por ahora, solo vamos a devolver los ticks desde
-                /// el RunsSSEController y acá voy a imprimir como avanza el tiempo.
+
+                ///  1. Preparar estado anterior
+
+                    /// Actualizar el estado de los pedidos con dicho estadoAnterior
+
+                ///  2. Obtener pedidos de la ventana actual
+
+                    /// Si no hay nada en la ventana, duerme
+                    // sleepToEndWindow(id, wEnd);
+
+                /// 3. Construimos TEG
+
+                /// 4. Generamos la solución inicial (seed)
+
+                /// 5. Ejecutamos ALNS
+
+                /// 6. Guardar solución para la siguiente ventana
+
+                /// 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
+
+                /// 8. Marcar ventana como enviada y hacer broadcast
+
                 System.out.println("Esto es operación diaria y estoy dentro del bucle. No hago nada más. El " +
                         "tiempo actual es:" + currentSimNow(id));
             }
@@ -528,39 +552,8 @@ public class RunManager {
             }
 
 
-            //Acá vamos a que el reloj simulado cruce el fin de ventana
-            while (true){
-                //En caso de existir pausa o cancelación (por ahora, esto no ocurrirá)
-                if (cancelled.get(id).get()) break;
-
-                while (paused.get(id).get() && !cancelled.get(id).get()) {
-                    sleepQuietly(Duration.ofMillis(100)); // dormimos cortito mientras esté pausado
-                }
-                if (cancelled.get(id).get()) break;
-
-                Instant simNow = currentSimNow(id);
-
-                //Verificamos si ya cruzó el fin de ventana
-                if (!simNow.isBefore(wEnd)){
-                    break;
-                }
-
-                //Lo que viene acá abajo es para evitar busy-wait, osea
-                //que el CPU no este ejecutando a cada rato lo de arriba
-
-                long remainingSimMs = Duration.between(simNow, wEnd).toMillis();
-                if (remainingSimMs <= 0) break;
-
-                //Acá calculamos lo que falta simular a "cuanto dormir"
-                RunContext ctx = requireContext(id);
-                double speed = ctx.speed();
-                long remainingRealMs = (long) Math.ceil(remainingSimMs / speed);
-
-                //Dormimos por tramos cortos para poder reaccionar a pausa o cancel
-                long napMs = Math.min(Math.max(remainingRealMs, 50L), 500L);
-                sleepQuietly(Duration.ofMillis(napMs));
-
-            }
+            //Llamamos al sleep (para que el reloj simulado cruce fin de ventana):
+            sleepToEndWindow(id, wEnd);
 
             // Siguiente ventana
             idx++;
