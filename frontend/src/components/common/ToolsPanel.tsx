@@ -84,7 +84,7 @@ export default function ToolsPanel({
   const {begin, runId} = useRunSession();
   const {windows, simNowUtc} = useRunSSE(runId || undefined);
 
-  // Obtener vuelos activos (en el aire ahora)
+  // Obtener SOLO vuelos que están EN EL AIRE en este momento
   const vuelosActivos = useMemo<VueloDTO[]>(() => {
     if (!simNowUtc || windows.length === 0) return [];
     
@@ -93,17 +93,24 @@ export default function ToolsPanel({
     
     windows.forEach(window => {
       window.vuelos.forEach(v => {
-        if (!vuelosEnAire.has(v.id)) vuelosEnAire.set(v.id, v);
+        if (!vuelosEnAire.has(v.id)) {
+          const salida = new Date(v.salidaUtc).getTime();
+          const llegada = new Date(v.llegadaUtc).getTime();
+          
+          // Solo incluir si está en el aire AHORA
+          if (now >= salida && now <= llegada) {
+            vuelosEnAire.set(v.id, v);
+          }
+        }
       });
     });
     
-    return Array.from(vuelosEnAire.values()).filter(v => {
-      const salida = new Date(v.salidaUtc).getTime();
-      const llegada = new Date(v.llegadaUtc).getTime();
-      return now >= salida && now <= llegada;
-    });
+    const resultado = Array.from(vuelosEnAire.values());
+    console.log('[ToolsPanel] Vuelos EN EL AIRE:', resultado.length);
+    return resultado;
   }, [windows, simNowUtc]);
 
+  // Obtener SOLO pedidos que están en vuelos activos
   const pedidosActivos = useMemo<PedidoDTO[]>(() => {
     if (!simNowUtc || windows.length === 0) return [];
     
@@ -115,7 +122,7 @@ export default function ToolsPanel({
       window.vuelos.forEach(vuelo => {
         const salida = new Date(vuelo.salidaUtc).getTime();
         const llegada = new Date(vuelo.llegadaUtc).getTime();
-        // Solo considerar vuelos que están en el aire ahora
+        // Solo considerar vuelos que están en el aire AHORA
         if (now >= salida && now <= llegada) {
           // Agregar los IDs de los pedidos en la carga de este vuelo
           vuelo.carga?.forEach(item => {
@@ -125,9 +132,11 @@ export default function ToolsPanel({
       });
     });
     
-    // Filtrar pedidos que están en vuelo
+    // Filtrar pedidos que están en vuelo AHORA
     const lastWindow = windows[windows.length - 1];
-    return (lastWindow?.pedidos || []).filter(p => pedidosEnVueloSet.has(p.id));
+    const resultado = (lastWindow?.pedidos || []).filter(p => pedidosEnVueloSet.has(p.id));
+    console.log('[ToolsPanel] Pedidos EN VUELO:', resultado.length);
+    return resultado;
   }, [windows, simNowUtc]);
 
   const almacenes = useMemo(() => ["WH-LIM01", "WH-BOG02", "WH-MEX03", "WH-SCL04"], []);
@@ -291,9 +300,9 @@ export default function ToolsPanel({
       )}
 
       {pedido && (
-        <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto mb-4">
+        <div className="absolute top-20 right-4 z-50 w-96 max-h-[80vh] overflow-y-auto p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto mb-4">
           <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-border pb-2">
+            <div className="flex items-center justify-between border-b border-border pb-2 sticky top-0 bg-card/90 backdrop-blur-sm">
               <div className="flex items-center gap-2">
                 <Package className="w-4 h-4 text-primary" />
                 <h3 className="font-semibold text-lg">PED-{pedido.id}</h3>
@@ -339,6 +348,42 @@ export default function ToolsPanel({
               <div className="text-xs text-muted-foreground">
                 <p className="font-semibold">Fecha de creación</p>
                 <p className="font-mono">{new Date(pedido.fechaCreacion).toLocaleString('es-PE', { timeZone: 'UTC' })} UTC</p>
+              </div>
+            )}
+            {/* NUEVO: Desglose de rutas de entrega */}
+            {pedido.rutas && pedido.rutas.length > 0 && (
+              <div className="border-t border-border pt-2">
+                <p className="text-sm font-semibold mb-2">
+                  Rutas de entrega ({pedido.rutas.length} {pedido.rutas.length === 1 ? 'ruta' : 'rutas'})
+                </p>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {pedido.rutas.map((ruta, idx) => (
+                    <div key={idx} className="p-2 rounded-lg bg-muted/50 border border-border/50">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-xs">{ruta.cantidad} uds</span>
+                          <span className="text-xs text-muted-foreground">
+                            {ruta.origen} → {ruta.destinoFinal}
+                          </span>
+                        </div>
+                      </div>
+                      {ruta.vuelos.length > 0 && (
+                        <div className="ml-2 space-y-1 border-l-2 border-primary/30 pl-2">
+                          {ruta.vuelos.map((vuelo, vIdx) => (
+                            <div key={vIdx} className="flex items-center justify-between text-xs bg-card/50 rounded px-2 py-1">
+                              <div>
+                                <span className="font-mono">{vuelo.origen}→{vuelo.destino}</span>
+                              </div>
+                              <div className="text-muted-foreground">
+                                {new Date(vuelo.salidaUtc).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

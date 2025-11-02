@@ -745,6 +745,7 @@ public class RunManager {
             // Extraer orígenes desde la solución (un pedido puede tener múltiples orígenes si se divide)
             List<String> origenes = new ArrayList<>();
             int cantidadAsignada = 0;
+            List<Map<String, Object>> rutasDetalle = new ArrayList<>(); // NUEVO: desglose de rutas
             
             if (solucion != null) {
                 var plan = solucion.planDe(pedido.getIdPedido());
@@ -758,6 +759,30 @@ public class RunManager {
                                 origenes.add(origen);
                             }
                             cantidadAsignada += ruta.getCantidad();
+                            
+                            // NUEVO: Construir detalle de la ruta
+                            Map<String, Object> rutaDetalle = new HashMap<>();
+                            rutaDetalle.put("cantidad", ruta.getCantidad());
+                            rutaDetalle.put("origen", origen);
+                            rutaDetalle.put("destinoFinal", pedido.getDestino());
+                            
+                            // Extraer vuelos de la ruta
+                            List<Map<String, Object>> vuelosRuta = new ArrayList<>();
+                            for (var tramo : ruta.getTramos()) {
+                                Map<String, Object> vueloRuta = new HashMap<>();
+                                vueloRuta.put("id", tramo.getVuelo().getOrigen() + "-" + 
+                                              tramo.getVuelo().getDestino() + "-" + 
+                                              tramo.getVuelo().getSalidaUtc().toString().replace(":", ""));
+                                vueloRuta.put("origen", tramo.getVuelo().getOrigen());
+                                vueloRuta.put("destino", tramo.getVuelo().getDestino());
+                                vueloRuta.put("salidaUtc", tramo.getVuelo().getSalidaUtc().toString());
+                                vueloRuta.put("llegadaUtc", tramo.getVuelo().getLlegadaUtc() != null ? 
+                                              tramo.getVuelo().getLlegadaUtc().toString() : null);
+                                vueloRuta.put("cantidad", ruta.getCantidad()); // Misma cantidad para todo el tramo
+                                vuelosRuta.add(vueloRuta);
+                            }
+                            rutaDetalle.put("vuelos", vuelosRuta);
+                            rutasDetalle.add(rutaDetalle);
                         }
                     }
                 }
@@ -776,6 +801,7 @@ public class RunManager {
             pedidoDTO.put("cantidadAsignada", cantidadAsignada);
             pedidoDTO.put("estadoAsignacion", cantidadAsignada >= pedido.getCantidad() ? "COMPLETO" : 
                                               cantidadAsignada > 0 ? "PARCIAL" : "PENDIENTE");
+            pedidoDTO.put("rutas", rutasDetalle); // NUEVO: desglose de rutas
             
             pedidosDTO.add(pedidoDTO);
         }
