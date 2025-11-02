@@ -84,6 +84,19 @@ export default function ToolsPanel({
   const {begin, runId} = useRunSession();
   const {windows, simNowUtc} = useRunSSE(runId || undefined);
 
+  //Fijar fecha de fin automáticamente al elegir fecha de inicio
+  const handleInicio = (value?: Date) => {
+    setInicio(value);
+    if (value){
+      const end = new Date(value);
+      end.setDate(end.getDate() + 7);
+      setFin(end);
+    }
+    else {
+      setFin(undefined);
+    }
+  }
+
   // Obtener SOLO vuelos que están EN EL AIRE en este momento
   const vuelosActivos = useMemo<VueloDTO[]>(() => {
     if (!simNowUtc || windows.length === 0) return [];
@@ -495,7 +508,7 @@ export default function ToolsPanel({
                 <Field label="Fecha de inicio">
                   <DateTimePicker
                     value={inicio}
-                    onChange={setInicio}
+                    onChange={handleInicio}
                     granularity="minute"
                     hourCycle={24}
                     locale={es}
@@ -508,7 +521,7 @@ export default function ToolsPanel({
                 <Field label="Fecha de fin">
                   <DateTimePicker
                     value={fin}
-                    onChange={setFin}
+                    disabled
                     granularity="minute"
                     hourCycle={24}
                     locale={es}
