@@ -616,6 +616,14 @@ public class RunManager {
             try {
                 int ocupacionActual = ocupacion.ocupacion(codigo, simNow);
                 int capacidadTotal = aeropuertosMap.getCapBodega(codigo);
+                
+                // Calcular carga llegando y saliendo AHORA MISMO
+                Map<String, Object> eventosActuales = calcularEventosActuales(runId, codigo, simNow);
+                int cargaLlegando = (Integer) eventosActuales.getOrDefault("cargaLlegando", 0);
+                int cargaSaliendo = (Integer) eventosActuales.getOrDefault("cargaSaliendo", 0);
+                
+                // Ocupación "efectiva" incluyendo lo que está llegando (pero no lo que está saliendo, ya no está)
+                // La ocupación actual ya refleja lo que salió, pero podemos mostrar lo que está llegando
                 int disponible = ocupacionActual < capacidadTotal ? capacidadTotal - ocupacionActual : 0;
                 double porcentaje = capacidadTotal > 0 ? (double) ocupacionActual / capacidadTotal : 0.0;
                 
@@ -628,6 +636,8 @@ public class RunManager {
                 airportData.put("capacidadTotal", capacidadTotal);
                 airportData.put("disponible", disponible);
                 airportData.put("porcentaje", porcentaje);
+                airportData.put("cargaLlegando", cargaLlegando);
+                airportData.put("cargaSaliendo", cargaSaliendo);
                 airportData.put("estadisticasFuturas", estadisticasFuturas);
                 
                 result.put(codigo, airportData);
@@ -642,6 +652,61 @@ public class RunManager {
 
     private static void sleepQuietly(Duration d) {
         try { Thread.sleep(d.toMillis()); } catch (InterruptedException ignored) {}
+    }
+    
+    /**
+     * Calcula carga que está llegando y saliendo EN ESTE MOMENTO (ventana de ±5 minutos)
+     */
+    private Map<String, Object> calcularEventosActuales(String runId, String codigoAeropuerto, Instant simNow) {
+        Map<String, Object> eventos = new HashMap<>();
+        int cargaLlegando = 0;
+        int cargaSaliendo = 0;
+        
+        try {
+            // Ventana de tiempo para considerar "ahora mismo" (±5 minutos)
+            Duration ventana = Duration.ofMinutes(5);
+            Instant simNowMinus = simNow.minus(ventana);
+            Instant simNowPlus = simNow.plus(ventana);
+            
+            // Obtener la solución actual
+            SolucionProgramacion solucion = solucionesAnteriores.get(runId);
+            if (solucion == null || solucion.getCargaPorVuelo() == null) {
+                eventos.put("cargaLlegando", 0);
+                eventos.put("cargaSaliendo", 0);
+                return eventos;
+            }
+            
+            CargaPorVuelo cargaPorVuelo = solucion.getCargaPorVuelo();
+            
+            // Iterar sobre todos los vuelos asignados en la solución
+            for (java.util.Map.Entry<VueloProgramadoId, Integer> entry : cargaPorVuelo.getAsignado().entrySet()) {
+                VueloProgramadoId vueloId = entry.getKey();
+                int cantidadAsignada = entry.getValue();
+                
+                if (cantidadAsignada > 0 && vueloId.getSalidaUtc() != null && vueloId.getLlegadaUtc() != null) {
+                    // Vuelos que están saliendo AHORA desde este aeropuerto
+                    if (codigoAeropuerto.equals(vueloId.getOrigen()) &&
+                        !vueloId.getSalidaUtc().isBefore(simNowMinus) &&
+                        !vueloId.getSalidaUtc().isAfter(simNowPlus)) {
+                        cargaSaliendo += cantidadAsignada;
+                    }
+                    
+                    // Vuelos que están llegando AHORA a este aeropuerto
+                    if (codigoAeropuerto.equals(vueloId.getDestino()) &&
+                        !vueloId.getLlegadaUtc().isBefore(simNowMinus) &&
+                        !vueloId.getLlegadaUtc().isAfter(simNowPlus)) {
+                        cargaLlegando += cantidadAsignada;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[RunManager] Error calculando eventos actuales para " + codigoAeropuerto + ": " + e.getMessage());
+        }
+        
+        eventos.put("cargaLlegando", cargaLlegando);
+        eventos.put("cargaSaliendo", cargaSaliendo);
+        
+        return eventos;
     }
     
     /**

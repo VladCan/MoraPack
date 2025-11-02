@@ -61,6 +61,8 @@ export type AeropuertoOcupacion = {
     capacidadTotal: number;
     disponible: number;
     porcentaje: number;
+    cargaLlegando?: number;  // Carga que está llegando ahora mismo
+    cargaSaliendo?: number;  // Carga que está saliendo ahora mismo
     estadisticasFuturas?: EstadisticasFuturas;
 };
 
