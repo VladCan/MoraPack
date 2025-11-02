@@ -82,6 +82,8 @@ public class RunsController {
         //Construimos el RunConfig con el tamaño de ventana configurable
         RunConfig config;
         Duration windowSize = Duration.ofHours(windowHours);
+
+        System.out.println("Estamos en " + scenario + " y la windowSize es: " + windowSize);
         
         if (end != null) {
             switch (scenario) {
@@ -89,8 +91,7 @@ public class RunsController {
                     config = RunConfig.simSemanal(start, end, sedes, windowSize);
                     break;
                 case COLAPSO:
-                    config = RunConfig.colapso(start, end, sedes, windowSize);
-                    break;
+                    throw new BadRequestException("COLAPSO no requiere endUtc.");
                 case OPERACION:
                     throw new BadRequestException("OPERACION no requiere endUtc.");
                 default:
@@ -101,7 +102,8 @@ public class RunsController {
                 case SIM_SEMANAL:
                     throw new BadRequestException("SIM_SEMANAL requiere endUtc.");
                 case COLAPSO:
-                    throw new BadRequestException("COLAPSO requiere endUtc.");
+                    config = RunConfig.colapso(start, sedes, windowSize);
+                    break;
                 case OPERACION:
                     config = RunConfig.operacion(sedes, windowSize);
                     break;
@@ -109,13 +111,6 @@ public class RunsController {
                     throw new BadRequestException("Scenario no soportado.");
             }
         }
-
-        /// TODO, para simulación diaria se tiene que consumir el pedido en vivo.
-        /*//EL origen de pedidos:
-        config = config.withOrder;
-         */
-
-
 
         //Creamos runId
         RunId runId = RunId.create();
