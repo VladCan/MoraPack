@@ -192,8 +192,31 @@ public class RunManager {
         //Acá calculamos la velocidad en segundos simulados por segundo real
         long simDeltaMs = (long) Math.floor(deltaMs * ctx.speed());
 
-        //Retornamos el ahora simulado
-        return ctx.simStartUtc().plusMillis(simDeltaMs);
+        // Retornamos el ahora simulado
+        Instant simulatedNow = ctx.simStartUtc().plusMillis(simDeltaMs);
+        
+        // Limitar el simNow al final de la última llegada de vuelo
+        SolucionProgramacion ultimaSolucion = solucionesAnteriores.get(runId);
+        if (ultimaSolucion != null) {
+            Instant ultimaLlegada = obtenerUltimaLlegada(ultimaSolucion);
+            if (ultimaLlegada != null && simulatedNow.isAfter(ultimaLlegada)) {
+                return ultimaLlegada;
+            }
+        }
+        
+        return simulatedNow;
+    }
+    
+    private Instant obtenerUltimaLlegada(SolucionProgramacion solucion) {
+        if (solucion == null || solucion.getCargaPorVuelo() == null) {
+            return null;
+        }
+        
+        return solucion.getCargaPorVuelo().getAsignado().keySet().stream()
+                .map(VueloProgramadoId::getLlegadaUtc)
+                .filter(Objects::nonNull)
+                .max(Instant::compareTo)
+                .orElse(null);
     }
 
     /** Obtiene el contexto o lanza un error claro si no existe. */
@@ -301,8 +324,8 @@ public class RunManager {
         Instant wEnd = wStart.plus(config.horasVentana());
         int idx = 0;
 
-        System.out.println("En esta iteración, wStart es: " + wStart + ", wEnd es: " + wEnd);
-        System.out.println("Voy a entrar al bucle, mi id es:" + id);
+        System.out.println("[RunManager] Config: fechaInicio=" + config.fechaInicio() + ", fechaFin=" + config.fechaFin());
+        System.out.println("[RunManager] Ventana inicial: wStart=" + wStart + ", wEnd=" + wEnd);
 
         while (!cancelled.get(id).get() && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
             /// Revisar esto:
@@ -332,7 +355,23 @@ public class RunManager {
             System.out.println("[RunManager] Procesando ventana " + idx + ": " + wStart + " - " + wEnd);
 
             try {
-                // 1. Obtener pedidos de la ventana actual
+                // 1. Preparar estado anterior si existe
+                SolucionProgramacion solucionAnterior = solucionesAnteriores.get(id);
+                Map<String, List<ArriboExogeno>> enVuelo = Map.of();
+                List<OcupacionAlmacen> reservas = List.of();
+
+                // Actualizar pedidos: eliminar completados y ajustar cantidades de los en progreso
+                if (solucionAnterior != null) {
+                    System.out.println("[RunManager] Antes de eliminarYActualizarCumplidosHasta: " + 
+                        pedidosCargados.getLista().size() + " pedidos en cola");
+                    pedidosCargados.eliminarYActualizarCumplidosHasta(wStart, solucionAnterior);
+                    System.out.println("[RunManager] Después de eliminarYActualizarCumplidosHasta: " + 
+                        pedidosCargados.getLista().size() + " pedidos en cola");
+                    enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior, wStart);
+                    reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior, wStart, Duration.ofHours(2));
+                }
+
+                // 2. Obtener pedidos de la ventana actual (ya actualizados)
                 VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wEnd);
                 List<Pedido> pedidosVentana = ventana.pedidos();
 
@@ -347,16 +386,6 @@ public class RunManager {
                     wStart = wEnd;
                     wEnd = wEnd.plus(config.horasVentana());
                     continue;
-                }
-
-                // 2. Preparar estado anterior si existe
-                SolucionProgramacion solucionAnterior = solucionesAnteriores.get(id);
-                Map<String, List<ArriboExogeno>> enVuelo = Map.of();
-                List<OcupacionAlmacen> reservas = List.of();
-
-                if (solucionAnterior != null) {
-                    enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior, wStart);
-                    reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior, wStart, Duration.ofHours(2));
                 }
 
                 // 3. Construir TEG para la ventana
@@ -392,7 +421,13 @@ public class RunManager {
                 solucionesAnteriores.put(id, solucionOptima);
 
                 // 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
-                List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStart, wEnd);
+                final Instant wStartFinal = wStart;
+                final Instant wEndFinal = wEnd;
+                
+                List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStartFinal, wEndFinal);
+                
+                // IMPORTANTE: Enviar TODOS los pedidos procesados (incluye parciales de ventanas anteriores)
+                // para que el frontend vea el estado actualizado de cada pedido
                 List<Object> pedidosVentanaDTO = convertirPedidosADTO(pedidosVentana, solucionOptima);
 
                 // 8. Marcar ventana como enviada y hacer broadcast
@@ -556,8 +591,181 @@ public class RunManager {
         return new Status(id.value(), st, 0);
     }
 
+    /**
+     * Calcula la ocupación actual de todos los aeropuertos para un run específico
+     */
+    public Map<String, Map<String, Object>> getCurrentAirportOccupancy(String runId) {
+        Map<String, Map<String, Object>> result = new HashMap<>();
+        
+        if (aeropuertosMap == null || aeropuertosMap.size() == 0) {
+            return result;
+        }
+        
+        // Obtener ocupación por aeropuerto para este run
+        OcupacionPorAeropuerto ocupacion = ocupacionesPorRun.get(runId);
+        if (ocupacion == null) {
+            System.out.println("[RunManager.getCurrentAirportOccupancy] Ocupacion null para runId: " + runId);
+            return result;
+        }
+        
+        // Obtener el tiempo simulado actual
+        Instant simNow = currentSimNow(runId);
+        
+        // Iterar sobre todos los aeropuertos
+        for (String codigo : aeropuertosMap.keys()) {
+            try {
+                int ocupacionActual = ocupacion.ocupacion(codigo, simNow);
+                int capacidadTotal = aeropuertosMap.getCapBodega(codigo);
+                
+                // Calcular carga llegando y saliendo AHORA MISMO
+                Map<String, Object> eventosActuales = calcularEventosActuales(runId, codigo, simNow);
+                int cargaLlegando = (Integer) eventosActuales.getOrDefault("cargaLlegando", 0);
+                int cargaSaliendo = (Integer) eventosActuales.getOrDefault("cargaSaliendo", 0);
+                
+                // Ocupación "efectiva" incluyendo lo que está llegando (pero no lo que está saliendo, ya no está)
+                // La ocupación actual ya refleja lo que salió, pero podemos mostrar lo que está llegando
+                int disponible = ocupacionActual < capacidadTotal ? capacidadTotal - ocupacionActual : 0;
+                double porcentaje = capacidadTotal > 0 ? (double) ocupacionActual / capacidadTotal : 0.0;
+                
+                // Calcular estadísticas de vuelos futuros (próximas 24 horas)
+                Instant simNow24h = simNow.plus(24, java.time.temporal.ChronoUnit.HOURS);
+                Map<String, Object> estadisticasFuturas = calcularEstadisticasFuturas(runId, codigo, simNow, simNow24h);
+                
+                Map<String, Object> airportData = new HashMap<>();
+                airportData.put("ocupacionActual", ocupacionActual);
+                airportData.put("capacidadTotal", capacidadTotal);
+                airportData.put("disponible", disponible);
+                airportData.put("porcentaje", porcentaje);
+                airportData.put("cargaLlegando", cargaLlegando);
+                airportData.put("cargaSaliendo", cargaSaliendo);
+                airportData.put("estadisticasFuturas", estadisticasFuturas);
+                
+                result.put(codigo, airportData);
+            } catch (Exception e) {
+                // Ignorar errores individuales de aeropuertos
+                System.err.println("[RunManager] Error calculando ocupación para " + codigo + ": " + e.getMessage());
+            }
+        }
+        
+        return result;
+    }
+
     private static void sleepQuietly(Duration d) {
         try { Thread.sleep(d.toMillis()); } catch (InterruptedException ignored) {}
+    }
+    
+    /**
+     * Calcula carga que está llegando y saliendo EN ESTE MOMENTO (ventana de ±5 minutos)
+     */
+    private Map<String, Object> calcularEventosActuales(String runId, String codigoAeropuerto, Instant simNow) {
+        Map<String, Object> eventos = new HashMap<>();
+        int cargaLlegando = 0;
+        int cargaSaliendo = 0;
+        
+        try {
+            // Ventana de tiempo para considerar "ahora mismo" (±5 minutos)
+            Duration ventana = Duration.ofMinutes(5);
+            Instant simNowMinus = simNow.minus(ventana);
+            Instant simNowPlus = simNow.plus(ventana);
+            
+            // Obtener la solución actual
+            SolucionProgramacion solucion = solucionesAnteriores.get(runId);
+            if (solucion == null || solucion.getCargaPorVuelo() == null) {
+                eventos.put("cargaLlegando", 0);
+                eventos.put("cargaSaliendo", 0);
+                return eventos;
+            }
+            
+            CargaPorVuelo cargaPorVuelo = solucion.getCargaPorVuelo();
+            
+            // Iterar sobre todos los vuelos asignados en la solución
+            for (java.util.Map.Entry<VueloProgramadoId, Integer> entry : cargaPorVuelo.getAsignado().entrySet()) {
+                VueloProgramadoId vueloId = entry.getKey();
+                int cantidadAsignada = entry.getValue();
+                
+                if (cantidadAsignada > 0 && vueloId.getSalidaUtc() != null && vueloId.getLlegadaUtc() != null) {
+                    // Vuelos que están saliendo AHORA desde este aeropuerto
+                    if (codigoAeropuerto.equals(vueloId.getOrigen()) &&
+                        !vueloId.getSalidaUtc().isBefore(simNowMinus) &&
+                        !vueloId.getSalidaUtc().isAfter(simNowPlus)) {
+                        cargaSaliendo += cantidadAsignada;
+                    }
+                    
+                    // Vuelos que están llegando AHORA a este aeropuerto
+                    if (codigoAeropuerto.equals(vueloId.getDestino()) &&
+                        !vueloId.getLlegadaUtc().isBefore(simNowMinus) &&
+                        !vueloId.getLlegadaUtc().isAfter(simNowPlus)) {
+                        cargaLlegando += cantidadAsignada;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[RunManager] Error calculando eventos actuales para " + codigoAeropuerto + ": " + e.getMessage());
+        }
+        
+        eventos.put("cargaLlegando", cargaLlegando);
+        eventos.put("cargaSaliendo", cargaSaliendo);
+        
+        return eventos;
+    }
+    
+    /**
+     * Calcula estadísticas de vuelos futuros para un aeropuerto específico
+     */
+    private Map<String, Object> calcularEstadisticasFuturas(String runId, String codigoAeropuerto, Instant simNow, Instant simNow24h) {
+        Map<String, Object> stats = new HashMap<>();
+        int llegadasPrevistas = 0;
+        int salidasPrevistas = 0;
+        int cargaEntrante = 0;
+        int cargaSaliente = 0;
+        
+        try {
+            // Obtener la solución actual
+            SolucionProgramacion solucion = solucionesAnteriores.get(runId);
+            if (solucion == null || solucion.getCargaPorVuelo() == null) {
+                stats.put("llegadasPrevistas", 0);
+                stats.put("salidasPrevistas", 0);
+                stats.put("cargaEntrante", 0);
+                stats.put("cargaSaliente", 0);
+                return stats;
+            }
+            
+            CargaPorVuelo cargaPorVuelo = solucion.getCargaPorVuelo();
+            
+            // Iterar sobre todos los vuelos asignados en la solución
+            for (java.util.Map.Entry<VueloProgramadoId, Integer> entry : cargaPorVuelo.getAsignado().entrySet()) {
+                VueloProgramadoId vueloId = entry.getKey();
+                int cantidadAsignada = entry.getValue();
+                
+                // Solo contar vuelos con carga asignada que están en el futuro
+                if (cantidadAsignada > 0 && vueloId.getSalidaUtc() != null && vueloId.getLlegadaUtc() != null) {
+                    // Contar salidas futuras desde este aeropuerto
+                    if (codigoAeropuerto.equals(vueloId.getOrigen()) && 
+                        !vueloId.getSalidaUtc().isBefore(simNow) && 
+                        !vueloId.getSalidaUtc().isAfter(simNow24h)) {
+                        salidasPrevistas++;
+                        cargaSaliente += cantidadAsignada;
+                    }
+                    
+                    // Contar llegadas futuras a este aeropuerto
+                    if (codigoAeropuerto.equals(vueloId.getDestino()) && 
+                        !vueloId.getLlegadaUtc().isBefore(simNow) && 
+                        !vueloId.getLlegadaUtc().isAfter(simNow24h)) {
+                        llegadasPrevistas++;
+                        cargaEntrante += cantidadAsignada;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[RunManager] Error calculando estadísticas futuras para " + codigoAeropuerto + ": " + e.getMessage());
+        }
+        
+        stats.put("llegadasPrevistas", llegadasPrevistas);
+        stats.put("salidasPrevistas", salidasPrevistas);
+        stats.put("cargaEntrante", cargaEntrante);
+        stats.put("cargaSaliente", cargaSaliente);
+        
+        return stats;
     }
     
     /**
@@ -693,7 +901,60 @@ public class RunManager {
             pedidoDTO.put("id", pedido.getIdPedido());
             pedidoDTO.put("idCliente", pedido.getIdCliente());
             pedidoDTO.put("destino", pedido.getDestino());
-            pedidoDTO.put("cantidad", pedido.getCantidad());
+            
+            // Extraer orígenes desde la solución (un pedido puede tener múltiples orígenes si se divide)
+            List<String> origenes = new ArrayList<>();
+            int cantidadAsignada = 0;
+            List<Map<String, Object>> rutasDetalle = new ArrayList<>(); // NUEVO: desglose de rutas
+            int cantidadTotal = pedido.getCantidad(); // por defecto, usar cantidad del pedido
+            
+            if (solucion != null) {
+                var plan = solucion.planDe(pedido.getIdPedido());
+                if (plan != null) {
+                    // Si hay un plan, usar la demanda ORIGINAL del PlanPedido
+                    cantidadTotal = plan.getDemanda();
+                    if (plan.getRutas() != null) {
+                        for (var ruta : plan.getRutas()) {
+                            if (ruta.getTramos() != null && !ruta.getTramos().isEmpty()) {
+                                // El primer tramo de cada ruta contiene el origen (sede)
+                                var primerTramo = ruta.getTramos().get(0);
+                                String origen = primerTramo.getVuelo().getOrigen();
+                                if (origen != null && !origenes.contains(origen)) {
+                                    origenes.add(origen);
+                                }
+                                cantidadAsignada += ruta.getCantidad();
+                                
+                                // NUEVO: Construir detalle de la ruta
+                                Map<String, Object> rutaDetalle = new HashMap<>();
+                                rutaDetalle.put("cantidad", ruta.getCantidad());
+                                rutaDetalle.put("origen", origen);
+                                rutaDetalle.put("destinoFinal", pedido.getDestino());
+                                
+                                // Extraer vuelos de la ruta
+                                List<Map<String, Object>> vuelosRuta = new ArrayList<>();
+                                for (var tramo : ruta.getTramos()) {
+                                    Map<String, Object> vueloRuta = new HashMap<>();
+                                    vueloRuta.put("id", tramo.getVuelo().getOrigen() + "-" + 
+                                                  tramo.getVuelo().getDestino() + "-" + 
+                                                  tramo.getVuelo().getSalidaUtc().toString().replace(":", ""));
+                                    vueloRuta.put("origen", tramo.getVuelo().getOrigen());
+                                    vueloRuta.put("destino", tramo.getVuelo().getDestino());
+                                    vueloRuta.put("salidaUtc", tramo.getVuelo().getSalidaUtc().toString());
+                                    vueloRuta.put("llegadaUtc", tramo.getVuelo().getLlegadaUtc() != null ? 
+                                                  tramo.getVuelo().getLlegadaUtc().toString() : null);
+                                    vueloRuta.put("cantidad", ruta.getCantidad()); // Misma cantidad para todo el tramo
+                                    vuelosRuta.add(vueloRuta);
+                                }
+                                rutaDetalle.put("vuelos", vuelosRuta);
+                                rutasDetalle.add(rutaDetalle);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Agregar campos faltantes al DTO
+            pedidoDTO.put("cantidad", cantidadTotal);
             pedidoDTO.put("fechaCreacion", pedido.getCreatedAtUtc() != null ? pedido.getCreatedAtUtc().toString() : null);
             pedidoDTO.put("fechaLocal", pedido.getFecha() != null ? pedido.getFecha().toString() : null);
             
@@ -707,27 +968,6 @@ public class RunManager {
             }
             pedidoDTO.put("continenteDestino", continenteDestino);
             
-            // Extraer orígenes desde la solución (un pedido puede tener múltiples orígenes si se divide)
-            List<String> origenes = new ArrayList<>();
-            int cantidadAsignada = 0;
-            
-            if (solucion != null) {
-                var plan = solucion.planDe(pedido.getIdPedido());
-                if (plan != null && plan.getRutas() != null) {
-                    for (var ruta : plan.getRutas()) {
-                        if (ruta.getTramos() != null && !ruta.getTramos().isEmpty()) {
-                            // El primer tramo de cada ruta contiene el origen (sede)
-                            var primerTramo = ruta.getTramos().get(0);
-                            String origen = primerTramo.getVuelo().getOrigen();
-                            if (origen != null && !origenes.contains(origen)) {
-                                origenes.add(origen);
-                            }
-                            cantidadAsignada += ruta.getCantidad();
-                        }
-                    }
-                }
-            }
-            
             // Si hay un solo origen, ponerlo como string; si hay múltiples, como array
             if (origenes.isEmpty()) {
                 pedidoDTO.put("origen", null);
@@ -739,8 +979,9 @@ public class RunManager {
             
             // Información adicional útil
             pedidoDTO.put("cantidadAsignada", cantidadAsignada);
-            pedidoDTO.put("estadoAsignacion", cantidadAsignada >= pedido.getCantidad() ? "COMPLETO" : 
+            pedidoDTO.put("estadoAsignacion", cantidadAsignada >= cantidadTotal ? "COMPLETO" : 
                                               cantidadAsignada > 0 ? "PARCIAL" : "PENDIENTE");
+            pedidoDTO.put("rutas", rutasDetalle); // NUEVO: desglose de rutas
             
             pedidosDTO.add(pedidoDTO);
         }

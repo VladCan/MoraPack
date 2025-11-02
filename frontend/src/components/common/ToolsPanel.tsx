@@ -28,6 +28,8 @@ import type { StartRunResponse } from "@/types/runs";
 import { useRunSession } from "@/lib/runSession";
 import toast from "react-hot-toast";
 import ToastCustom from "@/components/common/ToastCustom";
+import type { VueloDTO, PedidoDTO } from "@/hooks/useRunSSE";
+import { useRunSSE } from "@/hooks/useRunSSE";
 
 type NivelCarga = "disponible" | "limitado" | "saturado";
 
@@ -75,13 +77,90 @@ export default function ToolsPanel({
 
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const [vuelo, setVuelo] = useState<string | null>(null);
+  const [vuelo, setVuelo] = useState<VueloDTO | null>(null);
   const [almacen, setAlmacen] = useState<string | null>(null);
-  const [pedido, setPedido] = useState<string | null>(null);
+  const [pedido, setPedido] = useState<PedidoDTO | null>(null);
 
-  const vuelos = useMemo(() => ["AX123", "AX401", "AX777", "AX920", "AX333"], []);
+  const {begin, runId} = useRunSession();
+  const {windows, simNowUtc} = useRunSSE(runId || undefined);
+
+  // Obtener SOLO vuelos que están EN EL AIRE en este momento
+  const vuelosActivos = useMemo<VueloDTO[]>(() => {
+    if (!simNowUtc || windows.length === 0) return [];
+    
+    const now = new Date(simNowUtc).getTime();
+    const vuelosEnAire = new Map<string, VueloDTO>();
+    
+    windows.forEach(window => {
+      window.vuelos.forEach(v => {
+        if (!vuelosEnAire.has(v.id)) {
+          const salida = new Date(v.salidaUtc).getTime();
+          const llegada = new Date(v.llegadaUtc).getTime();
+          
+          // Solo incluir si está en el aire AHORA
+          if (now >= salida && now <= llegada) {
+            vuelosEnAire.set(v.id, v);
+          }
+        }
+      });
+    });
+    
+    const resultado = Array.from(vuelosEnAire.values());
+    console.log('[ToolsPanel] Vuelos EN EL AIRE:', resultado.length);
+    console.log('[ToolsPanel] simNowUtc:', simNowUtc);
+    console.log('[ToolsPanel] windows.length:', windows.length);
+    console.log('[ToolsPanel] Total vuelos en windows:', windows.reduce((sum, w) => sum + w.vuelos.length, 0));
+    return resultado;
+  }, [windows, simNowUtc]);
+
+  // Obtener SOLO pedidos que están en vuelos activos
+  const pedidosActivos = useMemo<PedidoDTO[]>(() => {
+    if (!simNowUtc || windows.length === 0) return [];
+    
+    const now = new Date(simNowUtc).getTime();
+    
+    // Recopilar IDs de pedidos que están en vuelos activos
+    const pedidosEnVueloSet = new Set<number>();
+    windows.forEach(window => {
+      window.vuelos.forEach(vuelo => {
+        const salida = new Date(vuelo.salidaUtc).getTime();
+        const llegada = new Date(vuelo.llegadaUtc).getTime();
+        // Solo considerar vuelos que están en el aire AHORA
+        if (now >= salida && now <= llegada) {
+          // Agregar los IDs de los pedidos en la carga de este vuelo
+          vuelo.carga?.forEach(item => {
+            pedidosEnVueloSet.add(item.pedidoId);
+          });
+        }
+      });
+    });
+    
+    // Filtrar pedidos que están en vuelo AHORA
+    const lastWindow = windows[windows.length - 1];
+    const resultado = (lastWindow?.pedidos || []).filter(p => pedidosEnVueloSet.has(p.id));
+    console.log('[ToolsPanel] Pedidos EN VUELO:', resultado.length);
+    console.log('[ToolsPanel] Pedidos IDs en vuelo:', Array.from(pedidosEnVueloSet));
+    console.log('[ToolsPanel] Total pedidos en último window:', lastWindow?.pedidos?.length || 0);
+    return resultado;
+  }, [windows, simNowUtc]);
+
   const almacenes = useMemo(() => ["WH-LIM01", "WH-BOG02", "WH-MEX03", "WH-SCL04"], []);
-  const pedidos = useMemo(() => ["PED-000123", "PED-000301", "PED-000402", "PED-000777"], []);
+
+  // Calcular cantidad EN EL AIRE del pedido seleccionado
+  const cantidadEnVuelo = useMemo(() => {
+    if (!pedido || !pedido.rutas || !simNowUtc) return 0;
+    
+    const now = new Date(simNowUtc).getTime();
+    return pedido.rutas.reduce((sum, ruta) => {
+      // Solo contar si la ruta tiene AL MENOS un vuelo en el aire
+      const tieneVueloEnAire = ruta.vuelos.some(vuelo => {
+        const salida = new Date(vuelo.salidaUtc).getTime();
+        const llegada = new Date(vuelo.llegadaUtc).getTime();
+        return now >= salida && now <= llegada;
+      });
+      return tieneVueloEnAire ? sum + ruta.cantidad : sum;
+    }, 0);
+  }, [pedido, simNowUtc]);
 
   const toggleNivel = (k: NivelCarga) =>
     setNiveles((prev) => ({ ...prev, [k]: !prev[k] }));
@@ -91,7 +170,6 @@ export default function ToolsPanel({
 
 
   const [loading, setLoading] = useState(false);
-  const {begin} = useRunSession();
 
   const handleRun = async () => {
     console.log("🚀 [ToolsPanel] Iniciando run...");
@@ -162,14 +240,207 @@ export default function ToolsPanel({
 
   return (
     <section className="mx-auto max-w-6xl px-3 sm:px-4">
+      {/* Tooltips detallados */}
+      {vuelo && (
+        <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto mb-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <div className="flex items-center gap-2">
+                <Plane className="w-4 h-4 text-primary" />
+                <h3 className="font-semibold text-lg">{vuelo.id}</h3>
+              </div>
+              <button onClick={() => setVuelo(null)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <p className="text-muted-foreground text-xs">Origen</p>
+                <p className="font-mono text-xs">{vuelo.origen}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Destino</p>
+                <p className="font-mono text-xs">{vuelo.destino}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <p className="text-muted-foreground text-xs">Salida</p>
+                <p className="font-mono text-xs">
+                  {new Date(vuelo.salidaUtc).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} UTC
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Llegada</p>
+                <p className="font-mono text-xs">
+                  {new Date(vuelo.llegadaUtc).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} UTC
+                </p>
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-muted-foreground">Carga</span>
+                <span className="font-semibold">
+                  {vuelo.cantidadAsignada} / {vuelo.capacidad}
+                </span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${(vuelo.cantidadAsignada / vuelo.capacidad) * 100}%` }}
+                />
+              </div>
+            </div>
+            {vuelo.carga.length > 0 && (
+              <div>
+                <p className="text-sm font-semibold mb-2">
+                  Carga ({vuelo.carga.length} {vuelo.carga.length === 1 ? 'pedido' : 'pedidos'})
+                </p>
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {vuelo.carga.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-lg bg-muted/50">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-semibold">#{item.pedidoId}</span>
+                        {item.esConexion && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+                            Conexión
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">{item.cantidad} uds</p>
+                        <p className="text-muted-foreground text-[10px]">→ {item.destinoFinal}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {pedido && (
+        <div className="absolute top-20 right-4 z-50 w-96 max-h-[80vh] overflow-y-auto p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto mb-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between border-b border-border pb-2 sticky top-0 bg-card/90 backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-primary" />
+                <h3 className="font-semibold text-lg">PED-{pedido.id}</h3>
+              </div>
+              <button onClick={() => setPedido(null)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <p className="text-muted-foreground text-xs">Cliente</p>
+                <p className="font-mono text-xs">#{pedido.idCliente}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Destino</p>
+                <p className="font-mono text-xs">{pedido.destino}</p>
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm mb-1">
+                <span className="text-muted-foreground">Estado</span>
+                <span className={`font-semibold ${
+                  cantidadEnVuelo >= pedido.cantidad ? "text-emerald-600" :
+                  cantidadEnVuelo > 0 ? "text-amber-600" : "text-rose-600"
+                }`}>
+                  {cantidadEnVuelo >= pedido.cantidad ? "COMPLETO" :
+                   cantidadEnVuelo > 0 ? "PARCIAL" : "PENDIENTE"}
+                </span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                <div
+                  className={`h-full transition-all ${
+                    cantidadEnVuelo >= pedido.cantidad ? "bg-emerald-600" :
+                    cantidadEnVuelo > 0 ? "bg-amber-600" : "bg-rose-600"
+                  }`}
+                  style={{ width: `${(cantidadEnVuelo / pedido.cantidad) * 100}%` }}
+                />
+              </div>
+              <p className="text-center text-xs text-muted-foreground mt-1">
+                {cantidadEnVuelo} / {pedido.cantidad} unidades
+              </p>
+            </div>
+            {pedido.fechaCreacion && (
+              <div className="text-xs text-muted-foreground">
+                <p className="font-semibold">Fecha de creación</p>
+                <p className="font-mono">{new Date(pedido.fechaCreacion).toLocaleString('es-PE', { timeZone: 'UTC' })} UTC</p>
+              </div>
+            )}
+            {/* NUEVO: Desglose de rutas de entrega */}
+            {pedido.rutas && pedido.rutas.length > 0 && (() => {
+              // Filtrar rutas que tienen vuelos EN EL AIRE AHORA
+              const now = new Date(simNowUtc || Date.now()).getTime();
+              const rutasVisibles = pedido.rutas.filter(ruta => {
+                return ruta.vuelos.some(vuelo => {
+                  const salida = new Date(vuelo.salidaUtc).getTime();
+                  const llegada = new Date(vuelo.llegadaUtc).getTime();
+                  return now >= salida && now <= llegada;
+                });
+              });
+              
+              return rutasVisibles.length > 0 && (
+                <div className="border-t border-border pt-2">
+                  <p className="text-sm font-semibold mb-2">
+                    Rutas activas ({rutasVisibles.length} {rutasVisibles.length === 1 ? 'ruta' : 'rutas'})
+                  </p>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {rutasVisibles.map((ruta, idx) => {
+                      // Filtrar vuelos de esta ruta que están EN EL AIRE
+                      const vuelosActivos = ruta.vuelos.filter(vuelo => {
+                        const salida = new Date(vuelo.salidaUtc).getTime();
+                        const llegada = new Date(vuelo.llegadaUtc).getTime();
+                        return now >= salida && now <= llegada;
+                      });
+                      
+                      return (
+                        <div key={idx} className="p-2 rounded-lg bg-muted/50 border border-border/50">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-xs">{ruta.cantidad} uds</span>
+                              <span className="text-xs text-muted-foreground">
+                                {ruta.origen} → {ruta.destinoFinal}
+                              </span>
+                            </div>
+                          </div>
+                          {vuelosActivos.length > 0 && (
+                            <div className="ml-2 space-y-1 border-l-2 border-primary/30 pl-2">
+                              {vuelosActivos.map((vuelo, vIdx) => (
+                                <div key={vIdx} className="flex items-center justify-between text-xs bg-card/50 rounded px-2 py-1">
+                                  <div>
+                                    <span className="font-mono">{vuelo.origen}→{vuelo.destino}</span>
+                                  </div>
+                                  <div className="text-muted-foreground">
+                                    {new Date(vuelo.salidaUtc).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* Selecciones principales (botones) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-        <SelectCard
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 relative">
+        <FlightSelectCard
           label="Vuelo"
           icon={<Plane className="h-4 w-4" />}
           placeholder="Seleccionar vuelo"
           value={vuelo}
-          items={vuelos}
+          items={vuelosActivos}
           onSelect={setVuelo}
         />
         <SelectCard
@@ -180,13 +451,14 @@ export default function ToolsPanel({
           items={almacenes}
           onSelect={setAlmacen}
         />
-        <SelectCard
+        <OrderSelectCard
           label="Pedido"
           icon={<Package className="h-4 w-4" />}
           placeholder="Seleccionar pedido"
           value={pedido}
-          items={pedidos}
+          items={pedidosActivos}
           onSelect={setPedido}
+          simNowUtc={simNowUtc}
         />
       </div>
 
@@ -442,6 +714,232 @@ function SelectCard({
                   className="w-full text-left px-2 py-2 rounded-md hover:bg-accent/40 text-sm"
                 >
                   {it}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function FlightSelectCard({
+  label,
+  icon,
+  placeholder,
+  value,
+  items,
+  onSelect,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  placeholder: string;
+  value: VueloDTO | null;
+  items: VueloDTO[];
+  onSelect: (val: VueloDTO) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+
+  const filtered = useMemo(
+    () => items.filter((v) => v.id.toLowerCase().includes(q.toLowerCase())),
+    [items, q]
+  );
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className={[
+            "group w-full text-left relative overflow-hidden rounded-2xl px-4 py-3",
+            "text-foreground",
+            GLASS,
+            "transition hover:shadow-xl hover:-translate-y-[1px] focus:outline-none focus:ring-2 focus:ring-ring",
+          ].join(" ")}
+          aria-label={`Seleccionar ${label.toLowerCase()}`}
+        >
+          <div className="flex items-center gap-3">
+            <span className="opacity-90 text-primary">{icon}</span>
+            <div className="min-w-0">
+              <p className="text-[12px] text-muted-foreground leading-tight">{label}</p>
+              <p className="text-[17px] font-semibold leading-tight truncate">
+                {value?.id ?? placeholder}
+              </p>
+            </div>
+          </div>
+        </button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="start"
+        className={[
+          "w-[min(320px,90vw)] p-3 rounded-xl",
+          GLASS,
+          "animate-in fade-in-0 zoom-in-95",
+        ].join(" ")}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={`Buscar ${label.toLowerCase()}…`}
+            className="h-8 text-sm ring-1 ring-border bg-card/70 supports-[backdrop-filter]:bg-card/20 supports-[backdrop-filter]:backdrop-blur-md"
+          />
+        </div>
+        <div className="max-h-56 overflow-auto">
+          {filtered.length === 0 && (
+            <p className="text-xs text-muted-foreground px-1 py-2">Sin resultados</p>
+          )}
+          <ul className="space-y-1">
+            {filtered.map((v) => (
+              <li key={v.id}>
+                <button
+                  onClick={() => {
+                    onSelect(v);
+                    setOpen(false);
+                    setQ("");
+                  }}
+                  className="w-full text-left px-2 py-2 rounded-md hover:bg-accent/40 text-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono">{v.id}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {v.origen} → {v.destino}
+                    </span>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function OrderSelectCard({
+  label,
+  icon,
+  placeholder,
+  value,
+  items,
+  onSelect,
+  simNowUtc,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  placeholder: string;
+  value: PedidoDTO | null;
+  items: PedidoDTO[];
+  onSelect: (val: PedidoDTO) => void;
+  simNowUtc?: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+
+  const filtered = useMemo(
+    () => items.filter((p) => p.id.toString().includes(q)),
+    [items, q]
+  );
+
+  // Función para calcular el estado basado en cantidadEnVuelo
+  const calcularEstado = (pedido: PedidoDTO): string => {
+    if (!pedido.rutas || !simNowUtc) {
+      console.log('[calcularEstado] Sin rutas o simNowUtc, usando estado backend:', pedido.estadoAsignacion);
+      return pedido.estadoAsignacion;
+    }
+    
+    const now = new Date(simNowUtc).getTime();
+    const cantidadEnVuelo = pedido.rutas.reduce((sum, ruta) => {
+      const tieneVueloEnAire = ruta.vuelos.some(vuelo => {
+        const salida = new Date(vuelo.salidaUtc).getTime();
+        const llegada = new Date(vuelo.llegadaUtc).getTime();
+        return now >= salida && now <= llegada;
+      });
+      return tieneVueloEnAire ? sum + ruta.cantidad : sum;
+    }, 0);
+
+    const estado = cantidadEnVuelo >= pedido.cantidad ? "COMPLETO" :
+                   cantidadEnVuelo > 0 ? "PARCIAL" : "PENDIENTE";
+    
+    console.log(`[calcularEstado] Pedido ${pedido.id}: cantidadEnVuelo=${cantidadEnVuelo}, cantidad=${pedido.cantidad}, estado=${estado}`);
+    
+    return estado;
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className={[
+            "group w-full text-left relative overflow-hidden rounded-2xl px-4 py-3",
+            "text-foreground",
+            GLASS,
+            "transition hover:shadow-xl hover:-translate-y-[1px] focus:outline-none focus:ring-2 focus:ring-ring",
+          ].join(" ")}
+          aria-label={`Seleccionar ${label.toLowerCase()}`}
+        >
+          <div className="flex items-center gap-3">
+            <span className="opacity-90 text-primary">{icon}</span>
+            <div className="min-w-0">
+              <p className="text-[12px] text-muted-foreground leading-tight">{label}</p>
+              <p className="text-[17px] font-semibold leading-tight truncate">
+                {value ? `PED-${value.id}` : placeholder}
+              </p>
+            </div>
+          </div>
+        </button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="start"
+        className={[
+          "w-[min(320px,90vw)] p-3 rounded-xl",
+          GLASS,
+          "animate-in fade-in-0 zoom-in-95",
+        ].join(" ")}
+      >
+        <div className="flex items-center gap-2 mb-2">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={`Buscar ${label.toLowerCase()}…`}
+            className="h-8 text-sm ring-1 ring-border bg-card/70 supports-[backdrop-filter]:bg-card/20 supports-[backdrop-filter]:backdrop-blur-md"
+          />
+        </div>
+        <div className="max-h-56 overflow-auto">
+          {filtered.length === 0 && (
+            <p className="text-xs text-muted-foreground px-1 py-2">Sin resultados</p>
+          )}
+          <ul className="space-y-1">
+            {filtered.map((p) => (
+              <li key={p.id}>
+                <button
+                  onClick={() => {
+                    onSelect(p);
+                    setOpen(false);
+                    setQ("");
+                  }}
+                  className="w-full text-left px-2 py-2 rounded-md hover:bg-accent/40 text-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono">PED-{p.id}</span>
+                    {(() => {
+                      const estado = calcularEstado(p);
+                      return (
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          estado === "COMPLETO" ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200" :
+                          estado === "PARCIAL" ? "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200" :
+                          "bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-200"
+                        }`}>
+                          {estado}
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </button>
               </li>
             ))}
