@@ -59,7 +59,7 @@ public class OcupacionPorAeropuerto {
     }
 
     /// POR AHORA USAR SOLO DENTRO DE LA CLASE (TOINCLUSIVE TRUE)
-    private Integer ocupacion(String idAeropuerto, Instant t){
+    public Integer ocupacion(String idAeropuerto, Instant t){
         if (t == null) throw new IllegalArgumentException("Null date");
 
         TreeMap<Instant, Integer> evs = eventosDe(idAeropuerto);
