@@ -20,7 +20,7 @@ public class AeropuertosService {
 
     @PostConstruct
     void init() {
-        try (Scanner sc = ArchivoUtils.getScannerFromResource("aereopuertos.txt")) {
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath("aereopuertos.txt")) {
             if (sc != null) aeropuertos.leerDatos(sc);
             else System.err.println("[AeropuertosService] No se encontró aereopuertos.txt");
         } catch (Exception e) {
