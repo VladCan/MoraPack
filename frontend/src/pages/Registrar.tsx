@@ -81,7 +81,11 @@ const husosStatus  = useQuery({
 /**Acá hay 2 handlers para subir con confirmación si ya hay archivo + refetch**/
 
 //pero antes: handler de subida con confirmación + refresh (TODO falta agregar cancelaciones)
-const onUpload = async (file: File, kind: "vuelos" | "aereopuertos" | "cancelaciones") => {
+const onUpload = async (file: File, kind: "vuelos" | "aereopuertos" | "cancelaciones" | "operacionDiaria") => {
+  
+  //TODO: POR AHORA SOLO TOMA VUELOS Y HUSOS
+  //EN EL BACK EL CONTROLLER TIENE QUE TENER EL ENDPOINT '/upload' (VER Línea 98)
+  
   const status = kind === "vuelos" ? vuelosStatus.data : husosStatus.data;
 
   if (status?.exists){
@@ -344,6 +348,21 @@ const renderDropzoneFooter = (
           </Form>
         </CardContent>
       </Card>
+
+      <div className="md: col-span-2">
+        <Card className="w-full backdrop-blur-lg bg-background/30 border-white/40 shadow-lg ring-1 ring-black/5">
+          <CardHeader>
+            <CardTitle className="text-blue-900">Carga para Operación Diaria</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Dropzone
+              label="Cargar archivo operación diaria"
+              onFiles={(fs) => onUpload(fs[0], "operacionDiaria")}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
     </div>
   );
 }
