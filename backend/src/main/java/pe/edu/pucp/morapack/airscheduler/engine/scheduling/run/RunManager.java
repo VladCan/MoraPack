@@ -131,7 +131,7 @@ public class RunManager {
     /**
      * Inicializa los catálogos compartidos si no están cargados
      */
-    private synchronized void inicializarCatalogos() {
+    private synchronized void inicializarCatalogos(RunConfig.Scenario scenario) {
         if (aeropuertosMap == null) {
             System.out.println("[RunManager] Inicializando catálogos...");
             
@@ -159,18 +159,22 @@ public class RunManager {
                 }
             }
             
-            // Cargar pedidos
+            // Cargar pedidos (solo fuera de OPERACION)
             pedidosCargados = new CargarPedidos();
-            try (Scanner sc = ArchivoUtils.getScannerFromResource("pedidosProfe.txt")) {
-                if (sc != null) {
-                    pedidosCargados.leerDatosProfe(sc);
-                    pedidosCargados.normalizarUtc(aeropuertosMap);
-                    pedidosCargados.ordenarPorUTC();
-                    System.out.println("[RunManager] Pedidos cargados: " + pedidosCargados.getLista().size());
-                } else {
-                    System.err.println("[RunManager] No se encontró archivo de pedidos");
+
+            if (scenario != RunConfig.Scenario.OPERACION){
+                try (Scanner sc = ArchivoUtils.getScannerFromResource("pedidosProfe.txt")) {
+                    if (sc != null) {
+                        pedidosCargados.leerDatosProfe(sc);
+                        pedidosCargados.normalizarUtc(aeropuertosMap);
+                        pedidosCargados.ordenarPorUTC();
+                        System.out.println("[RunManager] Pedidos cargados: " + pedidosCargados.getLista().size());
+                    } else {
+                        System.err.println("[RunManager] No se encontró archivo de pedidos");
+                    }
                 }
             }
+
             
             // Definir sedes
             sedes = new HashSet<>(Arrays.asList("SPIM", "EBCI", "UBBB"));
@@ -178,6 +182,11 @@ public class RunManager {
             System.out.println("[RunManager] Catálogos inicializados correctamente");
         }
     }
+
+    /**
+     * Inicializa los catálogos compartidos PARA OPERACIÓN DIARIA si no están cargados
+     */
+
 
     /*Devolvemos el ahora simulado del run*/
     /*public Instant currentSimNow(RunId runId){
@@ -374,7 +383,7 @@ public class RunManager {
             // ===== LÓGICA DE PLANIFICACIÓN POR VENTANAS =====
 
             // Inicializar catálogos si es necesario
-            inicializarCatalogos();
+            inicializarCatalogos(config.scenario());
 
             // Verificar si ya enviamos esta ventana (idempotencia)
             String windowIdISO = wStart.toString();
@@ -518,16 +527,33 @@ public class RunManager {
             if (cancelled.get(id).get()) break;
 
             /// 1. Inicializar catálogos (vuelos + aeropuertos ONLY)
+            inicializarCatalogos(config.scenario());
 
             System.out.println("[RunManager] Procesando ventana " + idx + ": " + wStart + " - " + wEnd);
 
             try {
 
                 ///  1. Preparar estado anterior
+                // 1. Preparar estado anterior si existe
+                SolucionProgramacion solucionAnterior = solucionesAnteriores.get(id);
+                Map<String, List<ArriboExogeno>> enVuelo = Map.of();
+                List<OcupacionAlmacen> reservas = List.of();
 
                     /// Actualizar el estado de los pedidos con dicho estadoAnterior
+                if (solucionAnterior != null) {
+                    System.out.println("[RunManager] Antes de eliminarYActualizarCumplidosHasta: " +
+                            pedidosCargados.getLista().size() + " pedidos en cola");
+                    pedidosCargados.eliminarYActualizarCumplidosHasta(wStart, solucionAnterior);
+                    System.out.println("[RunManager] Después de eliminarYActualizarCumplidosHasta: " +
+                            pedidosCargados.getLista().size() + " pedidos en cola");
+                    enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior, wStart);
+                    reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior, wStart, Duration.ofHours(2));
+                }
 
                 ///  2. Obtener pedidos de la ventana actual
+
+                    /// Primero, cargamos de queue a pedidosCargados y limpiamos queue
+                    cargarPedidosDesdeQueue(id, pedidosCargados);
 
                     /// Si no hay nada en la ventana, duerme
                     // sleepToEndWindow(id, wEnd);
@@ -559,8 +585,26 @@ public class RunManager {
             idx++;
             wStart = wEnd;
             wEnd   = wEnd.plus(Duration.ofMinutes(1));
+            //Como se ha diseñado para que lea todo0 de un archivo, tenemos que hacer esto para que funcione por ventana
+            pedidosCargados.setUtcNormalizada(false);
 
         }
+
+    }
+
+    private void cargarPedidosDesdeQueue(String id, CargarPedidos pedidosCargados){
+        ConcurrentLinkedQueue<Pedido> queue = queues.computeIfAbsent(id, k -> new ConcurrentLinkedQueue<>());
+
+        //Retiramos el pedido de la cola, y lo agregamos a pedidosCargados
+        while(!queue.isEmpty()){
+            Pedido p = queue.poll();
+            pedidosCargados.agregar(p);
+        }
+
+        //Realizamos el mismo proceso de normalizar y ordenar
+        pedidosCargados.normalizarUtc(aeropuertosMap);
+        pedidosCargados.ordenarPorUTC();
+        System.out.println("[cargarPedidosDesdeQueue] Pedidos cargados: " + pedidosCargados.getLista().size());
 
     }
 
@@ -601,7 +645,7 @@ public class RunManager {
         // Obtener ocupación por aeropuerto para este run
         OcupacionPorAeropuerto ocupacion = ocupacionesPorRun.get(runId);
         if (ocupacion == null) {
-            System.out.println("[RunManager.getCurrentAirportOccupancy] Ocupacion null para runId: " + runId);
+            //System.out.println("[RunManager.getCurrentAirportOccupancy] Ocupacion null para runId: " + runId);
             return result;
         }
         
