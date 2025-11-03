@@ -14,7 +14,6 @@ import pe.edu.pucp.morapack.airscheduler.api.mapper.PedidoMapper;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 
-import static org.hibernate.internal.util.StringHelper.isBlank;
 
 @Path("/pedidos")
 public class PedidosController {
