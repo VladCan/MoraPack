@@ -72,6 +72,21 @@ public class CargarPedidos {
      * Paso 2 (luego de leer): establece createdAtUtc en cada pedido
      * usando el GMT del aeropuerto DESTINO. No altera el orden de la cola.
      */
+
+    public void normalizarUtcOP(AeropuertosMap aeropuertosMap){
+        for (Pedido pedido : colaPedidos){
+            var aeropuertoDestino = aeropuertosMap.obtener(pedido.getDestino());
+            int gmt = (aeropuertoDestino != null) ? aeropuertoDestino.getGMT() : 0; // fallback seguro
+            //Verificamos si ya tiene UTC normalizada
+            if (pedido.getCreatedAtUtc() != null) continue;
+            pedido.computeUtcFromGmt(gmt);
+        }
+    }
+
+    public void setUtcNormalizada(boolean utcNormalizada) {
+        this.utcNormalizada = utcNormalizada;
+    }
+
     public void normalizarUtc(AeropuertosMap aeropuertosMap) {
         if (utcNormalizada)
             return; // idempotente
@@ -79,6 +94,8 @@ public class CargarPedidos {
         for (Pedido pedido : colaPedidos) {
             var aeropuertoDestino = aeropuertosMap.obtener(pedido.getDestino());
             int gmt = (aeropuertoDestino != null) ? aeropuertoDestino.getGMT() : 0; // fallback seguro
+            //Verificamos si ya tiene UTC normalizada (cambio hecho para OD, no rompe nada)
+            if (pedido.getCreatedAtUtc() != null) continue;
             pedido.computeUtcFromGmt(gmt);
         }
         utcNormalizada = true;
