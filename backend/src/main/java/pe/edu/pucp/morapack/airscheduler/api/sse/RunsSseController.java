@@ -15,8 +15,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import javax.print.attribute.standard.MediaSize.ISO;
-
 import java.time.format.DateTimeFormatter;
 
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunContext;
@@ -68,7 +66,7 @@ public class RunsSseController {
                 @Override
                 public void onFinished(String id, StopReason reason) {
                     emitter.emit(new FinishedEvt(id, reason.name()));
-                    emitter.complete(); // cerramos el SSE
+                    // NO cerramos el SSE aquí: los vuelos deben continuar hasta llegar
                 }
             };
             // Suscribimos al run
@@ -86,7 +84,10 @@ public class RunsSseController {
                             ISO.format(now),
                             ISO.format(simNow));
 
-                    emitter.emit(new TickEvt(runId.value(), simNow.toString()));
+                    // Obtener ocupación actual de aeropuertos
+                    var ocupacionAeropuertos = runManager.getCurrentAirportOccupancy(runId.value());
+
+                    emitter.emit(new TickEvt(runId.value(), simNow.toString(), ocupacionAeropuertos));
                 }
                 catch (Exception e) {
                     e.printStackTrace();
@@ -120,8 +121,9 @@ public class RunsSseController {
         public final String type = "TICK";
         public final String runId;
         public final String simNowUtc;
-        public TickEvt(String runId, String simNowUtc) {
-            this.runId = runId; this.simNowUtc = simNowUtc;
+        public final java.util.Map<String, java.util.Map<String, Object>> aeropuertos;
+        public TickEvt(String runId, String simNowUtc, java.util.Map<String, java.util.Map<String, Object>> aeropuertos) {
+            this.runId = runId; this.simNowUtc = simNowUtc; this.aeropuertos = aeropuertos != null ? aeropuertos : java.util.Collections.emptyMap();
         }
     }
 

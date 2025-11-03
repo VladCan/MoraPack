@@ -67,31 +67,21 @@ public class ALNS {
                 mejorSolucion = new SolucionProgramacion(nuevaSol); // copia profunda
                 //System.out.println("Cambio de mejor solución en iteración " + iter);
             }
-
             // Aceptar nueva solución (según criterio)
             boolean aceptar = (costoNueva < costoActual)
                 || (costoNueva == costoActual && rnd.nextDouble() < 0.25)
                 || (rnd.nextDouble() < tasaCambio);
             //boolean aceptar = (costoNueva < costoActual) || (rnd.nextDouble() < tasaCambio);
-
             if (aceptar) {
-                //La ruta es aceptada, se confirman los cambios de ocupaciones
-                //System.out.println("✔\uFE0F Nos estamos quedando con la nueva solución");
                 journal.commit();
                 solucionActual = new SolucionProgramacion(nuevaSol); // copia profunda
-
                 /// Para prueba (esto no se usa):
                 ocupacionPorAeropuerto1 = new OcupacionPorAeropuerto(journal.occ);
             }
             else {
-
-                //La ruta quedó descartada, no se confirman los cambios de ocupaciones
-                //System.out.println("✔\uFE0F Nos estamos quedando con la solución inicial");
                 journal.rollback();
-
                 /// Para prueba (esto no se usa en el algoritmo):
                 verificarImprimirIguales(journal.occ, ocupacionPorAeropuerto1);
-
             }
 
             //ImpresorSolucion.imprimirEnArchivo(solucionActual, "out/solucionActualALNS.txt",presenteUTC);

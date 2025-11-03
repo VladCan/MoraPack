@@ -25,6 +25,21 @@ export type VueloDTO = {
     carga: CargaItem[];
 };
 
+// Ruta de entrega de un pedido
+export type RutaDetalle = {
+    cantidad: number;
+    origen: string;
+    destinoFinal: string;
+    vuelos: Array<{
+        id: string;
+        origen: string;
+        destino: string;
+        salidaUtc: string;
+        llegadaUtc: string;
+        cantidad: number;
+    }>;
+};
+
 // Pedido con su origen asignado
 export type PedidoDTO = {
     id: number;
@@ -37,11 +52,31 @@ export type PedidoDTO = {
     fechaCreacion: string;
     fechaLocal?: string;
     continenteDestino?: string;
+    rutas?: RutaDetalle[];  // NUEVO: desglose de rutas
+};
+
+// Datos de ocupación de un aeropuerto
+export type AeropuertoOcupacion = {
+    ocupacionActual: number;
+    capacidadTotal: number;
+    disponible: number;
+    porcentaje: number;
+    cargaLlegando?: number;  // Carga que está llegando ahora mismo
+    cargaSaliendo?: number;  // Carga que está saliendo ahora mismo
+    estadisticasFuturas?: EstadisticasFuturas;
+};
+
+// Estadísticas de vuelos futuros para un aeropuerto
+export type EstadisticasFuturas = {
+    llegadasPrevistas: number;
+    salidasPrevistas: number;
+    cargaEntrante: number;
+    cargaSaliente: number;
 };
 
 export type RunEvt = 
 | {type:"RUN_STARTED"; runId: string; simStartUtc: string; wallAnchorUtc: string; speed: number }
-| { type: "TICK";        runId: string; simNowUtc:  string }
+| { type: "TICK";        runId: string; simNowUtc:  string; aeropuertos: Record<string, AeropuertoOcupacion> }
 | { type: "WINDOW";      runId: string; windowIndex: number; windowStartUtc: string; windowEndUtc: string; vuelos: VueloDTO[]; pedidos: PedidoDTO[] }
 | { type: "FINISHED";    runId: string; reason: string };
 
@@ -62,6 +97,7 @@ export function useRunSSE(runId?: string){
     const [simStartUtc, setSimStart] = useState<string|undefined>();
     const [windows, setWindows]   = useState<WindowData[]>([]);
     const [finished, setFinished] = useState<{reason:string}|null>(null);
+    const [airportOccupancy, setAirportOccupancy] = useState<Record<string, AeropuertoOcupacion>>({});
 
     const esRef = useRef<EventSource | null>(null);
 
@@ -98,6 +134,9 @@ export function useRunSSE(runId?: string){
                         break;
                     case "TICK":
                         setSimNow(evt.simNowUtc);
+                        if (evt.aeropuertos) {
+                            setAirportOccupancy(evt.aeropuertos);
+                        }
                         break;
                     case "WINDOW":
                         setWindows((prev) => {
@@ -151,6 +190,7 @@ export function useRunSSE(runId?: string){
         simNowUtc,
         windows,
         finished,
+        airportOccupancy,
         disconnect, //<- opcional por ahora
     };
 

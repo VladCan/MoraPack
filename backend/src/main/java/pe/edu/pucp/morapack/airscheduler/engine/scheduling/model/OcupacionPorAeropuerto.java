@@ -59,7 +59,7 @@ public class OcupacionPorAeropuerto {
     }
 
     /// POR AHORA USAR SOLO DENTRO DE LA CLASE (TOINCLUSIVE TRUE)
-    private Integer ocupacion(String idAeropuerto, Instant t){
+    public Integer ocupacion(String idAeropuerto, Instant t){
         if (t == null) throw new IllegalArgumentException("Null date");
 
         TreeMap<Instant, Integer> evs = eventosDe(idAeropuerto);
@@ -80,12 +80,6 @@ public class OcupacionPorAeropuerto {
 
     public Integer maxReservable(String idAeropuerto, Instant inicio, Instant fin){
         validarIntervalo(inicio, fin);
-
-        /*DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
-        Instant objetivo = Instant.parse("2025-10-10T00:54:00Z");
-        if (idAeropuerto.equals("LOWW") && !inicio.isAfter(objetivo) && !inicio.isBefore(objetivo) && eventosDe(idAeropuerto).size() >= 18){
-            System.out.println("Estamos en la fecha: " + formatter.format(inicio));
-        }*/
 
         if (inicio.equals(fin)) {
             // No hay tiempo de estancia ⇒ no se necesita holgura.
@@ -168,13 +162,6 @@ public class OcupacionPorAeropuerto {
 
         TreeMap<Instant, Integer> evs = eventosDe(idAeropuerto);
 
-        /*DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
-        Instant objetivo = Instant.parse("2025-10-09T00:54:00Z");
-        if (idAeropuerto.equals("LOWW") && !inicio.isAfter(objetivo) && !inicio.isBefore(objetivo)){
-            System.out.println("Estamos en la fecha: " + formatter.format(inicio));
-        }*/
-
-
         // === Protección: para no permitir ocupación negativa en el intervalo ===
         // Ocupación justo antes de aplicar la liberación
         int occ = ocupacion(idAeropuerto, inicio);
@@ -224,13 +211,6 @@ public class OcupacionPorAeropuerto {
 
         var ck = checkpointsDe(idAeropuerto);
 
-        /*DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
-        Instant objetivo = Instant.parse("2025-10-10T00:00:00Z");
-        if (idAeropuerto.equals("LOWW") && !inicio.isAfter(objetivo) && !inicio.isBefore(objetivo)){
-            System.out.println("Estamos en la fecha: " + formatter.format(inicio));
-        }*/
-
-
         Instant dayStart = inicioDeDiaUTC(inicio);
         Instant midnight = inicio.equals(dayStart) ? dayStart : dayStart.plusSeconds(24 * 60 * 60);
 
@@ -242,8 +222,6 @@ public class OcupacionPorAeropuerto {
 
             midnight = midnight.plusSeconds(24 * 60 * 60); // siguiente medianoche
         }
-
-
     }
 
     ///
@@ -257,24 +235,6 @@ public class OcupacionPorAeropuerto {
     private TreeMap<Instant, Integer> checkpointsDe(String id) {
         return checkpoints.computeIfAbsent(id, k -> new TreeMap<>());
     }
-    /* 
-    private void asegurarCheckpoint(String id, Instant dayStart) {
-        var ck = checkpointsDe(id);
-        if (ck.containsKey(dayStart)) return;
-
-        var ev = eventosDe(id);
-
-        // Tomamos el checkpoint previo si existe; si no, partimos de 0
-        Map.Entry<Instant, Integer> prevCk = ck.floorEntry(dayStart);
-        int occ = (prevCk != null) ? prevCk.getValue() : 0;
-        Instant desde = (prevCk != null) ? prevCk.getKey() : Instant.MIN; // si no hay, desde el principio
-
-        // Sumamos eventos en (desde, dayStart)
-        for (var delta : ev.subMap(desde, false, dayStart, true).values()) {
-            occ += delta;
-        }
-        ck.put(dayStart, occ);
-    }*/
 
     /** Inicio de día en UTC para el instante dado. */
     private static Instant inicioDeDiaUTC(Instant t) {
