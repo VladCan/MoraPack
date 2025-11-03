@@ -529,6 +529,19 @@ public class RunManager {
             /// 1. Inicializar catálogos (vuelos + aeropuertos ONLY)
             inicializarCatalogos(config.scenario());
 
+            /// Cuidado con esto, no se que tanto rompa
+            // Verificar si ya enviamos esta ventana (idempotencia)
+            String windowIdISO = wStart.toString();
+            Set<String> ventanasEnviadasRun = ventanasEnviadas.computeIfAbsent(id, k -> new HashSet<>());
+            if (ventanasEnviadasRun.contains(windowIdISO)) {
+                System.out.println("[RunManager] Ventana ya enviada, saltando: " + windowIdISO);
+                // Avanzar a la siguiente ventana antes de continuar
+                idx++;
+                wStart = wEnd;
+                wEnd = wEnd.plus(config.horasVentana());
+                continue;
+            }
+
             System.out.println("[RunManager] Procesando ventana " + idx + ": " + wStart + " - " + wEnd);
 
             try {
@@ -554,26 +567,86 @@ public class RunManager {
 
                     /// Primero, cargamos de queue a pedidosCargados y limpiamos queue
                     cargarPedidosDesdeQueue(id, pedidosCargados);
+                    VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wEnd);
+                    List<Pedido> pedidosVentana = ventana.pedidos();
 
                     /// Si no hay nada en la ventana, duerme
                     // sleepToEndWindow(id, wEnd);
+                    if (pedidosVentana.isEmpty()) {
+                        System.out.println("[RunManager] No hay pedidos en la ventana " + idx);
+                        // Marcar ventana como enviada aunque esté vacía
+                        ventanasEnviadasRun.add(windowIdISO);
+                        broadcastWindow(new WindowPacket(id, idx, wStart, wEnd, List.of(),
+                                convertirPedidosADTO(List.of(), null)));
+
+                        //Llamamos al sleep (para que el reloj simulado cruce fin de ventana):
+                        sleepToEndWindow(id, wEnd);
+
+                        // Avanzar a la siguiente ventana antes de continuar
+                        idx++;
+                        wStart = wEnd;
+                        wEnd = wEnd.plus(config.horasVentana());
+                        //Como se ha diseñado para que lea todo0 de un archivo, tenemos que hacer esto para que funcione por ventana
+                        pedidosCargados.setUtcNormalizada(false);
+                        continue;
+                    }
 
                 /// 3. Construimos TEG
 
+                Instant finTEG = wEnd.plus(config.horizon());
+                TEGParametros params = TEGParametros.builder()
+                        .inicioUtc(wStart)
+                        .finUtc(finTEG)
+                        .sedes(sedes)
+                        .arribosLibres(enVuelo)
+                        .reservasWaitIniciales(reservas)
+                        .build();
+
+                VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, vuelosMap).construir(params);
+
                 /// 4. Generamos la solución inicial (seed)
+                OcupacionPorAeropuerto ocupacionPorAeropuerto = ocupacionesPorRun.computeIfAbsent(id, k -> new OcupacionPorAeropuerto(aeropuertosMap));
+                SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of(), ocupacionPorAeropuerto);
+                SolucionProgramacion seed = ssp.generarSeed(teg, pedidosVentana, wStart);
 
                 /// 5. Ejecutamos ALNS
+                List<DestructionOperator> destructores = new ArrayList<>();
+                destructores.add(new RandomRemoval(20));
+                destructores.add(new WorstRemoval(20));
+
+                List<RepairOperator> reparadores = new ArrayList<>();
+                reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
+                reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
+
+                ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto);
+                SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
                 /// 6. Guardar solución para la siguiente ventana
+                solucionesAnteriores.put(id, solucionOptima);
 
                 /// 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
+                final Instant wStartFinal = wStart;
+                final Instant wEndFinal = wEnd;
+
+                List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStartFinal, wEndFinal);
+
+                // IMPORTANTE: Enviar TODOS los pedidos procesados (incluye parciales de ventanas anteriores)
+                // para que el frontend vea el estado actualizado de cada pedido
+                List<Object> pedidosVentanaDTO = convertirPedidosADTO(pedidosVentana, solucionOptima);
 
                 /// 8. Marcar ventana como enviada y hacer broadcast
+
+                ventanasEnviadasRun.add(windowIdISO);
+                broadcastWindow(new WindowPacket(id, idx, wStart, wEnd, vuelosVentana, pedidosVentanaDTO));
+
+                System.out.println("[RunManager] Ventana " + idx + " procesada exitosamente. Vuelos: " + vuelosVentana.size() + ", Pedidos: " + pedidosVentanaDTO.size());
+
 
                 System.out.println("Esto es operación diaria y estoy dentro del bucle. No hago nada más. El " +
                         "tiempo actual es:" + currentSimNow(id));
             }
             catch (Exception e){
+                System.err.println("[RunManager] Error procesando ventana " + idx + ": " + e.getMessage());
                 e.printStackTrace();
             }
 
