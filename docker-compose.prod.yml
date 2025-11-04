@@ -11,10 +11,10 @@ services:
     expose:
       - 8080
     environment:
-      # - QUARKUS_DATASOURCE_JDBC_URL=...
-      # - QUARKUS_DATASOURCE_USERNAME=...
-      # - QUARKUS_DATASOURCE_PASSWORD=...
-      - TZ=America/Lima
+      # Sobreescribe el default 'resource' a 'filesystem'
+      - MORAPACK_DATA_SOURCE_MODE=filesystem 
+      # Sobreescribe el default a /uploads (por seguridad, aunque el default ya era /uploads)
+      - MORAPACK_UPLOAD_DIR=/uploads
     volumes: # <--- CAMBIO AQUÍ (Sección nueva)
       # Conecta el volumen 'morapack-data' a la ruta '/uploads' del contenedor
       - morapack-data:/uploads
