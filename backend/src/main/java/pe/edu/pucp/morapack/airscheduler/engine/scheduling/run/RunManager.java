@@ -1,6 +1,7 @@
 package pe.edu.pucp.morapack.airscheduler.engine.scheduling.run;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -12,6 +13,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoManager;
 // Imports para la lógica de planificación
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
@@ -38,6 +40,13 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.ssp.SSPGeneradorSeed;
 
 @ApplicationScoped
 public class RunManager {
+
+    @Inject
+    ArchivoManager archivoManager;
+    private static final String AEROPUERTOS_FILENAME = "aereopuertos.txt";
+    private static final String VUELOS_FILENAME = "vuelos.txt";
+    private static final String PEDIDOS_FILENAME = "pedidos.txt";
+
     private final ExecutorService executor = Executors.newCachedThreadPool((r -> {
         Thread t = new Thread(r, "run-" + UUID.randomUUID());
         t.setDaemon(true);
@@ -137,44 +146,53 @@ public class RunManager {
             
             // Cargar aeropuertos
             aeropuertosMap = new AeropuertosMap();
-            try (Scanner sc = ArchivoUtils.getScannerFromResource(
-                    "c.1inf54.25.2.Aeropuerto.husos.v1.20250818__estudiantes.txt")) {
+            
+            // **USO DE ARCHIVOMANAGER:** Usar el manager para el archivo de aeropuertos
+            try (Scanner sc = archivoManager.getScannerForDataFile(AEROPUERTOS_FILENAME).orElse(null)) {
                 if (sc != null) {
                     aeropuertosMap.leerDatos(sc);
                     System.out.println("[RunManager] Aeropuertos cargados: " + aeropuertosMap.size());
                 } else {
-                    System.err.println("[RunManager] No se encontró archivo de aeropuertos");
+                    // El manager ya imprimió el error, pero reconfirmamos
+                    System.err.println("[RunManager] Falló la carga del archivo de aeropuertos."); 
                 }
+            } catch (Exception e) {
+                System.err.println("[RunManager] Error procesando archivo de aeropuertos: " + e.getMessage());
             }
             
             // Cargar vuelos
             vuelosMap = new VuelosMap(aeropuertosMap);
-            try (Scanner sc = ArchivoUtils.getScannerFromResource(
-                    "c.1inf54.25.2.planes_vuelo.v4.20250818.txt")) {
+            
+            // **USO DE ARCHIVOMANAGER:** Usar el manager para el archivo de vuelos
+            try (Scanner sc = archivoManager.getScannerForDataFile(VUELOS_FILENAME).orElse(null)) {
                 if (sc != null) {
                     vuelosMap.leerDatos(sc);
                     System.out.println("[RunManager] Vuelos cargados");
                 } else {
-                    System.err.println("[RunManager] No se encontró archivo de vuelos");
+                    System.err.println("[RunManager] Falló la carga del archivo de vuelos.");
                 }
+            } catch (Exception e) {
+                 System.err.println("[RunManager] Error procesando archivo de vuelos: " + e.getMessage());
             }
             
             // Cargar pedidos (solo fuera de OPERACION)
             pedidosCargados = new CargarPedidos();
 
             if (scenario != RunConfig.Scenario.OPERACION){
-                try (Scanner sc = ArchivoUtils.getScannerFromResource("pedidosProfe.txt")) {
+                // **USO DE ARCHIVOMANAGER:** Usar el manager para el archivo de pedidos
+                try (Scanner sc = archivoManager.getScannerForDataFile(PEDIDOS_FILENAME).orElse(null)) {
                     if (sc != null) {
                         pedidosCargados.leerDatosProfe(sc);
                         pedidosCargados.normalizarUtc(aeropuertosMap);
                         pedidosCargados.ordenarPorUTC();
                         System.out.println("[RunManager] Pedidos cargados: " + pedidosCargados.getLista().size());
                     } else {
-                        System.err.println("[RunManager] No se encontró archivo de pedidos");
+                        System.err.println("[RunManager] Falló la carga del archivo de pedidos.");
                     }
+                } catch (Exception e) {
+                    System.err.println("[RunManager] Error procesando archivo de pedidos: " + e.getMessage());
                 }
             }
-
             
             // Definir sedes
             sedes = new HashSet<>(Arrays.asList("SPIM", "EBCI", "UBBB"));

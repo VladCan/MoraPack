@@ -14,7 +14,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.Aeropuerto
 
 public class Genera {
 
-    private static final String AIRPORTS_RESOURCE = "c.1inf54.25.2.Aeropuerto.husos.v1.20250818__estudiantes.txt";
+    private static final String AIRPORTS_RESOURCE = "aereopuertos.txt";
 
     private static final String[] DESTINOS = {
             "SKBO", "SEQM", "SVMI", "SBBR", "SPIM", "SLLP", "SCEL", "SABE", "SGAS", "SUAA",

@@ -16,7 +16,7 @@ public class TestReservasCheckpoints {
         final Set<String> sedes = new HashSet<>(Arrays.asList("SPIM", "EBCI", "UBBB"));
         AeropuertosMap aeropuertosMap = new AeropuertosMap();// Aeropuertos (incluye husos horarios)
         try (Scanner sc = ArchivoUtils.getScannerFromResource(
-                "c.1inf54.25.2.Aeropuerto.husos.v1.20250818__estudiantes.txt")) {
+                "aeropuertos.txt")) {
             if (sc == null)
                 return;
             aeropuertosMap.leerDatos(sc);
