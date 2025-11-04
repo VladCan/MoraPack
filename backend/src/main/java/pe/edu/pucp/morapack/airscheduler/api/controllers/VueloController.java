@@ -29,7 +29,7 @@ public class VueloController {
     VuelosArchivoService vuelosArchivoService; // <-- Nuevo: Service que maneja I/O
     
     // Mantenemos el FILENAME para el cuerpo de las respuestas HTTP
-    private static final String FILENAME = "planesDeVuelo.txt"; 
+    private static final String FILENAME = "vuelos.txt"; 
 
     // Endpoint para recibir el archivo y guardarlo (DELEGACIÓN AL SERVICE)
     @POST

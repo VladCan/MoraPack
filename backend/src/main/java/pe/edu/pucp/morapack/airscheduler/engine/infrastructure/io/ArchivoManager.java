@@ -14,7 +14,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 @ApplicationScoped
 public class ArchivoManager {
 
-    @ConfigProperty(name = "morapack.data.source.mode", defaultValue = "resource")
+    @ConfigProperty(name = "morapack.data.source.mode")
     String dataSourceMode; 
 
     @ConfigProperty(name = "morapack.upload.dir")
