@@ -36,7 +36,7 @@ public class VuelosLiveService {
         Optional<Scanner> scOpt = vuelosArchivoService.getScannerForInitialLoad(); 
         
         if (scOpt.isEmpty()) {
-            System.err.println("[VuelosLiveService] No se encontró planesDeVuelo.txt. Carga inicial omitida.");
+            System.err.println("[VuelosLiveService] No se encontró vuelos.txt. Carga inicial omitida.");
             return;
         }
         
