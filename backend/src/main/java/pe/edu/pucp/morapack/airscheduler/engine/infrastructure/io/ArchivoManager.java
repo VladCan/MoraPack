@@ -34,7 +34,7 @@ public class ArchivoManager {
 
     /**
      * Obtiene un Scanner para leer cualquier archivo de datos iniciales.
-     * @param filename El nombre del archivo a buscar (e.g., "planesDeVuelo.txt").
+     * @param filename El nombre del archivo a buscar (e.g., "vuelos.txt").
      */
     public Optional<Scanner> getScannerForDataFile(String filename) { // <-- ¡Ahora acepta String!
         Optional<InputStream> isOpt = getInputStreamForDataFile(filename);

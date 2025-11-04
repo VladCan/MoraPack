@@ -21,7 +21,7 @@ public class VuelosArchivoService {
     @Inject
     ArchivoManager archivoManager; // Para obtener la ruta base y el Scanner
 
-    private static final String FILENAME = "planesDeVuelo.txt";
+    private static final String FILENAME = "vuelos.txt";
 
     /**
      * Obtiene el Path del archivo de planes de vuelo.
