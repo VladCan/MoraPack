@@ -12,6 +12,15 @@ type NavClockProps = {
   /** Locale para formateo (ej: 'es-PE') */
   locale?: string;
   /** Si lo pasas, se usará para obtener hora del backend; debe devolver un Date “server”. */
+
+  /// ESTO ES NUEVO: ///
+
+  value?: Date;
+
+  variant?: "system" | "run"; 
+
+  /// ESTO ES NUEVO ///
+
   fetcher?: () => Promise<Date>;
   /** Cada cuánto refrescar desde el backend (ms). Si no hay fetcher, solo hace tick local. */
   refreshInterval?: number;
@@ -22,16 +31,24 @@ export default function NavClock({
   use24h = true,
   showDate = true,
   locale = "es-ES",
+  value,
+  variant = "system",
   fetcher,
   refreshInterval = 60_000, // 1 min
 }: NavClockProps) {
   const [now, setNow] = useState<Date>(new Date());
 
-  // tick local cada segundo (suave para el navbar)
+  // Si NO hay value controlado, hacemos tick local
   useEffect(() => {
+    if (value) return; // controlado desde afuera
     const id = setInterval(() => setNow((d) => new Date(d.getTime() + 1000)), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [value]);
+
+  // Si llega un value controlado, lo reflejamos
+  useEffect(() => {
+    if (value) setNow(value);
+  }, [value]);
 
   // si hay fetcher, sincroniza periódicamente con backend
   useEffect(() => {
@@ -69,6 +86,12 @@ export default function NavClock({
       })
     : "";
 
+    // Paleta sutil distinta para “run”
+  const color =
+    variant === "run"
+      ? "bg-blue-50/70 ring-blue-300 text-blue-900"
+      : "bg-card/40 ring-border text-foreground";
+
   return (
     <div
       className={[
@@ -81,7 +104,7 @@ export default function NavClock({
         "flex items-center text-base font-medium",
         className,
       ].join(" ")}
-      title="Hora del sistema"
+      title={variant === "run" ? "Hora de simulación" : "Hora del sistema"}
     >
       <Clock className="h-4 w-4 opacity-80" />
       <div className="leading-tight">

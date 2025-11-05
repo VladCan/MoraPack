@@ -13,6 +13,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ModeToggle } from "../ui/mode-toggle";
 import { useRunSession } from "@/lib/runSession";
 import { useRunSSE } from "@/hooks/useRunSSE";
+import ClockSwitcher from "./ClockSwitcher";
 
 const tabs = [
   { to: "/registrar", label: "Registrar envío" },
@@ -44,6 +45,9 @@ export default function TopNav() {
 
   //Traemos el contexto
   const { runId, status, end, setSimNow, setWindow } = useRunSession();
+
+  //Para el reloj
+  const running = status === "running" && !!runId;
   
   //Acá expone connect(url, handlers) -> () => void
   const { simNowUtc, windows, finished } = useRunSSE(
@@ -170,7 +174,10 @@ export default function TopNav() {
           <>
             {/* Desktop: reloj fijo */}
             <div className="hidden md:block">
-              <NavClock className="fixed top-2 right-3 z-[50] shrink-0 whitespace-nowrap" />
+              <ClockSwitcher
+                running={running}
+                runNow={simNowUtc ? new Date(simNowUtc) : null}
+              />
             </div>
 
             {/* ===== MÓVIL: FAB reloj (izquierda) ===== */}
