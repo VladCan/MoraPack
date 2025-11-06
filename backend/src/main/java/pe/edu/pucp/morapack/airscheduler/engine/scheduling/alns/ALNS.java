@@ -25,7 +25,7 @@ public class ALNS {
     private final OcupacionPorAeropuerto ocupacionPorAeropuerto;
 
     private final Random rnd = new Random();        // RNG compartido para selección de operadores
-    private final int maxIter = 5;                 // iteraciones máximas
+    private final int maxIter = 3;                 // iteraciones máximas
     private final double tasaCambio = 0.3;          // probabilidad de aceptar peores soluciones
 
     public static final File logFile = new File("journal.log");
@@ -38,7 +38,7 @@ public class ALNS {
         OcupacionPorAeropuerto ocupacionPorAeropuerto1 = new OcupacionPorAeropuerto(ocupacionPorAeropuerto);
 
         for (int iter = 0; iter < maxIter; iter++) {
-            //System.out.println("Iteración ALNS " + iter);
+            System.out.println("---------Iteración ALNS " + (iter + 1) + "---------");
 
             // Seleccionar operadores aleatorios
             DestructionOperator destrOp = destructions.get(rnd.nextInt(destructions.size()));

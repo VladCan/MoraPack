@@ -25,7 +25,7 @@ public class RegretRepair implements RepairOperator {
     private final List<String> sedes;
     private final IndexVuelos indexVuelos;
 
-    private final int N = 5;
+    private final int N = 3;
     private final Duration slaLlegadaMax = Duration.ofHours(46);
     private final int H_MAX = 3;
 
@@ -44,15 +44,21 @@ public class RegretRepair implements RepairOperator {
     @Override
     public void repair(SolucionProgramacion s, ALNS.Journal journal, Instant presenteUTC) {
 
+        int cantReparados = 0;
+        int cantSinPedidos = 0;
+
         List<PlanPedido> planos = new ArrayList<>(s.getPlanPorPedido().values());
         CargaPorVuelo cargaPorVuelo = s.getCargaPorVuelo();
 
-        System.out.println("Estamos dentro del repair.");
+        //System.out.println("Estamos dentro del repair.");
 
         ///Vamos a buscar todos los planes que no tengan rutas (osea, los destruidos)
         for (PlanPedido plan : planos) {
             /// Encontramos un plan sin rutas
             if (plan.getRutas() == null || plan.getRutas().isEmpty()) {
+
+                cantSinPedidos++;
+
                 int idPedido = plan.getIdPedido();
                 int demanda = plan.getDemanda();
                 String dest = plan.getAeropuertoDestino();
@@ -60,7 +66,7 @@ public class RegretRepair implements RepairOperator {
 
                 List<PlanPedido> planesCandidatos = new ArrayList<>();
 
-                System.out.println("La demanda de este pedido es: " + demanda);
+                //System.out.println("La demanda de este pedido es: " + demanda);
 
                 /// Vamos a generar N planes para un mismo pedido
                 for (int i = 0; i < N; i++) {
@@ -80,7 +86,9 @@ public class RegretRepair implements RepairOperator {
 
                     int rem = demanda;
 
-                    System.out.println("!!!!Comenzando plan: " + (i+1) + " de " + N);
+                    //System.out.println("!!!!Comenzando plan: " + (i+1) + " de " + N);
+
+                    //System.out.println("Entrando al while...");
 
                     /// Aca dentro va la lógica del SSP
                     while (rem > 0) {
@@ -96,12 +104,12 @@ public class RegretRepair implements RepairOperator {
                             if (ruta != null) break;
                         }
 
-                        System.out.println("Salí de buscarRutaMinHops.");
+                        //System.out.println("Salí de buscarRutaMinHops.");
 
                         //No se pudo asignar ni una sola ruta: break
                         if (ruta == null) break;
 
-                        System.out.println("Tenemos una supuesta ruta factible (ruta != null).");
+                        //System.out.println("Tenemos una supuesta ruta factible (ruta != null).");
 
                         // 3.1) Determinar cantidad asignable: mínimo de residuales en los vuelos de la ruta
                         int capRuta = capacidadVuelosSim(ruta, cargaPorVuelo, deltaCargaLocal);
@@ -122,7 +130,7 @@ public class RegretRepair implements RepairOperator {
                         //Determinamos mínimo asignable
                         int q = Math.min(Math.min(capRuta, capOcup), rem);
 
-                        System.out.println("Ruta factible. Vamos a reservar: " + q);
+                        //System.out.println("Ruta factible. Vamos a reservar: " + q);
 
                         // 5.1) Reservar 'q' en los aeropuertos/almacenes
                         reservarOcupacionesRuta(ruta, ocupacionEnAlmacen, q);
@@ -134,13 +142,13 @@ public class RegretRepair implements RepairOperator {
                         // 6) Actualizar remanente y ventana 2h
                         rem -= q;
 
-                        System.out.println("Ahora mi rem es: " + rem);
+                        //System.out.println("Ahora mi rem es: " + rem);
 
                         if (primeraLlegada == null) primeraLlegada = ruta.arriboFinal;
 
                     }
 
-                    System.out.println("Salí del bucle");
+                    //System.out.println("Salí del while");
 
                     if (rem <= 0){
                         PlanPedido planCandidato = PlanPedido.builder()
@@ -156,18 +164,28 @@ public class RegretRepair implements RepairOperator {
 
                 }
 
+
+
                 /// Sobre los planesCandidatos, aplicamos el regret y nos quedamos con 1.
                 PlanPedido planElegido = obtenerPlanElegido(planesCandidatos, cargaPorVuelo);
 
-                /// Con dicho plan, actualizamos las ocupaciones de solucionProgramacion
-                aplicarPlanEnGlobal(planElegido, s, journal);
+                if (planElegido != null){
+                    /// Con dicho plan, actualizamos las ocupaciones de solucionProgramacion
+                    aplicarPlanEnGlobal(planElegido, s, journal);
 
-                /// Nueva cargaPorVuelo (de la solución actualizada)
-                cargaPorVuelo = s.getCargaPorVuelo();
+                    /// Nueva cargaPorVuelo (de la solución actualizada)
+                    cargaPorVuelo = s.getCargaPorVuelo();
 
+                    cantReparados++;
+                    System.out.println("Reparamos " + cantReparados);
+                }
 
             }
         }
+
+
+        System.out.println("[RegretRepair] De " + cantSinPedidos + " pedidos sin rutas," +
+                " reconstruimos: " + cantReparados);
 
     }
 
@@ -232,11 +250,13 @@ public class RegretRepair implements RepairOperator {
         long seed = Objects.hash(idPedido, i, 9_001);
         Collections.shuffle(hopsI, new Random(seed));
 
+        /*
         for (int a : hopsI){
             System.out.print(a + " - ");
         }
+         */
 
-        System.out.println(" ");
+        //System.out.println(" ");
 
         return hopsI;
     }
@@ -540,14 +560,14 @@ public class RegretRepair implements RepairOperator {
                 Instant ini = tPrev.getLlegadaUtc();
                 Instant fin = tNext.getVuelo().getSalidaUtc();
                 if (ini.isBefore(fin)) {
-                    journal.getOcc().reservar(tPrev.getVuelo().getDestino(), ini, fin, qRuta);
+                    journal.reservar(tPrev.getVuelo().getDestino(), ini, fin, qRuta);
                 }
             }
 
             // (B) +2h en destino final
             TramoAsignado last = tramos.get(tramos.size() - 1);
             Instant arr = last.getLlegadaUtc();
-            journal.getOcc().reservar(last.getVuelo().getDestino(), arr, arr.plus(Duration.ofHours(2)), qRuta);
+            journal.reservar(last.getVuelo().getDestino(), arr, arr.plus(Duration.ofHours(2)), qRuta);
 
             // (C) Asignación global en vuelos
             for (TramoAsignado t : tramos) {
