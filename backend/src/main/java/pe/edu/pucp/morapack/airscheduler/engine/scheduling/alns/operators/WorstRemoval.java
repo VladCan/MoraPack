@@ -1,5 +1,6 @@
 package pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.operators;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
@@ -63,28 +64,44 @@ public class WorstRemoval implements DestructionOperator {
     }
 
     private void liberarRuta(PlanPedido plan, RutaAsignada ruta, ALNS.Journal journal, SolucionProgramacion s) {
-        int q = ruta.getCantidad();
-        List<TramoAsignado> tr = ruta.getTramos();
 
-        for (int i = 0; i < tr.size(); i++) {
-            TramoAsignado t = tr.get(i);
-            VueloProgramadoId v = t.getVuelo();
+        if (ruta == null || ruta.getTramos() == null || ruta.getTramos().isEmpty()) return;
 
-            Instant oriIni = (i == 0) ? plan.getCreadoUtc() : tr.get(i - 1).getVuelo().getLlegadaUtc();
-            Instant oriFin = v.getSalidaUtc();
-            if (oriIni != null && oriFin != null && !oriFin.isBefore(oriIni)) {
-                journal.liberar(v.getOrigen(), oriIni, oriFin, q);
+        final int qRuta = ruta.getCantidad();                  // lo que reservaste en occ
+        final List<TramoAsignado> tr = ruta.getTramos();
+
+        // 1) ESCALAS: liberar [llegada(tr i), salida(tr i+1)) en aeropuerto destino del tramo i
+        for (int i = 0; i < tr.size() - 1; i++) {
+            TramoAsignado tPrev = tr.get(i);
+            TramoAsignado tNext = tr.get(i + 1);
+
+            String apEscala = tPrev.getVuelo().getDestino();
+            Instant ini = tPrev.getLlegadaUtc();
+            Instant fin = tNext.getVuelo().getSalidaUtc();
+
+            if (ini != null && fin != null && ini.isBefore(fin)) {
+                journal.liberar(apEscala, ini, fin, qRuta);
             }
-
-            Instant dstIni = v.getLlegadaUtc();
-            Instant dstFin = (i + 1 < tr.size())
-                    ? tr.get(i + 1).getVuelo().getSalidaUtc()
-                    : (dstIni == null ? null : dstIni.plus(java.time.Duration.ofHours(2)));
-            if (dstIni != null && dstFin != null && !dstFin.isBefore(dstIni)) {
-                journal.liberar(v.getDestino(), dstIni, dstFin, q);
-            }
-
-            s.getCargaPorVuelo().asignar(v, -q);
         }
+
+        // 2) DESTINO FINAL: liberar +2h
+        TramoAsignado last = tr.get(tr.size() - 1);
+        String apFinal = last.getVuelo().getDestino();
+        Instant arr = last.getLlegadaUtc();
+        if (arr != null) {
+            Instant fin2h = arr.plus(Duration.ofHours(2));
+            journal.liberar(apFinal, arr, fin2h, qRuta);
+        }
+
+        // 3) CARGA EN VUELOS: revertir asignaciones por tramo
+        for (TramoAsignado t : tr) {
+            int qTramo = t.getCantidad();                      // usa la cantidad efectiva del tramo
+            if (qTramo != 0) {
+                s.getCargaPorVuelo().asignar(t.getVuelo(), -qTramo);
+            }
+        }
+
+
+
     }
 }

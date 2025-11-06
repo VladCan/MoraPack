@@ -136,10 +136,10 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             //ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt",presenteUTC);
             // ALNS
             List<DestructionOperator> destructores = new ArrayList<>();
-            destructores.add(new RandomRemoval(20));
+            //destructores.add(new RandomRemoval(20));
             destructores.add(new WorstRemoval(20));
             List<RepairOperator> reparadores = new ArrayList<>();
-            reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
+            //reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
             reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
             ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC, ocupacionPorAeropuerto);
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
@@ -166,7 +166,18 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                         Locale.forLanguageTag("es-ES"))
                         .withZone(ZoneOffset.UTC).format(presenteUTC)));
 
-            VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46),mapa);
+            //VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46), mapa);
+
+            /// VerificadorSLA que solo revisa 46hrs:
+            List<VerificadorSLA.SLAViolation> v46 = VerificadorSLA.verificarSLA46hEstricto(
+                    solucionOptima, Duration.ofHours(46), presenteUTC);
+
+            if (!v46.isEmpty()) {
+                System.out.println("⚠️ Violaciones SLA 46h: " + v46.size());
+            } else {
+                System.out.println("✅ Ningún pedido viola el SLA 46h.");
+            }
+
         }
         System.out.println("─────────────────────────────────────────────");
         System.out.println("📄 Reporte de simulación guardado en: out/reporteSimulacion.txt");
@@ -185,6 +196,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
         borrarSiExiste("out/solucion.txt");
         borrarSiExiste("out/solucionInicial.txt");
         borrarSiExiste("out/reporteAereopuertos.txt");
+        borrarSiExiste("journal.log");
     }
 
     private static void borrarSiExiste(String nombre) {

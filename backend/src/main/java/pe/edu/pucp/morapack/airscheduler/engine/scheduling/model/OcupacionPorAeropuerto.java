@@ -50,6 +50,26 @@ public class OcupacionPorAeropuerto {
         this.aeropuertosMap = original.aeropuertosMap;
     }
 
+    //Para no reasignar la referencia
+    public void copyFrom(OcupacionPorAeropuerto other) {
+        if (other == null) return;
+
+        this.eventos.clear();
+        this.checkpoints.clear();
+
+        // Copia profunda de eventos
+        for (Map.Entry<String, TreeMap<Instant, Integer>> e : other.getEventos().entrySet()) {
+            this.eventos.put(e.getKey(), new TreeMap<>(e.getValue()));
+        }
+
+        // Copia profunda de checkpoints
+        for (Map.Entry<String, TreeMap<Instant, Integer>> e : other.getCheckpoints().entrySet()) {
+            this.checkpoints.put(e.getKey(), new TreeMap<>(e.getValue()));
+        }
+
+        this.aeropuertosMap = other.aeropuertosMap;
+    }
+
     ///
     /// Funciones principales: disponible, ocupacion, maxReservable, reservar, liberar.
     ///
@@ -108,6 +128,45 @@ public class OcupacionPorAeropuerto {
         return Math.max(0, holgura);
     }
 
+    public void reservarConNombre(String idAeropuerto, Instant inicio, Instant fin, int q, String clase){
+        validarIntervalo(inicio, fin);
+        if (q <= 0) throw new IllegalArgumentException("q debe ser > 0");
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
+        Instant objetivo = Instant.parse("2025-10-10T06:18:00Z");
+        if (idAeropuerto.equals("LOWW") && !inicio.isAfter(objetivo) && !inicio.isBefore(objetivo)){
+            System.out.println("Estamos en la fecha: " + formatter.format(inicio));
+        }
+
+        if (inicio.equals(fin)){
+            //System.out.println("Inicio y fin iguales.");
+            return;
+        }
+
+        int maxQ = maxReservable(idAeropuerto, inicio, fin);
+        if (q > maxQ){ //Si queremos asignar más de lo que realmente se puede.
+            System.out.println(" \uD83D\uDEA8 [" + clase + "] Reserva excede holgura. aeropuerto=" + idAeropuerto +
+                    " q=" + q + " > maxReservable=" + maxQ +
+                    " en [" + inicio + ", " + fin + ")");
+            return;
+        }
+
+
+        //if (idAeropuerto.equals("SKBO"))
+        //System.out.println("Vamos a reservar " + q  + " desde " + formatter.format(inicio) + " hasta " + formatter.format(fin) + " porque maxReservable = " + maxQ);
+
+        TreeMap<Instant, Integer> evs = eventosDe(idAeropuerto);
+        evs.merge(inicio, q, Integer::sum);
+        evs.merge(fin, -q, Integer::sum);
+
+        //Si el delta queda en 0, se remueve.
+        if (evs.get(inicio) != null && evs.get(inicio) == 0) evs.remove(inicio);
+        if (evs.get(fin) != null && evs.get(fin) == 0) evs.remove(fin);
+
+        // Actualiza checkpoints en medianoches dentro de [inicio, fin)
+        actualizarCheckpointsEnRango(idAeropuerto, inicio, fin, +q);
+    }
+
     public void reservar(String idAeropuerto, Instant inicio, Instant fin, int q){
         validarIntervalo(inicio, fin);
         if (q <= 0) throw new IllegalArgumentException("q debe ser > 0");
@@ -125,10 +184,9 @@ public class OcupacionPorAeropuerto {
 
         int maxQ = maxReservable(idAeropuerto, inicio, fin);
         if (q > maxQ){ //Si queremos asignar más de lo que realmente se puede.
-            /*
-            System.out.println("Reserva excede holgura. aeropuerto=" + idAeropuerto +
+            System.out.println(" \uD83D\uDEA8 Reserva excede holgura. aeropuerto=" + idAeropuerto +
                     " q=" + q + " > maxReservable=" + maxQ +
-                    " en [" + inicio + ", " + fin + ")"); */
+                    " en [" + inicio + ", " + fin + ")");
             return;
         }
 
@@ -181,7 +239,7 @@ public class OcupacionPorAeropuerto {
         int qEfectivo = Math.min(q, Math.max(0, minOcc));
         //if (qEfectivo != q) System.out.println("qEfectivo != q: " + qEfectivo + " != " + q);
         if (qEfectivo == 0) {
-            //System.out.println("No podemos liberar de forma segura");
+            System.out.println("\uD83D\uDEA8 No podemos liberar de forma segura");
             // Nada que liberar de forma segura; salimos sin tocar eventos
             return;
         }
@@ -243,7 +301,9 @@ public class OcupacionPorAeropuerto {
 
     private void validarIntervalo(Instant a, Instant b) {
         if (a == null || b == null) throw new IllegalArgumentException("inicio/fin no pueden ser null");
-        if (a.isAfter(b)) throw new IllegalArgumentException("intervalo inválido: inicio > fin");
+        if (a.isAfter(b)) {
+            throw new IllegalArgumentException("intervalo inválido: inicio > fin");
+        }
         //if (!a.isBefore(b)) System.out.println("Intervalo inválido: inicio: " + a + ", fin: " + b);
         //if (!a.isBefore(b)) throw new IllegalArgumentException("intervalo inválido: inicio >= fin");
     }

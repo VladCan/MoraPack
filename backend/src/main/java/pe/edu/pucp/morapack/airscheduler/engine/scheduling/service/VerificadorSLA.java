@@ -53,6 +53,49 @@ public final class VerificadorSLA {
         return diagnosticar(sol, ventana46h, null, null);
     }
 
+    /// Hecho por Fabián
+    /// Método0 que únicamente valida el SLA de 46hrs (luego refactor para 46/70hrs)
+    public static List<SLAViolation> verificarSLA46hEstricto(SolucionProgramacion sol,
+                                                             Duration ventana46h,
+                                                             Instant presenteUtc) {
+        Objects.requireNonNull(sol, "sol");
+        Objects.requireNonNull(ventana46h, "ventana46h");
+        Objects.requireNonNull(presenteUtc, "presenteUtc");
+
+        List<SLAViolation> violaciones = new ArrayList<>();
+
+        for (PlanPedido p : sol.asMap().values()) {
+            if (p == null) continue;
+
+            Instant creado = p.getCreadoUtc();
+            if (creado == null) continue; // si no hay createdAt, lo omitimos
+
+            Instant limite46 = creado.plus(ventana46h);
+            boolean tieneRutas = (p.getRutas() != null && !p.getRutas().isEmpty());
+            Instant ultimaLlegada = p.ultimaLlegada(); // null si no hay rutas
+
+            boolean viola;
+            long tardH;
+
+            if (!tieneRutas || ultimaLlegada == null) {
+                // No planificado aún: solo viola si ya pasaron 46h desde creación
+                viola = presenteUtc.isAfter(limite46);
+                tardH = viola ? Math.max(0L, Duration.between(limite46, presenteUtc).toHours()) : 0L;
+            } else {
+                // Planificado: verifica la última llegada
+                viola = ultimaLlegada.isAfter(limite46);
+                tardH = viola ? Math.max(0L, Duration.between(limite46, ultimaLlegada).toHours()) : 0L;
+            }
+
+            if (viola) {
+                violaciones.add(new SLAViolation(p.getIdPedido(), creado, ultimaLlegada, tardH));
+            }
+        }
+
+        return violaciones;
+    }
+
+
     /** NUEVO: diagnostica todo (bodegas opcional, rutas reales opcional). */
     public static SLAReport diagnosticar(SolucionProgramacion sol,
                                          Duration ventana46h,

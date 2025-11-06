@@ -53,6 +53,10 @@ public class SplitRepair implements RepairOperator {
             // Reservas de BODEGA (journal) para esperas origen/destino:
             reservarBodegasDeRutas(journal, plan.getCreadoUtc(), plan.getAeropuertoDestino(), nuevas);
 
+            if (plan.getIdPedido() == 31){
+                int a = 0;
+            }
+
             // Reemplazar plan en la solución:
             PlanPedido nuevoPlan = PlanPedido.builder()
                     .idPedido(plan.getIdPedido())
@@ -206,7 +210,7 @@ public class SplitRepair implements RepairOperator {
                         : tr.get(i - 1).getVuelo().getLlegadaUtc();
                 Instant esperaFinOri = v.getSalidaUtc();
                 if (esperaIniOri != null && esperaFinOri != null && !esperaFinOri.isBefore(esperaIniOri)) {
-                    journal.reservar(v.getOrigen(), esperaIniOri, esperaFinOri, q);
+                    journal.reservarConNombre(v.getOrigen(), esperaIniOri, esperaFinOri, q, "SplitRepair");
                 }
 
                 // Espera en DESTINO:
@@ -220,7 +224,7 @@ public class SplitRepair implements RepairOperator {
                     esperaFinDst = (esperaIniDst == null) ? null : esperaIniDst.plus(PICKUP_FINAL);
                 }
                 if (esperaIniDst != null && esperaFinDst != null && !esperaFinDst.isBefore(esperaIniDst)) {
-                    journal.reservar(v.getDestino(), esperaIniDst, esperaFinDst, q);
+                    journal.reservarConNombre(v.getOrigen(), esperaIniOri, esperaFinOri, q, "SplitRepair");
                 }
             }
         }

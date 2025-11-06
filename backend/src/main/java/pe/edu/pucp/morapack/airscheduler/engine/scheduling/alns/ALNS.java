@@ -24,6 +24,8 @@ public class ALNS {
     private final Instant presenteUTC;
     private final OcupacionPorAeropuerto ocupacionPorAeropuerto;
 
+    private static int ejecucion = 1;
+
     private final Random rnd = new Random();        // RNG compartido para selección de operadores
     private final int maxIter = 3;                 // iteraciones máximas
     private final double tasaCambio = 0.3;          // probabilidad de aceptar peores soluciones
@@ -35,10 +37,21 @@ public class ALNS {
         // Copias profundas desde el inicio
         SolucionProgramacion mejorSolucion = new SolucionProgramacion(solucionInicial);
         SolucionProgramacion solucionActual = new SolucionProgramacion(solucionInicial);
-        OcupacionPorAeropuerto ocupacionPorAeropuerto1 = new OcupacionPorAeropuerto(ocupacionPorAeropuerto);
+
+        OcupacionPorAeropuerto mejorOPA = new OcupacionPorAeropuerto(ocupacionPorAeropuerto);
+
+        log("===============================================================");
+        log("===============================================================");
+        log("\uD83D\uDCDD Ejecución número " + ejecucion);
+        log("===============================================================");
+        log("===============================================================");
 
         for (int iter = 0; iter < maxIter; iter++) {
             System.out.println("---------Iteración ALNS " + (iter + 1) + "---------");
+
+            log("***************************************************************");
+            log("\uD83D\uDCA1 Iteración " + (iter + 1) + " (Ventana " + ejecucion + ")");
+            log("***************************************************************");
 
             // Seleccionar operadores aleatorios
             DestructionOperator destrOp = destructions.get(rnd.nextInt(destructions.size()));
@@ -46,10 +59,11 @@ public class ALNS {
 
             // Copia profunda de la solución actual
             SolucionProgramacion nuevaSol = new SolucionProgramacion(solucionActual);
-            //nuevaSol.getPlanPorPedido().get(1).limpiarTramos();
-            //solucionActual.getPlanPorPedido().get(1).getRutas();
 
-            Journal journal = new Journal(ocupacionPorAeropuerto);
+            // ★ Copia de trabajo de ocupaciones SOLO para esta iteración
+            OcupacionPorAeropuerto occWork = new OcupacionPorAeropuerto(ocupacionPorAeropuerto);
+
+            Journal journal = new Journal(occWork);
 
             // Aplicar destrucción
             destrOp.destroy(nuevaSol, journal, presenteUTC);
@@ -62,34 +76,35 @@ public class ALNS {
             double costoActual = getCostoTotal(solucionActual);
             double costoMejor = getCostoTotal(mejorSolucion);
 
-            // Actualizar mejor solución
-            if (costoNueva < costoMejor) {
-                mejorSolucion = new SolucionProgramacion(nuevaSol); // copia profunda
-                //System.out.println("Cambio de mejor solución en iteración " + iter);
-            }
-            // Aceptar nueva solución (según criterio)
             boolean aceptar = (costoNueva < costoActual)
-                || (costoNueva == costoActual && rnd.nextDouble() < 0.25)
-                || (rnd.nextDouble() < tasaCambio);
-            //boolean aceptar = (costoNueva < costoActual) || (rnd.nextDouble() < tasaCambio);
-            if (aceptar) {
-                journal.commit();
-                solucionActual = new SolucionProgramacion(nuevaSol); // copia profunda
-                /// Para prueba (esto no se usa):
-                ocupacionPorAeropuerto1 = new OcupacionPorAeropuerto(journal.occ);
-            }
-            else {
-                journal.rollback();
-                /// Para prueba (esto no se usa en el algoritmo):
-                verificarImprimirIguales(journal.occ, ocupacionPorAeropuerto1);
-            }
+                    || (costoNueva == costoActual && rnd.nextDouble() < 0.25)
+                    || (rnd.nextDouble() < tasaCambio);
 
-            //ImpresorSolucion.imprimirEnArchivo(solucionActual, "out/solucionActualALNS.txt",presenteUTC);
-            //ImpresorSolucion.imprimirEnArchivo(nuevaSol, "out/solucionNuevaALNS.txt",presenteUTC);
-            //ImpresorSolucion.imprimirEnArchivo(mejorSolucion, "out/mejorSolucionALNS.txt",presenteUTC);
+            if (aceptar) {
+                //Confirmamos la ocupación
+
+                // ★ Confirmar = copiar estado de trabajo al global
+                ocupacionPorAeropuerto.copyFrom(occWork);
+
+                journal.commit();
+
+                solucionActual = new SolucionProgramacion(nuevaSol);
+
+                if (costoNueva < costoMejor) {
+                    mejorSolucion = new SolucionProgramacion(nuevaSol); // copia profunda
+
+                    //Podemos hacerlo asi ya que ocupacionPorAeropuerto ya es la nuevaSol (por el copyFrom de líneas arriba)
+                    mejorOPA = new OcupacionPorAeropuerto(ocupacionPorAeropuerto);
+                    //System.out.println("Cambio de mejor solución en iteración " + iter);
+                }
+            }
 
         }
 
+
+        ejecucion++;
+
+        ocupacionPorAeropuerto.copyFrom(mejorOPA);
         return mejorSolucion;
     }
 
@@ -140,6 +155,16 @@ public class ALNS {
 
         public OcupacionPorAeropuerto getOcc() {
             return this.occ;
+        }
+
+        public void reservarConNombre(String ap, Instant ini, Instant fin, int q, String clase) {
+            log("✔\uFE0F Vamos a RESERVAR " + q + " (" + ini + " - " + fin + ") en " + ap);
+
+            occ.reservarConNombre(ap, ini, fin, q, clase);
+            undo.push(() -> {
+                log("↩️ Aplicando: LIBERAR " + q + " (" + ini + " - " + fin + ") en " + ap);
+                occ.liberar(ap, ini, fin, q);
+            }); // inversa
         }
 
         // En vez de llamar occ.reservar directamente, los operadores llaman:
@@ -193,7 +218,7 @@ public class ALNS {
     }
 
     public static boolean sonIguales(OcupacionPorAeropuerto o1, OcupacionPorAeropuerto o2) {
-        if (o1 == o2) return true;
+        //if (o1 == o2) return true;
         if (o1 == null || o2 == null) return false;
 
         // Compara ambos mapas: eventos y checkpoints
