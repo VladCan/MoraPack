@@ -201,6 +201,11 @@ public class CargarPedidos {
         for (Iterator<Pedido> it = colaPedidos.iterator(); it.hasNext();) {
             Pedido pedido = it.next();
             PlanPedido plan = planes.get(pedido.getIdPedido());
+
+            if (pedido.getIdPedido() == 33){
+                int a = 0;
+            };
+
             if (plan == null || plan.getRutas() == null || plan.getRutas().isEmpty()) {
                 // sin asignaciones previas para este pedido
                 continue;

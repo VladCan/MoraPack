@@ -22,9 +22,15 @@ public class SolucionProgramacion {
 
     private final CargaPorVuelo cargaPorVuelo;
 
-    public SolucionProgramacion(Map<Integer, PlanPedido> planPorPedido, CargaPorVuelo cargaPorVuelo) {
+    /// Esto es para que el ALNS no reconstruya pedidos ya construidos:
+    private Set<Integer> pedidosCongelados = new HashSet<>();
+
+    public SolucionProgramacion(Map<Integer, PlanPedido> planPorPedido, CargaPorVuelo cargaPorVuelo, Set<Integer> pedidosCongelados) {
         this.planPorPedido = new HashMap<>(planPorPedido); // <-- mutable
         this.cargaPorVuelo = cargaPorVuelo;
+        this.pedidosCongelados = (pedidosCongelados != null)
+                ? new HashSet<>(pedidosCongelados)
+                : new HashSet<>();
     }
 
     public CargaPorVuelo getCargaPorVuelo() {
@@ -41,6 +47,18 @@ public class SolucionProgramacion {
         // Copiar profundo cargaPorVuelo
         this.cargaPorVuelo = new CargaPorVuelo(otra.cargaPorVuelo);
 
+        this.pedidosCongelados.addAll(otra.pedidosCongelados);
+
+    }
+
+    /// Esto es para que el ALNS no reconstruya pedidos ya construidos:
+    public void congelarPedidosCompletos(){
+        for (Map.Entry<Integer, PlanPedido> e : planPorPedido.entrySet()) {
+            PlanPedido p = e.getValue();
+            if (p != null && p.estaCompleto()) {
+                pedidosCongelados.add(e.getKey());
+            }
+        }
     }
 
     public PlanPedido planDe(int idPedido) {

@@ -25,6 +25,18 @@ public class WorstRemoval implements DestructionOperator {
 
         for (int i = 0; i < n && i < lista.size(); i++) {
             PlanPedido plan = lista.get(i);
+
+            if (plan.getIdPedido() == 166){
+                int a = 0;
+            }
+
+            /// Salteamos un pedido que ya ha sido confirmado.
+            if (s.getPedidosCongelados() != null && s.getPedidosCongelados().contains(plan.getIdPedido())) {
+                continue;
+            }
+
+            System.out.println("\uD83C\uDFC3\u200D♂\uFE0F\u200D➡\uFE0F Vamos a deconstruir el Pedido: " + plan.getIdPedido());
+
             List<RutaAsignada> rutas = plan.getRutas();
             if (rutas == null || rutas.isEmpty()) continue;
 

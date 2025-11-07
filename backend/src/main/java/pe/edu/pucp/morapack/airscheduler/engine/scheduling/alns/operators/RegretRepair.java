@@ -10,6 +10,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.ssp.SSPGeneradorSeed;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.IntStream;
 
@@ -56,6 +57,13 @@ public class RegretRepair implements RepairOperator {
         for (PlanPedido plan : planos) {
             /// Encontramos un plan sin rutas
             if (plan.getRutas() == null || plan.getRutas().isEmpty()) {
+
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").withZone(ZoneOffset.UTC);
+                Instant objetivo = Instant.parse("2025-11-13T02:18:00Z");
+                if (presenteUTC.isAfter(objetivo)){
+                    System.out.println("Estamos en la fecha: " + formatter.format(presenteUTC));
+                }
+
 
                 cantSinPedidos++;
 
