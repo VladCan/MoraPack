@@ -6,7 +6,7 @@ import FlightPath from "@/components/common/FlightPath";
 import { useAirports } from "@/hooks/useAirports";
 import { useRunSSE } from "@/hooks/useRunSSE";
 import { useRunSession } from "@/lib/runSession";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
 const COLOR_SEDE   = "#005097";
@@ -51,7 +51,7 @@ export default function Simulacion() {
   const { data: airportsDtoRaw } = useAirports();
   const [hoveredAirportId, setHoveredAirportId] = useState<string | null>(null);
   const [activeAirportId, setActiveAirportId] = useState<string | null>(null);
-  const [hoveredFlight, setHoveredFlight] = useState<FlightForRender | null>(null);
+  const [activeFlight, setActiveFlight] = useState<FlightForRender | null>(null);
 
   // Parsear aeropuertos
   const airports: AirportPoint[] = useMemo(() => {
@@ -155,6 +155,17 @@ export default function Simulacion() {
 
     return allFlights;
   }, [windows, simNowUtc, airportsMap]);
+
+  // Sincronizar vuelo activo con datos actualizados
+  useEffect(() => {
+    if (!activeFlight) return;
+    const refreshed = flightsToRender.find((f) => f.id === activeFlight.id);
+    if (!refreshed) {
+      setActiveFlight(null);
+    } else if (refreshed !== activeFlight) {
+      setActiveFlight(refreshed);
+    }
+  }, [flightsToRender, activeFlight]);
 
   // Obtener datos del aeropuerto activo
   const activeAirportData = activeAirportId && airportOccupancy[activeAirportId]
@@ -262,20 +273,31 @@ export default function Simulacion() {
       )}
 
       {/* Tooltip de vuelo */}
-      {hoveredFlight && !activeAirportId && (
-        <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-none">
+      {activeFlight && !activeAirportId && (
+        <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
           <div className="space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: hoveredFlight.planeColor }}></div>
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeFlight.planeColor }}></div>
                 <h3 className="font-semibold text-lg">
-                  {hoveredFlight.origenCodigo} → {hoveredFlight.destinoCodigo}
+                  {activeFlight.origenCodigo} → {activeFlight.destinoCodigo}
                 </h3>
               </div>
-              <span className="text-xs text-muted-foreground">
-                {Math.round(hoveredFlight.progress * 100)}%
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {Math.round(activeFlight.progress * 100)}%
+                </span>
+                <button
+                  onClick={() => setActiveFlight(null)}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Cerrar detalles de vuelo"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* Tiempos */}
@@ -283,7 +305,7 @@ export default function Simulacion() {
               <div>
                 <p className="text-muted-foreground text-xs">Salida</p>
                 <p className="font-mono text-xs">
-                  {new Date(hoveredFlight.salidaUtc).toLocaleTimeString('es-PE', {
+                  {new Date(activeFlight.salidaUtc).toLocaleTimeString('es-PE', {
                     hour: '2-digit',
                     minute: '2-digit',
                     timeZone: 'UTC'
@@ -293,7 +315,7 @@ export default function Simulacion() {
               <div>
                 <p className="text-muted-foreground text-xs">Llegada</p>
                 <p className="font-mono text-xs">
-                  {new Date(hoveredFlight.llegadaUtc).toLocaleTimeString('es-PE', {
+                  {new Date(activeFlight.llegadaUtc).toLocaleTimeString('es-PE', {
                     hour: '2-digit',
                     minute: '2-digit',
                     timeZone: 'UTC'
@@ -307,28 +329,28 @@ export default function Simulacion() {
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-muted-foreground">Ocupación</span>
                 <span className="font-semibold">
-                  {hoveredFlight.cantidadAsignada} / {hoveredFlight.capacidad}
+                  {activeFlight.cantidadAsignada} / {activeFlight.capacidad}
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div
                   className="h-full transition-all"
                   style={{
-                    width: `${(hoveredFlight.cantidadAsignada / hoveredFlight.capacidad) * 100}%`,
-                    backgroundColor: hoveredFlight.pathColor,
+                    width: `${(activeFlight.cantidadAsignada / activeFlight.capacidad) * 100}%`,
+                    backgroundColor: activeFlight.pathColor,
                   }}
                 />
               </div>
             </div>
 
             {/* Carga */}
-            {hoveredFlight.carga.length > 0 && (
+            {activeFlight.carga.length > 0 && (
               <div>
                 <p className="text-sm font-semibold mb-2">
-                  Carga ({hoveredFlight.carga.length} {hoveredFlight.carga.length === 1 ? 'pedido' : 'pedidos'})
+                  Carga ({activeFlight.carga.length} {activeFlight.carga.length === 1 ? 'pedido' : 'pedidos'})
                 </p>
                 <div className="max-h-40 overflow-y-auto space-y-1">
-                  {hoveredFlight.carga.map((item, idx) => (
+                  {activeFlight.carga.map((item, idx) => (
                     <div
                       key={idx}
                       className="flex items-center justify-between text-xs p-2 rounded-lg bg-muted/50"
@@ -365,8 +387,9 @@ export default function Simulacion() {
             progress={flight.progress}
             pathColor={flight.pathColor}
             planeColor={flight.planeColor}
-            onMouseEnter={() => setHoveredFlight(flight)}
-            onMouseLeave={() => setHoveredFlight(null)}
+            onClick={() =>
+              setActiveFlight((prev) => (prev?.id === flight.id ? null : flight))
+            }
           />
         ))}
 

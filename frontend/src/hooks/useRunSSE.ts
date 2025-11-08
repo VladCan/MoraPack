@@ -95,9 +95,9 @@ export function useRunSSE(runId?: string){
     const [error, setError] = useState<string|null>(null);
 
     const [speed, setSpeed] = useState<number|undefined>();
-    const [simNowUtc, setSimNow]  = useState<string|undefined>();
+    const [simNowUtc, setSimNow]  = useState<string|undefined>();
     const [simStartUtc, setSimStart] = useState<string|undefined>();
-    const [windows, setWindows]   = useState<WindowData[]>([]);
+    const [windows, setWindows]   = useState<WindowData[]>([]);
     const [finished, setFinished] = useState<{reason:string}|null>(null);
     const [airportOccupancy, setAirportOccupancy] = useState<Record<string, AeropuertoOcupacion>>({});
 
@@ -136,6 +136,18 @@ export function useRunSSE(runId?: string){
     }, [runId]);
 
     useEffect(() => {
+        // Reset state whenever conectamos a otro run
+        setConnected(false);
+        setError(null);
+        setSpeed(undefined);
+        setSimStart(undefined);
+        setSimNow(undefined);
+        setWindows([]);
+        setFinished(null);
+        setAirportOccupancy({});
+    }, [runId]);
+
+    useEffect(() => {
         if (!url) return;
 
         console.log(`[RUN DIAG] Conectando SSE a: ${url}`); // Log del intento de conexión
@@ -170,19 +182,29 @@ export function useRunSSE(runId?: string){
                         break;
                     case "WINDOW":
                         setWindows((prev) => {
-                        // evita duplicados por reconexiones
-                        if (prev.find(w => w.index === evt.windowIndex)) return prev;
-                        return [...prev, {
-                            index: evt.windowIndex,
-                            startUtc: evt.windowStartUtc,
-                            endUtc:   evt.windowEndUtc,
-                            vuelos: evt.vuelos || [],
-                            pedidos: evt.pedidos || [],
-                        }];
+                            const nextWindow: WindowData = {
+                                index: evt.windowIndex,
+                                startUtc: evt.windowStartUtc,
+                                endUtc:   evt.windowEndUtc,
+                                vuelos: evt.vuelos || [],
+                                pedidos: evt.pedidos || [],
+                            };
+
+                            const existingIdx = prev.findIndex((w) => w.index === evt.windowIndex);
+                            if (existingIdx >= 0) {
+                                const copy = [...prev];
+                                copy[existingIdx] = nextWindow;
+                                return copy;
+                            }
+                            return [...prev, nextWindow];
                         });
                         break;
                     case "FINISHED":
                         setFinished({ reason: evt.reason });
+                        // Cerramos la conexión para liberar recursos en el backend.
+                        es.close();
+                        esRef.current = null;
+                        setConnected(false);
                         break;
                 }
 
