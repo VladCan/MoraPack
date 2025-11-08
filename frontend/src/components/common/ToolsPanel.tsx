@@ -29,7 +29,6 @@ import { useRunSession } from "@/lib/runSession";
 import toast from "react-hot-toast";
 import ToastCustom from "@/components/common/ToastCustom";
 import type { VueloDTO, PedidoDTO } from "@/hooks/useRunSSE";
-import { useRunSSE } from "@/hooks/useRunSSE";
 
 type NivelCarga = "disponible" | "limitado" | "saturado";
 
@@ -81,8 +80,7 @@ export default function ToolsPanel({
   const [almacen, setAlmacen] = useState<string | null>(null);
   const [pedido, setPedido] = useState<PedidoDTO | null>(null);
 
-  const {begin, runId} = useRunSession();
-  const {windows, simNowUtc} = useRunSSE(runId || undefined);
+  const { begin, simNow: simNowUtc, windows } = useRunSession();
 
   //Fijar fecha de fin automáticamente al elegir fecha de inicio
   const handleInicio = (value?: Date) => {
@@ -99,8 +97,14 @@ export default function ToolsPanel({
 
   // Obtener SOLO vuelos que están EN EL AIRE en este momento
   const vuelosActivos = useMemo<VueloDTO[]>(() => {
-    if (!simNowUtc || windows.length === 0) return [];
+    if (windows.length === 0) return [];
     
+    // Si aún no tenemos TICK (simNowUtc), mostramos los vuelos de la última ventana.
+    if (!simNowUtc) {
+      const lastWindow = windows[windows.length - 1];
+      return lastWindow?.vuelos ?? [];
+    }
+
     const now = new Date(simNowUtc).getTime();
     const vuelosEnAire = new Map<string, VueloDTO>();
     
@@ -119,6 +123,11 @@ export default function ToolsPanel({
     });
     
     const resultado = Array.from(vuelosEnAire.values());
+    if (resultado.length === 0) {
+      const lastWindow = windows[windows.length - 1];
+      return lastWindow?.vuelos ?? [];
+    }
+    
     console.log('[ToolsPanel] Vuelos EN EL AIRE:', resultado.length);
     console.log('[ToolsPanel] simNowUtc:', simNowUtc);
     console.log('[ToolsPanel] windows.length:', windows.length);
@@ -128,7 +137,12 @@ export default function ToolsPanel({
 
   // Obtener SOLO pedidos que están en vuelos activos
   const pedidosActivos = useMemo<PedidoDTO[]>(() => {
-    if (!simNowUtc || windows.length === 0) return [];
+    if (windows.length === 0) return [];
+
+    if (!simNowUtc) {
+      const lastWindow = windows[windows.length - 1];
+      return lastWindow?.pedidos ?? [];
+    }
     
     const now = new Date(simNowUtc).getTime();
     
@@ -151,6 +165,10 @@ export default function ToolsPanel({
     // Filtrar pedidos que están en vuelo AHORA
     const lastWindow = windows[windows.length - 1];
     const resultado = (lastWindow?.pedidos || []).filter(p => pedidosEnVueloSet.has(p.id));
+    if (resultado.length === 0) {
+      return lastWindow?.pedidos ?? [];
+    }
+
     console.log('[ToolsPanel] Pedidos EN VUELO:', resultado.length);
     console.log('[ToolsPanel] Pedidos IDs en vuelo:', Array.from(pedidosEnVueloSet));
     console.log('[ToolsPanel] Total pedidos en último window:', lastWindow?.pedidos?.length || 0);
