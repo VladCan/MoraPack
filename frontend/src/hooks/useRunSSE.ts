@@ -77,9 +77,9 @@ export type EstadisticasFuturas = {
 
 export type RunEvt = 
 | {type:"RUN_STARTED"; runId: string; simStartUtc: string; wallAnchorUtc: string; speed: number }
-| { type: "TICK";        runId: string; simNowUtc:  string; aeropuertos: Record<string, AeropuertoOcupacion> }
-| { type: "WINDOW";      runId: string; windowIndex: number; windowStartUtc: string; windowEndUtc: string; vuelos: VueloDTO[]; pedidos: PedidoDTO[] }
-| { type: "FINISHED";    runId: string; reason: string };
+| { type: "TICK"; runId: string; simNowUtc: string; aeropuertos: Record<string, AeropuertoOcupacion> }
+| { type: "WINDOW"; runId: string; windowIndex: number; windowStartUtc: string; windowEndUtc: string; vuelos: VueloDTO[]; pedidos: PedidoDTO[] }
+| { type: "FINISHED"; runId: string; reason: string };
 
 export type WindowData = {
     index: number;
@@ -208,9 +208,9 @@ export function useRunSSE(runId?: string){
                         break;
                 }
 
-            }
-            catch (e) {
-
+            } catch (err: unknown) {
+                console.error("[RUN DIAG] Failed to parse SSE message or handle event:", err);
+                setError("Error procesando mensaje SSE");
             }
         }
 
