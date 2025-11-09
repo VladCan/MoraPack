@@ -74,8 +74,8 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             pedidos.leerDatosProfe(sc);
         } // localtime no localdatetime
         pedidos.normalizarUtc(aeropuertosMap);
-        pedidos.sort("out/pedidos.txt");
-        System.exit(1);
+        //pedidos.sort("out/pedidos.txt");
+        //System.exit(1);
         // Para asegurar que siempre estén ordenados por fecha de creación UTC
         pedidos.ordenarPorUTC();
 
