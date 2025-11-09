@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 
 /**
  * SplitRepair (packing máximo coherente) mejorado para priorizar SLA y Residual.
- * El Dijkstra incluye filtro SLA y un stop de seguridad contra rutas cíclicas/excesivas.
+ * Incluye filtro de SLA y seguridad contra ciclos.
  */
 public class SplitRepair implements RepairOperator {
 
@@ -43,6 +43,8 @@ public class SplitRepair implements RepairOperator {
             List<RutaAsignada> nuevas = buildPackingMax(plan, s, prevByFlight);
             nuevas = combinarRutasIguales(nuevas);
             aplicarDeltasCargaPorVuelo(s, prevByFlight, contribucionPorVuelo(nuevas));
+            
+            // 🎯 CORRECCIÓN: Llamada a reservar bodegas, respetando la exclusión de sedes.
             reservarBodegasDeRutas(journal, plan.getCreadoUtc(), plan.getAeropuertoDestino(), nuevas);
 
             PlanPedido nuevoPlan = PlanPedido.builder()
@@ -72,7 +74,6 @@ public class SplitRepair implements RepairOperator {
             
             if (rutaVuelos == null || rutaVuelos.isEmpty()) break;
 
-            // Uso de toList() requiere cast para resolver inferencia de tipo T
             List<VueloProgramadoId> pathIds = rutaVuelos.stream()
                     .map((Function<Vuelo, VueloProgramadoId>) v -> toId(v, ref))
                     .toList();
@@ -130,10 +131,8 @@ public class SplitRepair implements RepairOperator {
                                              Instant refCreacion,
                                              Instant deadline) {
         
-        // El estado de distancia sigue siendo Costo (Double), PERO usamos el tiempo de llegada absoluto
-        // (arrivalTimes) para garantizar la factibilidad temporal.
         Map<String, Double> dist = new HashMap<>();
-        Map<String, Instant> arrivalTimes = new HashMap<>(); 
+        Map<String, Instant> arrivalTimes = new HashMap<>();
         Map<String, Vuelo> prev = new HashMap<>();
         PriorityQueue<String> pq = new PriorityQueue<>(Comparator.comparingDouble(n -> dist.getOrDefault(n, Double.POSITIVE_INFINITY)));
 
@@ -162,9 +161,9 @@ public class SplitRepair implements RepairOperator {
 
                 // 2. Filtro de Residual y SLA
                 if (residualAjustado(id, s, prevByFlight, addedNow) <= 0) continue;
-                if (id.getLlegadaUtc().isAfter(deadline)) continue; // 🛑 Filtro SLA
+                if (id.getLlegadaUtc().isAfter(deadline)) continue; 
 
-                // 3. Cálculo de peso: Usamos el costo logístico del VueloProgramadoId
+                // 3. Cálculo de peso
                 double costoLogistico = id.getCosto(); 
                 double peso = COST_WEIGHT * costoLogistico; 
 
@@ -173,7 +172,6 @@ public class SplitRepair implements RepairOperator {
 
                 if (nd < dist.getOrDefault(v.getDestino(), Double.POSITIVE_INFINITY)) {
                     dist.put(v.getDestino(), nd);
-                    // 🛑 ACTULIZACIÓN CRÍTICA: Almacenar también el tiempo de llegada absoluto
                     arrivalTimes.put(v.getDestino(), id.getLlegadaUtc()); 
                     
                     prev.put(v.getDestino(), v);
@@ -191,7 +189,7 @@ public class SplitRepair implements RepairOperator {
         // 🛑 RECONSTRUCCIÓN CON STOP DE SEGURIDAD (PREVIENE OOM)
         while (prev.containsKey(w)) {
             if (safetyCounter++ > MAX_NODES_IN_PATH) {
-                System.err.println("ALERTA: Se alcanzó el límite de tramos en Dijkstra. Posible bucle o ruta excesivamente larga.");
+                //System.err.println("ALERTA: Se alcanzó el límite de tramos en Dijkstra. Posible bucle o ruta excesivamente larga.");
                 return null; 
             }
             Vuelo v = prev.get(w);
@@ -304,25 +302,31 @@ public class SplitRepair implements RepairOperator {
                 VueloProgramadoId v = t.getVuelo();
                 int q = r.getCantidad();
 
+                // === FILTRO DE SEDE (Regla de negocio: Capacidad infinita en sedes) ===
+
                 // Espera en ORIGEN: [creado o llegada_prev, salida)
-                Instant esperaIniOri = (i == 0)
-                        ? creadoUtc
-                        : tr.get(i - 1).getVuelo().getLlegadaUtc();
-                Instant esperaFinOri = v.getSalidaUtc();
-                if (esperaIniOri != null && esperaFinOri != null && !esperaFinOri.isBefore(esperaIniOri)) {
-                    journal.reservar(v.getOrigen(), esperaIniOri, esperaFinOri, q);
+                if (!sedes.contains(v.getOrigen())) { // 🛑 Solo si NO es una sede
+                    Instant esperaIniOri = (i == 0)
+                            ? creadoUtc
+                            : tr.get(i - 1).getVuelo().getLlegadaUtc();
+                    Instant esperaFinOri = v.getSalidaUtc();
+                    if (esperaIniOri != null && esperaFinOri != null && !esperaFinOri.isBefore(esperaIniOri)) {
+                        journal.reservar(v.getOrigen(), esperaIniOri, esperaFinOri, q);
+                    }
                 }
 
-                // Espera en DESTINO: [llegada, llegada + PICKUP_FINAL)
-                Instant esperaIniDst = v.getLlegadaUtc();
-                Instant esperaFinDst;
-                if (i + 1 < tr.size()) {
-                    esperaFinDst = tr.get(i + 1).getVuelo().getSalidaUtc();
-                } else {
-                    esperaFinDst = (esperaIniDst == null) ? null : esperaIniDst.plus(PICKUP_FINAL);
-                }
-                if (esperaIniDst != null && esperaFinDst != null && !esperaFinDst.isBefore(esperaIniDst)) {
-                    journal.reservar(v.getDestino(), esperaIniDst, esperaFinDst, q);
+                // Espera en DESTINO (Conexión o Final): [llegada, llegada + PICKUP_FINAL)
+                if (!sedes.contains(v.getDestino())) { // 🛑 Solo si NO es una sede
+                    Instant esperaIniDst = v.getLlegadaUtc();
+                    Instant esperaFinDst;
+                    if (i + 1 < tr.size()) {
+                        esperaFinDst = tr.get(i + 1).getVuelo().getSalidaUtc();
+                    } else {
+                        esperaFinDst = (esperaIniDst == null) ? null : esperaIniDst.plus(PICKUP_FINAL);
+                    }
+                    if (esperaIniDst != null && esperaFinDst != null && !esperaFinDst.isBefore(esperaIniDst)) {
+                        journal.reservar(v.getDestino(), esperaIniDst, esperaFinDst, q);
+                    }
                 }
             }
         }

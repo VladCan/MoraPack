@@ -2,7 +2,14 @@ package pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io;
 
 import lombok.Getter;
 
+import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -20,7 +27,7 @@ public class CargarPedidos {
 
     private final Queue<Pedido> colaPedidos = new LinkedList<>();
     private boolean utcNormalizada = false; // evita doble normalización
-
+    private static final String SEPARATOR = "-";
     // DTO simple de la ventana
     public record VentanaPedidos(Instant presenteUTC, List<Pedido> pedidos) {
     }
@@ -63,7 +70,8 @@ public class CargarPedidos {
         while (sc.hasNextLine()) {
             Pedido pedido = new Pedido();
             int idPedido=colaPedidos.size()+1;
-            pedido.leerProfe(sc,idPedido);
+            //pedido.leerProfe(sc,idPedido);
+            pedido.leerProfeNew(sc,idPedido);
             agregar(pedido);
         }
     }
@@ -316,71 +324,72 @@ public class CargarPedidos {
                 + "==============================");
     }
     /** Imprime una VentanaPedidos (hasta presenteUTC) en una tabla bonita. */
-    public void imprimirVentanaDePedidos(VentanaPedidos ventana) {
-        if (ventana == null) {
-            System.out.println("VentanaPedidos: null");
+    public void sort(String filename) {
+        if (colaPedidos.isEmpty()) { // Usar la cola directamente
+            System.out.println("⚠️ No hay pedidos para ordenar.");
             return;
         }
 
-        Instant corte = ventana.presenteUTC();
-        List<Pedido> pedidos = ventana.pedidos();
+        // 1. Mover la cola a una lista temporal para ordenar
+        List<Pedido> tmp = new ArrayList<>(colaPedidos);
 
-        String corteStr = (corte != null) ? FMT_UTC.format(corte) : "-";
+        // 2. Ordenar la lista utilizando Collections.sort por el tiempo de creación UTC.
+        // Asumimos que getCreatedAtUtc() devuelve un Instant.
+        tmp.sort(Comparator.comparing(Pedido::getCreatedAtUtc)); 
 
-        System.out.println("================================ VENTANA DE PEDIDOS ================================");
-        System.out.println("Hasta (corte UTC): " + corteStr);
-        System.out.println("Cantidad de pedidos en la ventana: " + (pedidos == null ? 0 : pedidos.size()));
-        System.out.println("-----------------------------------------------------------------------------------");
+        // 3. Volver a llenar la cola interna con la lista ordenada
+        colaPedidos.clear();
+        colaPedidos.addAll(tmp); 
 
-        if (pedidos == null || pedidos.isEmpty()) {
-            System.out.println("(sin pedidos en la ventana)");
-            System.out.println("===================================================================================");
-            return;
+        // 4. Imprimir la lista ordenada en el archivo de destino con el formato original
+        try {
+            Path path = Paths.get(filename);
+            Files.createDirectories(path.getParent());
+
+            try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(
+                    path,
+                    StandardOpenOption.CREATE, 
+                    StandardOpenOption.TRUNCATE_EXISTING))) {
+
+                // Escribir cada pedido en el formato original
+                for (int i = 0; i < tmp.size(); i++) {
+                    Pedido p = tmp.get(i);
+                    // 🛑 Usamos el índice + 1 como ID de archivo secuencial.
+                    out.println(formatearPedidoOriginal(p, i + 1)); 
+                }
+                
+                System.out.printf("✅ Pedidos ordenados por UTC y guardados en: %s (%d registros)%n", 
+                    path.toAbsolutePath(), tmp.size());
+
+            }
+        } catch (Exception e) {
+            System.err.printf("❌ Error al guardar la lista de pedidos ordenados: %s%n", e.getMessage());
+            throw new RuntimeException("Error al ordenar/guardar pedidos.", e);
         }
+    }
 
-        // Orden solo para impresión (no modifica la cola)
-        List<Pedido> lista = new ArrayList<>(pedidos);
-        lista.sort(
-            Comparator
-                .comparing(Pedido::getCreatedAtUtc,
-                        Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(Pedido::getFecha,
-                        Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparingInt(Pedido::getIdPedido)
-        );
-
-        // Cabecera de tabla (mismo layout que imprimrPedidos)
-        System.out.printf(
-            "%-5s %-8s %-7s %-7s %-15s %7s  %-19s  %-19s%n",
-            "ID", "Cliente", "Destino", "Origen", "Cont.Dest", "Cant.", "Fecha(Local)", "UTC"
-        );
-        System.out.println("-----------------------------------------------------------------------------------"
-                        + "-----------------------");
-
-        int totalCant = 0;
-
-        for (Pedido p : lista) {
-            String fechaLocalStr = (p.getFecha() != null) ? FMT_LOCAL.format(p.getFecha()) : "-";
-            String utcStr        = (p.getCreatedAtUtc() != null) ? FMT_UTC.format(p.getCreatedAtUtc()) : "-";
-
-            System.out.printf(
-                "%-5d %-8d %-7s %-7s %-15s %7d  %-19s  %-19s%n",
-                p.getIdPedido(),
-                p.getIdCliente(),
-                nvl(p.getDestino()),
-                nvl(p.getOrigen()),
-                nvl(p.getContinenteDestino()),
-                p.getCantidad(),
-                fechaLocalStr,
-                utcStr
-            );
-            totalCant += p.getCantidad();
-        }
-
-        System.out.println("-----------------------------------------------------------------------------------"
-                        + "-----------------------");
-        System.out.println("Totales -> pedidos: " + lista.size() + " | cantidad acumulada: " + totalCant);
-        System.out.println("===================================================================================");
+    /**
+     * Helper para formatear el pedido al formato original (ej. 000000001-20250102-01-29-UBBB-004-0031433).
+     */
+    private String formatearPedidoOriginal(Pedido p, int generatedId) {
+        LocalDateTime originalDate = p.getFecha(); 
+        
+        // Asumiendo que el ID del cliente y la cantidad son números y necesitan padding
+        String idPedidoStr = String.format("%09d", generatedId);
+        String datePart = originalDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        String hh = originalDate.format(DateTimeFormatter.ofPattern("HH"));
+        String mm = originalDate.format(DateTimeFormatter.ofPattern("mm"));
+        String cantidadStr = String.format("%03d", p.getCantidad()); 
+        String idClienteStr = String.format("%07d", p.getIdCliente()); 
+        
+        // Reconstrucción del formato: ID-YYYYMMDD-HH-MM-DEST-CANT-IDCLIENTE
+        return idPedidoStr + SEPARATOR +
+               datePart + SEPARATOR +
+               hh + SEPARATOR +
+               mm + SEPARATOR +
+               p.getDestino() + SEPARATOR +
+               cantidadStr + SEPARATOR +
+               idClienteStr;
     }
 
 }
