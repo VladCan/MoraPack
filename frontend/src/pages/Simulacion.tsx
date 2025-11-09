@@ -6,7 +6,7 @@ import FlightPath from "@/components/common/FlightPath";
 import { useAirports } from "@/hooks/useAirports";
 import { useRunSSE } from "@/hooks/useRunSSE";
 import { useRunSession } from "@/lib/runSession";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 
 const COLOR_SEDE   = "#005097";
@@ -78,6 +78,8 @@ export default function Simulacion() {
   const { simNowUtc, windows, airportOccupancy } = useRunSSE(runId || undefined);
 
   // Procesar vuelos para renderizar
+  const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
+
   const flightsToRender = useMemo<FlightForRender[]>(() => {
     if (!simNowUtc || windows.length === 0) {
       return [];
@@ -85,6 +87,7 @@ export default function Simulacion() {
 
     const now = new Date(simNowUtc).getTime();
     const allFlights: FlightForRender[] = [];
+    const seenIds = new Set<string>();
 
     // Crear un Set para evitar duplicados (mismo vuelo en múltiples ventanas)
     const vuelosUnicos = new Map<string, typeof windows[0]['vuelos'][0]>();
@@ -119,8 +122,12 @@ export default function Simulacion() {
 
         // Calcular progreso (0.0 a 1.0)
         const duracion = llegadaTime - salidaTime;
-        const transcurrido = now - salidaTime;
-        const progress = duracion > 0 ? Math.min(1, Math.max(0, transcurrido / duracion)) : 0;
+        if (!flightFirstSeenRef.current.has(vuelo.id)) {
+          flightFirstSeenRef.current.set(vuelo.id, Math.max(now, salidaTime));
+        }
+        const firstSeen = flightFirstSeenRef.current.get(vuelo.id) ?? Math.max(now, salidaTime);
+        const transcurridoDesdeVista = Math.max(0, Math.min(now, llegadaTime) - firstSeen);
+        const progress = duracion > 0 ? Math.min(1, transcurridoDesdeVista / duracion) : 0;
 
         // Determinar color basado en ocupación
         const ocupacion = vuelo.cantidadAsignada / vuelo.capacidad;
@@ -150,6 +157,14 @@ export default function Simulacion() {
           cantidadAsignada: vuelo.cantidadAsignada,
           carga: vuelo.carga || [],
         });
+        seenIds.add(vuelo.id);
+    });
+
+    // Limpiar vuelos que ya no están visibles
+    flightFirstSeenRef.current.forEach((_, key) => {
+      if (!seenIds.has(key)) {
+        flightFirstSeenRef.current.delete(key);
+      }
     });
 
     return allFlights;
