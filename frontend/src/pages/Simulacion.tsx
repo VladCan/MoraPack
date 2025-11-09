@@ -121,7 +121,7 @@ export default function Simulacion() {
         }
 
         // Calcular progreso (0.0 a 1.0)
-        const duracion = llegadaTime - salidaTime;
+        //const duracion = llegadaTime - salidaTime; //not being used
         if (!flightFirstSeenRef.current.has(vuelo.id)) {
           flightFirstSeenRef.current.set(vuelo.id, Math.max(now, salidaTime));
         }
