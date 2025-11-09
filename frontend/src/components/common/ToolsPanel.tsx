@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Building2,
   Plane,
@@ -26,6 +26,7 @@ import { buildStartRunRequest } from "@/services/buildStartRunRequest";
 import { handleApi, postJson } from "@/services/api";
 import type { StartRunResponse } from "@/types/runs";
 import { useRunSession } from "@/lib/runSession";
+import { useAirports } from "@/hooks/useAirports";
 import toast from "react-hot-toast";
 import ToastCustom from "@/components/common/ToastCustom";
 import type { VueloDTO, PedidoDTO } from "@/hooks/useRunSSE";
@@ -80,7 +81,33 @@ export default function ToolsPanel({
   const [almacen, setAlmacen] = useState<string | null>(null);
   const [pedido, setPedido] = useState<PedidoDTO | null>(null);
 
-  const { begin, simNow: simNowUtc, windows } = useRunSession();
+  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport } = useRunSession();
+  const { data: airportsData } = useAirports();
+
+  const warehouseOptions = useMemo(() => {
+    if (!airportsData) return [];
+    return airportsData
+      .filter((a) => !a.sede)
+      .map((a) => ({
+        id: a.codigo,
+        label: `${a.ciudad ?? a.codigo} (${a.codigo})`,
+      }));
+  }, [airportsData]);
+
+  const warehouseLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    warehouseOptions.forEach((a) => map.set(a.id, a.label));
+    return map;
+  }, [warehouseOptions]);
+
+  useEffect(() => {
+    setAlmacen(selectedAirportId ?? null);
+  }, [selectedAirportId]);
+
+  const handleSelectAlmacen = (codigo: string) => {
+    setAlmacen(codigo);
+    setSelectedAirport(codigo);
+  };
 
   //Fijar fecha de fin automáticamente al elegir fecha de inicio
   const handleInicio = (value?: Date) => {
@@ -175,8 +202,6 @@ export default function ToolsPanel({
     return resultado;
   }, [windows, simNowUtc]);
 
-  const almacenes = useMemo(() => ["WH-LIM01", "WH-BOG02", "WH-MEX03", "WH-SCL04"], []);
-
   // Calcular cantidad EN EL AIRE del pedido seleccionado
   const cantidadEnVuelo = useMemo(() => {
     if (!pedido || !pedido.rutas || !simNowUtc) return 0;
@@ -267,6 +292,7 @@ export default function ToolsPanel({
     setVuelo(null);
     setAlmacen(null);
     setPedido(null);
+    setSelectedAirport(null);
   };
 
   return (
@@ -474,13 +500,13 @@ export default function ToolsPanel({
           items={vuelosActivos}
           onSelect={setVuelo}
         />
-        <SelectCard
+        <WarehouseSelectCard
           label="Almacén"
           icon={<Building2 className="h-4 w-4" />}
           placeholder="Seleccionar almacén"
-          value={almacen}
-          items={almacenes}
-          onSelect={setAlmacen}
+          value={almacen ? warehouseLabelMap.get(almacen) ?? `${almacen}` : null}
+          items={warehouseOptions}
+          onSelect={handleSelectAlmacen}
         />
         <OrderSelectCard
           label="Pedido"
@@ -665,7 +691,9 @@ export default function ToolsPanel({
 
 /* ---------- Subcomponentes ---------- */
 
-function SelectCard({
+type WarehouseOption = { id: string; label: string };
+
+function WarehouseSelectCard({
   label,
   icon,
   placeholder,
@@ -677,16 +705,22 @@ function SelectCard({
   icon: React.ReactNode;
   placeholder: string;
   value: string | null;
-  items: string[];
+  items: WarehouseOption[];
   onSelect: (val: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
 
   const filtered = useMemo(
-    () => items.filter((i) => i.toLowerCase().includes(q.toLowerCase())),
+    () =>
+      items.filter((opt) =>
+        opt.label.toLowerCase().includes(q.toLowerCase()) ||
+        opt.id.toLowerCase().includes(q.toLowerCase())
+      ),
     [items, q]
   );
+
+  const displayValue = value ?? placeholder;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -705,7 +739,7 @@ function SelectCard({
             <div className="min-w-0">
               <p className="text-[12px] text-muted-foreground leading-tight">{label}</p>
               <p className="text-[17px] font-semibold leading-tight truncate">
-                {value ?? placeholder}
+                {displayValue}
               </p>
             </div>
           </div>
@@ -734,17 +768,20 @@ function SelectCard({
             <p className="text-xs text-muted-foreground px-1 py-2">Sin resultados</p>
           )}
           <ul className="space-y-1">
-            {filtered.map((it) => (
-              <li key={it}>
+            {filtered.map((opt) => (
+              <li key={opt.id}>
                 <button
                   onClick={() => {
-                    onSelect(it);
+                    onSelect(opt.id);
                     setOpen(false);
                     setQ("");
                   }}
                   className="w-full text-left px-2 py-2 rounded-md hover:bg-accent/40 text-sm"
                 >
-                  {it}
+                  <div className="flex items-center justify-between">
+                    <span>{opt.label}</span>
+                    <span className="text-xs text-muted-foreground font-mono">{opt.id}</span>
+                  </div>
                 </button>
               </li>
             ))}
