@@ -21,12 +21,10 @@ public class SplitRepair implements RepairOperator {
     private final VuelosTEG teg;
     private final List<String> sedes;
 
-    // 🛑 CORRECCIÓN: Definición de constantes
+    // 🛑 SEGURIDAD Y CONSTANTES
     private static final Duration SLA_ARRIVAL_LIMIT = Duration.ofHours(46); 
     private static final Duration PICKUP_FINAL = Duration.ofHours(2); 
     private static final double COST_WEIGHT = 1.0; 
-    
-    // 🛑 SEGURIDAD: Límite máximo de tramos en una ruta (previene OOM).
     private static final int MAX_NODES_IN_PATH = 500; 
 
     public SplitRepair(List<String> sedes, VuelosTEG teg) {
@@ -58,7 +56,7 @@ public class SplitRepair implements RepairOperator {
         }
     }
 
-    // 🛑 MÉTODO AUXILIAR: buildPackingMax
+    // 🛑 buildPackingMax
     private List<RutaAsignada> buildPackingMax(PlanPedido plan,
                                                  SolucionProgramacion s,
                                                  Map<VueloProgramadoId, Integer> prevByFlight) {
@@ -132,8 +130,10 @@ public class SplitRepair implements RepairOperator {
                                              Instant refCreacion,
                                              Instant deadline) {
         
+        // El estado de distancia sigue siendo Costo (Double), PERO usamos el tiempo de llegada absoluto
+        // (arrivalTimes) para garantizar la factibilidad temporal.
         Map<String, Double> dist = new HashMap<>();
-        Map<String, Instant> arrivalTimes = new HashMap<>();
+        Map<String, Instant> arrivalTimes = new HashMap<>(); 
         Map<String, Vuelo> prev = new HashMap<>();
         PriorityQueue<String> pq = new PriorityQueue<>(Comparator.comparingDouble(n -> dist.getOrDefault(n, Double.POSITIVE_INFINITY)));
 
@@ -150,22 +150,21 @@ public class SplitRepair implements RepairOperator {
             List<Vuelo> salidas = teg.getVuelosPorOrigen().get(u);
             if (salidas == null) continue;
 
-            // TIEMPO ABSOLUTO DE LLEGADA AL NODO u (el tiempo en que el pedido está listo para el siguiente vuelo)
+            // Tiempo de llegada al nodo 'u' (base para la salida del nuevo vuelo)
             Instant lastArrivalTime = arrivalTimes.get(u);
             
             for (Vuelo v : salidas) {
                 VueloProgramadoId id = toId(v, refCreacion);
                 
-                // 1. FILTRO DE FACTIBILIDAD TEMPORAL (¡LA CLAVE!):
-                // El vuelo 'v' NO puede salir antes de que la carga esté lista en 'u' (lastArrivalTime).
-                // Sumamos 1 minuto (o un tiempo de manejo mínimo) si la salida es el mismo instante que la llegada.
+                // 1. FILTRO DE FACTIBILIDAD TEMPORAL (CRÍTICO)
+                // Debe haber un tiempo mínimo de manejo/layover (60s)
                 if (id.getSalidaUtc().isBefore(lastArrivalTime.plusSeconds(60))) continue; 
 
-                // 2. Filtro de Residual y SLA (se mantienen)
+                // 2. Filtro de Residual y SLA
                 if (residualAjustado(id, s, prevByFlight, addedNow) <= 0) continue;
-                if (id.getLlegadaUtc().isAfter(deadline)) continue; 
+                if (id.getLlegadaUtc().isAfter(deadline)) continue; // 🛑 Filtro SLA
 
-                // 3. Cálculo de peso (Costo Logístico)
+                // 3. Cálculo de peso: Usamos el costo logístico del VueloProgramadoId
                 double costoLogistico = id.getCosto(); 
                 double peso = COST_WEIGHT * costoLogistico; 
 
@@ -182,6 +181,7 @@ public class SplitRepair implements RepairOperator {
                 }
             }
         }
+
         if (!prev.containsKey(destino)) return null;
 
         List<Vuelo> ruta = new ArrayList<>();
@@ -192,7 +192,7 @@ public class SplitRepair implements RepairOperator {
         while (prev.containsKey(w)) {
             if (safetyCounter++ > MAX_NODES_IN_PATH) {
                 System.err.println("ALERTA: Se alcanzó el límite de tramos en Dijkstra. Posible bucle o ruta excesivamente larga.");
-                return null; // Forzar fallo del Dijkstra
+                return null; 
             }
             Vuelo v = prev.get(w);
             ruta.add(v);
@@ -230,7 +230,6 @@ public class SplitRepair implements RepairOperator {
     }
     
     private double costoRuta(List<Vuelo> ruta) {
-        // Usamos el costo del Vuelo (que ya incluye penalización de capacidad) para el ranking final.
         return ruta.stream()
                 .mapToDouble(Vuelo::getCosto)
                 .sum();
