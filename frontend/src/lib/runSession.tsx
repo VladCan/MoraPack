@@ -17,6 +17,8 @@ interface RunSessionState {
     status: RunStatus;
     simNow: string | null;          // ISO-8601 del "ahora" simulado
     lastWindow: RunWindow | null;   // última ventana recibida por SSE (con vuelos y pedidos)
+    windows: RunWindow[];           // historial completo de ventanas recibidas
+    selectedAirportId: string | null;
 
     //Esto va a usar TopNav:
     begin: (runId: string) => void;
@@ -24,6 +26,7 @@ interface RunSessionState {
 
     setSimNow: (iso: string) => void;
     setWindow: (w: RunWindow) => void;
+    setSelectedAirport: (id: string | null) => void;
 }
 
 const RunSessionContext = createContext<RunSessionState | null>(null);
@@ -33,12 +36,16 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
     const [status, setStatus] = useState<RunStatus>("idle");
     const [simNow, setSimNowState] = useState<string | null>(null);
     const [lastWindow, setLastWindow] = useState<RunWindow | null>(null);
+    const [windows, setWindows] = useState<RunWindow[]>([]);
+    const [selectedAirportId, setSelectedAirportId] = useState<string | null>(null);
 
     const begin = useCallback((id: string) => {
         setRunId(id);
         setStatus("running");
         setSimNowState(null);
         setLastWindow(null);
+        setWindows([]);
+        setSelectedAirportId(null);
     }, []);
 
     const end = useCallback((st: Extract<RunStatus, "finished" | "failed"> = "finished") => {
@@ -50,11 +57,20 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
     }, []);
 
     const setWindow = useCallback((w: RunWindow) => {
-        setLastWindow(prev => {
-            // Solo actualizar si cambió el índice
-            if (prev?.index === w.index) return prev;
-            return w;
+        setLastWindow(w);
+        setWindows(prev => {
+            const idx = prev.findIndex(win => win.index === w.index);
+            if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = w;
+                return next;
+            }
+            return [...prev, w];
         });
+    }, []);
+
+    const setSelectedAirport = useCallback((id: string | null) => {
+        setSelectedAirportId(id);
     }, []);
 
     const value = useMemo<RunSessionState>(() => ({
@@ -62,11 +78,14 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         status,
         simNow,
         lastWindow,
+        windows,
+        selectedAirportId,
         begin,
         end,
         setSimNow,
         setWindow,
-    }), [runId, status, simNow, lastWindow, begin, end, setSimNow, setWindow])
+        setSelectedAirport,
+    }), [runId, status, simNow, lastWindow, windows, selectedAirportId, begin, end, setSimNow, setWindow, setSelectedAirport]);
 
     return (
         <RunSessionContext.Provider value={value}>

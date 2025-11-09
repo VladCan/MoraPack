@@ -104,6 +104,7 @@ interface FlightPathProps {
   planeColor?: string;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  onClick?: () => void;
 }
 
 export default function FlightPath({
@@ -115,6 +116,7 @@ export default function FlightPath({
   planeColor,
   onMouseEnter,
   onMouseLeave,
+  onClick,
 }: FlightPathProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
@@ -178,6 +180,7 @@ export default function FlightPath({
         <div
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
+          onClick={onClick}
           className="cursor-pointer"
         >
           <PlaneIcon

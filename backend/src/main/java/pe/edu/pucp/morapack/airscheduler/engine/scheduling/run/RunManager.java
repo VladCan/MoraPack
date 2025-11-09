@@ -15,7 +15,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoManager;
 // Imports para la lógica de planificación
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.VentanaPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
@@ -132,6 +131,7 @@ public class RunManager {
     private final Map<String, SolucionProgramacion> solucionesAnteriores = new ConcurrentHashMap<>();
     private final Map<String, OcupacionPorAeropuerto> ocupacionesPorRun = new ConcurrentHashMap<>();
     private final Map<String, Set<String>> ventanasEnviadas = new ConcurrentHashMap<>();
+    private static final Duration PICKUP_WAIT = Duration.ofHours(2);
 
     public void addContext(String idRun, RunContext context) {
         contexts.put(idRun, context);
@@ -484,7 +484,8 @@ public class RunManager {
                 ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto);
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
-                // 6. Guardar solución para la siguiente ventana
+                // 6. Guardar solución para la siguiente ventana y sincronizar ocupación
+                actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
                 solucionesAnteriores.put(id, solucionOptima);
 
                 // 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
@@ -639,7 +640,8 @@ public class RunManager {
                 ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto);
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
-                /// 6. Guardar solución para la siguiente ventana
+                /// 6. Guardar solución para la siguiente ventana y sincronizar ocupación
+                actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
                 solucionesAnteriores.put(id, solucionOptima);
 
                 /// 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
@@ -780,6 +782,89 @@ public class RunManager {
         }
         
         return result;
+    }
+    
+    private void actualizarOcupacionDesdeSolucion(String runId,
+                                                  SolucionProgramacion solucionOptima,
+                                                  List<OcupacionAlmacen> reservasPrevias,
+                                                  Map<String, List<ArriboExogeno>> arribosEnVuelo) {
+        OcupacionPorAeropuerto nuevaOcupacion = construirOcupacionDesdeSolucion(solucionOptima);
+        if (reservasPrevias != null && !reservasPrevias.isEmpty()) {
+            for (OcupacionAlmacen reserva : reservasPrevias) {
+                if (reserva == null || reserva.cantidad() <= 0) continue;
+                Instant inicio = reserva.desde();
+                Instant fin = reserva.hasta();
+                if (inicio != null && fin != null && inicio.isBefore(fin)) {
+                    nuevaOcupacion.reservar(reserva.aeropuerto(), inicio, fin, reserva.cantidad());
+                }
+            }
+        }
+        if (arribosEnVuelo != null && !arribosEnVuelo.isEmpty()) {
+            for (Map.Entry<String, List<ArriboExogeno>> entry : arribosEnVuelo.entrySet()) {
+                String aeropuerto = entry.getKey();
+                if (aeropuerto == null) continue;
+                List<ArriboExogeno> llegadas = entry.getValue();
+                if (llegadas == null) continue;
+                for (ArriboExogeno arribo : llegadas) {
+                    if (arribo == null || arribo.cantidad() <= 0) continue;
+                    Instant llegada = arribo.arriboUtc();
+                    if (llegada == null) continue;
+                    Instant fin = llegada.plus(PICKUP_WAIT);
+                    nuevaOcupacion.reservar(aeropuerto, llegada, fin, arribo.cantidad());
+                }
+            }
+        }
+        ocupacionesPorRun.put(runId, nuevaOcupacion);
+    }
+
+    private OcupacionPorAeropuerto construirOcupacionDesdeSolucion(SolucionProgramacion solucionOptima) {
+        OcupacionPorAeropuerto nueva = new OcupacionPorAeropuerto(aeropuertosMap);
+        if (solucionOptima == null || solucionOptima.getPlanPorPedido() == null) {
+            return nueva;
+        }
+
+        for (PlanPedido plan : solucionOptima.getPlanPorPedido().values()) {
+            if (plan == null || plan.getRutas() == null) {
+                continue;
+            }
+
+            for (RutaAsignada ruta : plan.getRutas()) {
+                if (ruta == null) continue;
+                int cantidad = ruta.getCantidad();
+                if (cantidad <= 0) continue;
+
+                List<TramoAsignado> tramos = ruta.getTramos();
+                if (tramos == null || tramos.isEmpty()) {
+                    continue;
+                }
+
+                for (int i = 0; i < tramos.size() - 1; i++) {
+                    TramoAsignado actual = tramos.get(i);
+                    TramoAsignado siguiente = tramos.get(i + 1);
+                    if (actual == null || siguiente == null) continue;
+                    VueloProgramadoId vueloActual = actual.getVuelo();
+                    VueloProgramadoId vueloSiguiente = siguiente.getVuelo();
+                    if (vueloActual == null || vueloSiguiente == null) continue;
+
+                    Instant inicio = vueloActual.getLlegadaUtc();
+                    Instant fin = vueloSiguiente.getSalidaUtc();
+                    if (inicio != null && fin != null && inicio.isBefore(fin)) {
+                        nueva.reservar(vueloActual.getDestino(), inicio, fin, cantidad);
+                    }
+                }
+
+                TramoAsignado ultimo = tramos.get(tramos.size() - 1);
+                if (ultimo != null && ultimo.getVuelo() != null) {
+                    Instant llegadaFinal = ultimo.getVuelo().getLlegadaUtc();
+                    if (llegadaFinal != null) {
+                        Instant fin = llegadaFinal.plus(PICKUP_WAIT);
+                        nueva.reservar(ultimo.getVuelo().getDestino(), llegadaFinal, fin, cantidad);
+                    }
+                }
+            }
+        }
+
+        return nueva;
     }
 
     private static void sleepQuietly(Duration d) {

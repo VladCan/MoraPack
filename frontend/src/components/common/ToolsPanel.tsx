@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   Building2,
   Plane,
@@ -26,10 +26,10 @@ import { buildStartRunRequest } from "@/services/buildStartRunRequest";
 import { handleApi, postJson } from "@/services/api";
 import type { StartRunResponse } from "@/types/runs";
 import { useRunSession } from "@/lib/runSession";
+import { useAirports } from "@/hooks/useAirports";
 import toast from "react-hot-toast";
 import ToastCustom from "@/components/common/ToastCustom";
 import type { VueloDTO, PedidoDTO } from "@/hooks/useRunSSE";
-import { useRunSSE } from "@/hooks/useRunSSE";
 
 type NivelCarga = "disponible" | "limitado" | "saturado";
 
@@ -81,8 +81,33 @@ export default function ToolsPanel({
   const [almacen, setAlmacen] = useState<string | null>(null);
   const [pedido, setPedido] = useState<PedidoDTO | null>(null);
 
-  const {begin, runId} = useRunSession();
-  const {windows, simNowUtc} = useRunSSE(runId || undefined);
+  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport } = useRunSession();
+  const { data: airportsData } = useAirports();
+
+  const warehouseOptions = useMemo(() => {
+    if (!airportsData) return [];
+    return airportsData
+      .filter((a) => !a.sede)
+      .map((a) => ({
+        id: a.codigo,
+        label: `${a.ciudad ?? a.codigo} (${a.codigo})`,
+      }));
+  }, [airportsData]);
+
+  const warehouseLabelMap = useMemo(() => {
+    const map = new Map<string, string>();
+    warehouseOptions.forEach((a) => map.set(a.id, a.label));
+    return map;
+  }, [warehouseOptions]);
+
+  useEffect(() => {
+    setAlmacen(selectedAirportId ?? null);
+  }, [selectedAirportId]);
+
+  const handleSelectAlmacen = (codigo: string) => {
+    setAlmacen(codigo);
+    setSelectedAirport(codigo);
+  };
 
   //Fijar fecha de fin automáticamente al elegir fecha de inicio
   const handleInicio = (value?: Date) => {
@@ -99,8 +124,14 @@ export default function ToolsPanel({
 
   // Obtener SOLO vuelos que están EN EL AIRE en este momento
   const vuelosActivos = useMemo<VueloDTO[]>(() => {
-    if (!simNowUtc || windows.length === 0) return [];
+    if (windows.length === 0) return [];
     
+    // Si aún no tenemos TICK (simNowUtc), mostramos los vuelos de la última ventana.
+    if (!simNowUtc) {
+      const lastWindow = windows[windows.length - 1];
+      return lastWindow?.vuelos ?? [];
+    }
+
     const now = new Date(simNowUtc).getTime();
     const vuelosEnAire = new Map<string, VueloDTO>();
     
@@ -119,6 +150,11 @@ export default function ToolsPanel({
     });
     
     const resultado = Array.from(vuelosEnAire.values());
+    if (resultado.length === 0) {
+      const lastWindow = windows[windows.length - 1];
+      return lastWindow?.vuelos ?? [];
+    }
+    
     console.log('[ToolsPanel] Vuelos EN EL AIRE:', resultado.length);
     console.log('[ToolsPanel] simNowUtc:', simNowUtc);
     console.log('[ToolsPanel] windows.length:', windows.length);
@@ -128,7 +164,12 @@ export default function ToolsPanel({
 
   // Obtener SOLO pedidos que están en vuelos activos
   const pedidosActivos = useMemo<PedidoDTO[]>(() => {
-    if (!simNowUtc || windows.length === 0) return [];
+    if (windows.length === 0) return [];
+
+    if (!simNowUtc) {
+      const lastWindow = windows[windows.length - 1];
+      return lastWindow?.pedidos ?? [];
+    }
     
     const now = new Date(simNowUtc).getTime();
     
@@ -151,13 +192,15 @@ export default function ToolsPanel({
     // Filtrar pedidos que están en vuelo AHORA
     const lastWindow = windows[windows.length - 1];
     const resultado = (lastWindow?.pedidos || []).filter(p => pedidosEnVueloSet.has(p.id));
+    if (resultado.length === 0) {
+      return lastWindow?.pedidos ?? [];
+    }
+
     console.log('[ToolsPanel] Pedidos EN VUELO:', resultado.length);
     console.log('[ToolsPanel] Pedidos IDs en vuelo:', Array.from(pedidosEnVueloSet));
     console.log('[ToolsPanel] Total pedidos en último window:', lastWindow?.pedidos?.length || 0);
     return resultado;
   }, [windows, simNowUtc]);
-
-  const almacenes = useMemo(() => ["WH-LIM01", "WH-BOG02", "WH-MEX03", "WH-SCL04"], []);
 
   // Calcular cantidad EN EL AIRE del pedido seleccionado
   const cantidadEnVuelo = useMemo(() => {
@@ -249,6 +292,7 @@ export default function ToolsPanel({
     setVuelo(null);
     setAlmacen(null);
     setPedido(null);
+    setSelectedAirport(null);
   };
 
   return (
@@ -456,13 +500,13 @@ export default function ToolsPanel({
           items={vuelosActivos}
           onSelect={setVuelo}
         />
-        <SelectCard
+        <WarehouseSelectCard
           label="Almacén"
           icon={<Building2 className="h-4 w-4" />}
           placeholder="Seleccionar almacén"
-          value={almacen}
-          items={almacenes}
-          onSelect={setAlmacen}
+          value={almacen ? warehouseLabelMap.get(almacen) ?? `${almacen}` : null}
+          items={warehouseOptions}
+          onSelect={handleSelectAlmacen}
         />
         <OrderSelectCard
           label="Pedido"
@@ -647,7 +691,9 @@ export default function ToolsPanel({
 
 /* ---------- Subcomponentes ---------- */
 
-function SelectCard({
+type WarehouseOption = { id: string; label: string; city?: string; country?: string };
+
+function WarehouseSelectCard({
   label,
   icon,
   placeholder,
@@ -659,16 +705,34 @@ function SelectCard({
   icon: React.ReactNode;
   placeholder: string;
   value: string | null;
-  items: string[];
+  items: WarehouseOption[];
   onSelect: (val: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [countryFilter, setCountryFilter] = useState<string>("all");
+
+  const countries = useMemo(
+    () =>
+      Array.from(
+        new Set(items.map((opt) => opt.country).filter((c): c is string => Boolean(c)))
+      ).sort(),
+    [items]
+  );
 
   const filtered = useMemo(
-    () => items.filter((i) => i.toLowerCase().includes(q.toLowerCase())),
-    [items, q]
+    () =>
+      items
+        .filter((opt) =>
+          opt.label.toLowerCase().includes(q.toLowerCase()) ||
+          opt.id.toLowerCase().includes(q.toLowerCase()) ||
+          (opt.city ?? "").toLowerCase().includes(q.toLowerCase())
+        )
+        .filter((opt) => (countryFilter === "all" ? true : opt.country === countryFilter)),
+    [items, q, countryFilter]
   );
+
+  const displayValue = value ?? placeholder;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -687,7 +751,7 @@ function SelectCard({
             <div className="min-w-0">
               <p className="text-[12px] text-muted-foreground leading-tight">{label}</p>
               <p className="text-[17px] font-semibold leading-tight truncate">
-                {value ?? placeholder}
+                {displayValue}
               </p>
             </div>
           </div>
@@ -702,31 +766,51 @@ function SelectCard({
           "animate-in fade-in-0 zoom-in-95",
         ].join(" ")}
       >
-        <div className="flex items-center gap-2 mb-2">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={`Buscar ${label.toLowerCase()}…`}
-            className="h-8 text-sm ring-1 ring-border bg-card/70 supports-[backdrop-filter]:bg-card/20 supports-[backdrop-filter]:backdrop-blur-md"
-          />
+        <div className="space-y-2 mb-2">
+          {countries.length > 1 && (
+            <Select value={countryFilter} onValueChange={setCountryFilter}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Filtrar por país" />
+              </SelectTrigger>
+              <SelectContent className={GLASS_SOFT}>
+                <SelectItem value="all">Todos los países</SelectItem>
+                {countries.map((country) => (
+                  <SelectItem key={country} value={country}>
+                    {country}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <div className="flex items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={`Buscar ${label.toLowerCase()}…`}
+              className="h-8 text-sm ring-1 ring-border bg-card/70 supports-[backdrop-filter]:bg-card/20 supports-[backdrop-filter]:backdrop-blur-md"
+            />
+          </div>
         </div>
         <div className="max-h-56 overflow-auto">
           {filtered.length === 0 && (
             <p className="text-xs text-muted-foreground px-1 py-2">Sin resultados</p>
           )}
           <ul className="space-y-1">
-            {filtered.map((it) => (
-              <li key={it}>
+            {filtered.map((opt) => (
+              <li key={opt.id}>
                 <button
                   onClick={() => {
-                    onSelect(it);
+                    onSelect(opt.id);
                     setOpen(false);
                     setQ("");
                   }}
                   className="w-full text-left px-2 py-2 rounded-md hover:bg-accent/40 text-sm"
                 >
-                  {it}
+                  <div className="flex items-center justify-between">
+                    <span>{opt.label}</span>
+                    <span className="text-xs text-muted-foreground font-mono">{opt.id}</span>
+                  </div>
                 </button>
               </li>
             ))}
@@ -754,10 +838,29 @@ function FlightSelectCard({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [originFilter, setOriginFilter] = useState<string>("all");
+  const [destFilter, setDestFilter] = useState<string>("all");
+
+  const origins = useMemo(
+    () => Array.from(new Set(items.map((v) => v.origen))).sort(),
+    [items]
+  );
+  const dests = useMemo(
+    () => Array.from(new Set(items.map((v) => v.destino))).sort(),
+    [items]
+  );
 
   const filtered = useMemo(
-    () => items.filter((v) => v.id.toLowerCase().includes(q.toLowerCase())),
-    [items, q]
+    () =>
+      items
+        .filter((v) =>
+          v.id.toLowerCase().includes(q.toLowerCase()) ||
+          v.origen.toLowerCase().includes(q.toLowerCase()) ||
+          v.destino.toLowerCase().includes(q.toLowerCase())
+        )
+        .filter((v) => (originFilter === "all" ? true : v.origen === originFilter))
+        .filter((v) => (destFilter === "all" ? true : v.destino === destFilter)),
+    [items, q, originFilter, destFilter]
   );
 
   return (
@@ -792,14 +895,50 @@ function FlightSelectCard({
           "animate-in fade-in-0 zoom-in-95",
         ].join(" ")}
       >
-        <div className="flex items-center gap-2 mb-2">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={`Buscar ${label.toLowerCase()}…`}
-            className="h-8 text-sm ring-1 ring-border bg-card/70 supports-[backdrop-filter]:bg-card/20 supports-[backdrop-filter]:backdrop-blur-md"
-          />
+        <div className="space-y-2 mb-2">
+          {(origins.length > 1 || dests.length > 1) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {origins.length > 1 && (
+                <Select value={originFilter} onValueChange={setOriginFilter}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Origen" />
+                  </SelectTrigger>
+                  <SelectContent className={GLASS_SOFT}>
+                    <SelectItem value="all">Todos los orígenes</SelectItem>
+                    {origins.map((origin) => (
+                      <SelectItem key={origin} value={origin}>
+                        {origin}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {dests.length > 1 && (
+                <Select value={destFilter} onValueChange={setDestFilter}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Destino" />
+                  </SelectTrigger>
+                  <SelectContent className={GLASS_SOFT}>
+                    <SelectItem value="all">Todos los destinos</SelectItem>
+                    {dests.map((dest) => (
+                      <SelectItem key={dest} value={dest}>
+                        {dest}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={`Buscar ${label.toLowerCase()}…`}
+              className="h-8 text-sm ring-1 ring-border bg-card/70 supports-[backdrop-filter]:bg-card/20 supports-[backdrop-filter]:backdrop-blur-md"
+            />
+          </div>
         </div>
         <div className="max-h-56 overflow-auto">
           {filtered.length === 0 && (
@@ -851,22 +990,18 @@ function OrderSelectCard({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-
-  const filtered = useMemo(
-    () => items.filter((p) => p.id.toString().includes(q)),
-    [items, q]
-  );
+  const [estadoFilter, setEstadoFilter] = useState<string>("all");
+  const [destinoFilter, setDestinoFilter] = useState<string>("all");
 
   // Función para calcular el estado basado en cantidadEnVuelo
-  const calcularEstado = (pedido: PedidoDTO): string => {
+  const calcularEstado = useCallback((pedido: PedidoDTO): string => {
     if (!pedido.rutas || !simNowUtc) {
-      console.log('[calcularEstado] Sin rutas o simNowUtc, usando estado backend:', pedido.estadoAsignacion);
       return pedido.estadoAsignacion;
     }
-    
+
     const now = new Date(simNowUtc).getTime();
     const cantidadEnVuelo = pedido.rutas.reduce((sum, ruta) => {
-      const tieneVueloEnAire = ruta.vuelos.some(vuelo => {
+      const tieneVueloEnAire = ruta.vuelos.some((vuelo) => {
         const salida = new Date(vuelo.salidaUtc).getTime();
         const llegada = new Date(vuelo.llegadaUtc).getTime();
         return now >= salida && now <= llegada;
@@ -874,13 +1009,32 @@ function OrderSelectCard({
       return tieneVueloEnAire ? sum + ruta.cantidad : sum;
     }, 0);
 
-    const estado = cantidadEnVuelo >= pedido.cantidad ? "COMPLETO" :
-                   cantidadEnVuelo > 0 ? "PARCIAL" : "PENDIENTE";
-    
-    console.log(`[calcularEstado] Pedido ${pedido.id}: cantidadEnVuelo=${cantidadEnVuelo}, cantidad=${pedido.cantidad}, estado=${estado}`);
-    
-    return estado;
-  };
+    return cantidadEnVuelo >= pedido.cantidad
+      ? "COMPLETO"
+      : cantidadEnVuelo > 0
+      ? "PARCIAL"
+      : "PENDIENTE";
+  }, [simNowUtc]);
+
+  const estados = useMemo(
+    () =>
+      Array.from(new Set(items.map((p) => calcularEstado(p)))).sort(),
+    [items, calcularEstado]
+  );
+
+  const destinos = useMemo(
+    () => Array.from(new Set(items.map((p) => p.destino))).sort(),
+    [items]
+  );
+
+  const filtered = useMemo(
+    () =>
+      items
+        .filter((p) => p.id.toString().includes(q) || p.destino.toLowerCase().includes(q.toLowerCase()))
+        .filter((p) => (estadoFilter === "all" ? true : calcularEstado(p) === estadoFilter))
+        .filter((p) => (destinoFilter === "all" ? true : p.destino === destinoFilter)),
+    [items, q, estadoFilter, destinoFilter, calcularEstado]
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -914,14 +1068,50 @@ function OrderSelectCard({
           "animate-in fade-in-0 zoom-in-95",
         ].join(" ")}
       >
-        <div className="flex items-center gap-2 mb-2">
-          <Search className="h-4 w-4 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={`Buscar ${label.toLowerCase()}…`}
-            className="h-8 text-sm ring-1 ring-border bg-card/70 supports-[backdrop-filter]:bg-card/20 supports-[backdrop-filter]:backdrop-blur-md"
-          />
+        <div className="space-y-2 mb-2">
+          {(estados.length > 1 || destinos.length > 1) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {estados.length > 1 && (
+                <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Estado" />
+                  </SelectTrigger>
+                  <SelectContent className={GLASS_SOFT}>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    {estados.map((estado) => (
+                      <SelectItem key={estado} value={estado}>
+                        {estado}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {destinos.length > 1 && (
+                <Select value={destinoFilter} onValueChange={setDestinoFilter}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Destino" />
+                  </SelectTrigger>
+                  <SelectContent className={GLASS_SOFT}>
+                    <SelectItem value="all">Todos los destinos</SelectItem>
+                    {destinos.map((dest) => (
+                      <SelectItem key={dest} value={dest}>
+                        {dest}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={`Buscar ${label.toLowerCase()}…`}
+              className="h-8 text-sm ring-1 ring-border bg-card/70 supports-[backdrop-filter]:bg-card/20 supports-[backdrop-filter]:backdrop-blur-md"
+            />
+          </div>
         </div>
         <div className="max-h-56 overflow-auto">
           {filtered.length === 0 && (
