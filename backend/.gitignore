@@ -45,4 +45,5 @@ nb-configuration.xml
 .certs/
 #pedidos
 out/*
-src/main/resources/pedidos*
+src/main/resources/pedidos.txt
+src/main/resources/pedidosbackup.txt
