@@ -127,7 +127,8 @@ export default function Simulacion() {
         }
         const firstSeen = flightFirstSeenRef.current.get(vuelo.id) ?? Math.max(now, salidaTime);
         const transcurridoDesdeVista = Math.max(0, Math.min(now, llegadaTime) - firstSeen);
-        const progress = duracion > 0 ? Math.min(1, transcurridoDesdeVista / duracion) : 0;
+        const duracionRestante = Math.max(1, llegadaTime - firstSeen);
+        const progress = Math.min(1, transcurridoDesdeVista / duracionRestante);
 
         // Determinar color basado en ocupación
         const ocupacion = vuelo.cantidadAsignada / vuelo.capacidad;
