@@ -50,7 +50,6 @@ export default function Simulacion() {
 
   const { data: airportsDtoRaw } = useAirports();
   const [hoveredAirportId, setHoveredAirportId] = useState<string | null>(null);
-  const [activeAirportId, setActiveAirportId] = useState<string | null>(null);
   const [activeFlight, setActiveFlight] = useState<FlightForRender | null>(null);
 
   // Parsear aeropuertos
@@ -75,7 +74,7 @@ export default function Simulacion() {
   }, [airports]);
 
   // Conectar al SSE
-  const { runId } = useRunSession();
+  const { runId, selectedAirportId, setSelectedAirport } = useRunSession();
   const { simNowUtc, windows, airportOccupancy } = useRunSSE(runId || undefined);
 
   // Procesar vuelos para renderizar
@@ -168,8 +167,8 @@ export default function Simulacion() {
   }, [flightsToRender, activeFlight]);
 
   // Obtener datos del aeropuerto activo
-  const activeAirportData = activeAirportId && airportOccupancy[activeAirportId]
-    ? airportOccupancy[activeAirportId]
+  const activeAirportData = selectedAirportId && airportOccupancy[selectedAirportId]
+    ? airportOccupancy[selectedAirportId]
     : null;
 
   return (
@@ -184,7 +183,7 @@ export default function Simulacion() {
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeAirportData.porcentaje > 0.8 ? "#f97316" : activeAirportData.porcentaje > 0.5 ? "#facc15" : "#38bdf8" }}></div>
                 <h3 className="font-semibold text-lg">
-                  {activeAirportId}
+                  {selectedAirportId}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
@@ -192,7 +191,7 @@ export default function Simulacion() {
                   {Math.round(activeAirportData.porcentaje * 100)}%
                 </span>
                 <button
-                  onClick={() => setActiveAirportId(null)}
+                  onClick={() => setSelectedAirport(null)}
                   className="text-muted-foreground hover:text-foreground transition-colors"
                   aria-label="Cerrar"
                 >
@@ -273,7 +272,7 @@ export default function Simulacion() {
       )}
 
       {/* Tooltip de vuelo */}
-      {activeFlight && !activeAirportId && (
+      {activeFlight && !selectedAirportId && (
         <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
           <div className="space-y-3">
             {/* Header */}
@@ -396,14 +395,14 @@ export default function Simulacion() {
         {/* Renderizar aeropuertos */}
         <AirportMarkers
           items={airports}
-          activeId={activeAirportId}
+          activeId={selectedAirportId}
           hoveredId={hoveredAirportId}
           baseColor={COLOR_NORMAL}
           activeColor={ACTIVE_COLOR}
           hoverColor={HOVER_COLOR}
           onHoverChange={setHoveredAirportId}
           onClick={(id) =>
-            setActiveAirportId((prev) => (prev === id ? null : id))
+            setSelectedAirport(selectedAirportId === id ? null : id)
           }
           iconSize={16}
         />
