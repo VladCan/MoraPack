@@ -218,12 +218,12 @@ const renderDropzoneFooterOP = (
   isLoading?: boolean
 ) => (
   <>
-    <div className="text-xs text-muted-foreground">
+    <div className="text-xs text-muted-foreground font-bold">
       {isLoading
         ? "Cargando estado..."
         : status?.exists
           ? <>
-              Ya se cargó un archivo de Operación Diaria. {kind}
+              ☑️ Ya se cargó un archivo de Operación Diaria - {kind}.
             </>
           : "No se pudo recuperar el estado o no existe archivo."}
     </div>
@@ -417,7 +417,7 @@ const renderDropzoneFooterOP = (
             <Dropzone
               label="Cargar archivo operación diaria"
               onFiles={(fs) => onUpload(fs[0], "operacionDiaria")}
-              footer={renderDropzoneFooterOP("aereopuertos", operacionDiariaStatus.data, operacionDiariaStatus.isLoading)}
+              footer={renderDropzoneFooterOP("operacionDiaria", operacionDiariaStatus.data, operacionDiariaStatus.isLoading)}
             />
             
           </CardContent>
