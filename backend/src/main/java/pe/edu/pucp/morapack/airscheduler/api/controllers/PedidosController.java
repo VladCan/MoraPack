@@ -1,26 +1,31 @@
 package pe.edu.pucp.morapack.airscheduler.api.controllers;
+
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import java.io.File;
+// Eliminamos el import de ConfigProperty
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
+// Eliminamos los imports de Files y StandardCopyOption
 
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import pe.edu.pucp.morapack.airscheduler.api.mapper.PedidoMapper;
+import pe.edu.pucp.morapack.airscheduler.api.response.JsonResponse;
+import pe.edu.pucp.morapack.airscheduler.api.response.PedidoResponse;
+import pe.edu.pucp.morapack.airscheduler.api.service.PedidosService; // <-- Nuevo: Importar el service
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 
-import static org.hibernate.internal.util.StringHelper.isBlank;
 
 @Path("/pedidos")
 public class PedidosController {
-    // Endpoint para recibir el archivo y guardarlo
-    @ConfigProperty(name = "morapack.upload.dir")
-    String uploadDir;
+    
+    // Eliminamos: @ConfigProperty(name = "morapack.upload.dir") String uploadDir;
+    
+    // Inyectamos el nuevo PedidosService (asumimos que RunManager también es inyectado aquí si se usa directamente en crearPedido)
+    @Inject 
+    PedidosService pedidosService; // <-- Nuevo: Service para manejar la persistencia
+    
     @Inject
     RunManager runManager;
 
@@ -31,20 +36,19 @@ public class PedidosController {
         public Integer cantidad;
     }
 
+    // Endpoint para recibir el archivo y guardarlo (DELEGACIÓN AL SERVICE)
     @POST
     @Path("/upload")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     public Response uploadPedidos(
             @FormParam("file") InputStream fileInputStream) {
-        // Directorio donde se guardará el archivo
-        String directory = uploadDir;
-        File outputFile = new File(directory + "/pedidos.txt");
-
-        // Crear el archivo y escribir los datos
+        
         try {
-            Files.copy(fileInputStream, outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            // **DELEGACIÓN:** El service se encarga de obtener la ruta, crear el directorio y copiar el archivo.
+            java.nio.file.Path targetPath = pedidosService.guardarArchivoPedidos(fileInputStream);
+            
             return Response
-                    .ok(new JsonResponse("success", "Archivo de pedidos guardado exitosamente", outputFile.getAbsolutePath()))
+                    .ok(new JsonResponse("success", "Archivo de pedidos guardado exitosamente", targetPath.toAbsolutePath().toString()))
                     .build();
         } catch (IOException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
@@ -53,24 +57,26 @@ public class PedidosController {
         }
     }
 
-    //Dado que la creación de un pedido sí o sí está conectada solamente a la operación diaria, podemos llamar
-    //a runManager dentro del método
+    // Dado que la creación de un pedido sí o sí está conectada solamente a la operación diaria, podemos llamar
+    // a runManager dentro del método
     @POST
     @Path("/crear")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response crearPedido(PedidoRequest request) {
         try {
-            //int idGenerado = (int) (Math.random() * 1000) + 1;
-
+            // ... (Validación y conversión se mantienen) ...
+            
             //Primero, validamos
             if (request == null) return bad("Body requerido");
-            if (isBlank(String.valueOf(request.idCliente))) return bad("scenario es requerido");
-            if (isBlank(request.destino)) return bad("scenario es requerido");
-            if (isBlank(request.fecha)) return bad("scenario es requerido");
-            if (isBlank(String.valueOf(request.cantidad))) return bad("scenario es requerido");
+            // Nota: isBlank es mejor para Strings, no para Integers.
+            // Considera validar que idCliente y cantidad no sean null y sean positivos.
+            if (isBlank(String.valueOf(request.idCliente))) return bad("El idCliente es requerido"); 
+            if (isBlank(request.destino)) return bad("El destino es requerido");
+            if (isBlank(request.fecha)) return bad("La fecha es requerida");
+            if (isBlank(String.valueOf(request.cantidad))) return bad("La cantidad es requerida");
 
-            //Si todo0 ok, convertimos a pedido
+            //Si todo ok, convertimos a pedido
             Pedido pedido = PedidoMapper.toPedido(request);
             int idGenerado = pedido.getIdPedido();
 
@@ -78,7 +84,6 @@ public class PedidosController {
                     "a " + request.destino + " creado correctamente con id " + idGenerado + " a las " + request.fecha;
 
             //Ahora vamos a ver si hay un run de OperaciónDiaria activo.
-            //Si existe, devuelve el runId. Caso contrario, lo crea y lo devuelve.
             String runId = runManager.ensureOperacionStarted();
 
             //Ahora, encolamos el pedido
@@ -101,6 +106,4 @@ public class PedidosController {
         return Response.status(Response.Status.BAD_REQUEST).entity(new PedidosController.ErrorDTO(msg)).build();
     }
     private static final class ErrorDTO { public final String message; ErrorDTO(String m){ this.message = m; } }
-
-
 }

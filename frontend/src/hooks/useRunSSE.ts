@@ -1,6 +1,7 @@
 // src/hooks/useRunSSE.ts
 
 import { useEffect, useMemo, useRef, useState } from "react";
+// ... (omitiendo la definición de tipos por brevedad) ...
 
 // Tipos de carga en un vuelo
 export type CargaItem = {
@@ -46,13 +47,13 @@ export type PedidoDTO = {
     idCliente: number;
     destino: string;
     cantidad: number;
-    origen: string | string[] | null;  // Puede ser string, array o null
+    origen: string | string[] | null; 
     cantidadAsignada: number;
     estadoAsignacion: "COMPLETO" | "PARCIAL" | "PENDIENTE";
     fechaCreacion: string;
     fechaLocal?: string;
     continenteDestino?: string;
-    rutas?: RutaDetalle[];  // NUEVO: desglose de rutas
+    rutas?: RutaDetalle[]; 
 };
 
 // Datos de ocupación de un aeropuerto
@@ -61,8 +62,8 @@ export type AeropuertoOcupacion = {
     capacidadTotal: number;
     disponible: number;
     porcentaje: number;
-    cargaLlegando?: number;  // Carga que está llegando ahora mismo
-    cargaSaliendo?: number;  // Carga que está saliendo ahora mismo
+    cargaLlegando?: number;
+    cargaSaliendo?: number;
     estadisticasFuturas?: EstadisticasFuturas;
 };
 
@@ -76,9 +77,9 @@ export type EstadisticasFuturas = {
 
 export type RunEvt = 
 | {type:"RUN_STARTED"; runId: string; simStartUtc: string; wallAnchorUtc: string; speed: number }
-| { type: "TICK";        runId: string; simNowUtc:  string; aeropuertos: Record<string, AeropuertoOcupacion> }
-| { type: "WINDOW";      runId: string; windowIndex: number; windowStartUtc: string; windowEndUtc: string; vuelos: VueloDTO[]; pedidos: PedidoDTO[] }
-| { type: "FINISHED";    runId: string; reason: string };
+| { type: "TICK"; runId: string; simNowUtc: string; aeropuertos: Record<string, AeropuertoOcupacion> }
+| { type: "WINDOW"; runId: string; windowIndex: number; windowStartUtc: string; windowEndUtc: string; vuelos: VueloDTO[]; pedidos: PedidoDTO[] }
+| { type: "FINISHED"; runId: string; reason: string };
 
 export type WindowData = {
     index: number;
@@ -87,6 +88,7 @@ export type WindowData = {
     vuelos: VueloDTO[];
     pedidos: PedidoDTO[];
 }
+
 
 export function useRunSSE(runId?: string){
     const [connected, setConnected] = useState(false);
@@ -103,23 +105,63 @@ export function useRunSSE(runId?: string){
 
     const url = useMemo(() => {
         if (!runId) return null;
-        const base = import.meta.env.VITE_API_BASE_URL as string | undefined;
-        return new URL(`/runs/${runId}/stream`, base).toString();
+        
+        // 1. Definir la ruta interna del recurso SIN la barra inicial.
+        const path = `runs/${runId}/stream`; 
+
+        const base = import.meta.env.VITE_API_BASE_URL as string | undefined; // Base: https://.../api/
+        
+        console.log("[RUN DIAG] 🧪 Inicia construcción de URL");
+        console.log("[RUN DIAG] 🔍 VITE_API_BASE_URL (base):", base);
+        console.log("[RUN DIAG] 🔍 Recurso path:", path); // Debe ser 'runs/{id}/stream'
+
+        // 2. Usar new URL() para construir la URL absoluta (Base + Path)
+        try {
+            let finalUrl: string;
+
+            if (base && base.length > 0) {
+                // CORRECCIÓN: new URL(path, base) ahora combina correctamente: .../api/runs/123/stream
+                finalUrl = new URL(path, base).toString();
+            } else {
+                // Fallback (si la variable de entorno no se inyecta)
+                finalUrl = `/${path}`; 
+            }
+            
+            console.log("[RUN DIAG] URL FINAL construida:", finalUrl);
+            return finalUrl;
+        } catch (e) {
+            console.error("[RUN DIAG] ❌ Error en construcción de URL:", e);
+            return null; 
+        }
+    }, [runId]);
+
+    useEffect(() => {
+        // Reset state whenever conectamos a otro run
+        setConnected(false);
+        setError(null);
+        setSpeed(undefined);
+        setSimStart(undefined);
+        setSimNow(undefined);
+        setWindows([]);
+        setFinished(null);
+        setAirportOccupancy({});
     }, [runId]);
 
     useEffect(() => {
         if (!url) return;
 
+        console.log(`[RUN DIAG] Conectando SSE a: ${url}`); // Log del intento de conexión
+
         const es = new EventSource(url, {withCredentials: false});
         esRef.current = es;
         
-        //Evita "setState on unmounted component" (no actualiza estado si el efecto ya fue limpiado)
         let alive = true;
 
         es.onopen = () => {
             if (!alive) return;
             setConnected(true);
             setError(null);
+            console.log("[RUN DIAG] Conexión abierta.");
         }
 
         es.onmessage = (ev) => {
@@ -140,25 +182,35 @@ export function useRunSSE(runId?: string){
                         break;
                     case "WINDOW":
                         setWindows((prev) => {
-                        // evita duplicados por reconexiones
-                        if (prev.find(w => w.index === evt.windowIndex)) return prev;
-                        return [...prev, {
-                            index: evt.windowIndex,
-                            startUtc: evt.windowStartUtc,
-                            endUtc:   evt.windowEndUtc,
-                            vuelos: evt.vuelos || [],
-                            pedidos: evt.pedidos || [],
-                        }];
+                            const nextWindow: WindowData = {
+                                index: evt.windowIndex,
+                                startUtc: evt.windowStartUtc,
+                                endUtc:   evt.windowEndUtc,
+                                vuelos: evt.vuelos || [],
+                                pedidos: evt.pedidos || [],
+                            };
+
+                            const existingIdx = prev.findIndex((w) => w.index === evt.windowIndex);
+                            if (existingIdx >= 0) {
+                                const copy = [...prev];
+                                copy[existingIdx] = nextWindow;
+                                return copy;
+                            }
+                            return [...prev, nextWindow];
                         });
                         break;
                     case "FINISHED":
                         setFinished({ reason: evt.reason });
+                        // Cerramos la conexión para liberar recursos en el backend.
+                        es.close();
+                        esRef.current = null;
+                        setConnected(false);
                         break;
                 }
 
-            }
-            catch (e) {
-
+            } catch (err: unknown) {
+                console.error("[RUN DIAG] Failed to parse SSE message or handle event:", err);
+                setError("Error procesando mensaje SSE");
             }
         }
 
@@ -166,11 +218,13 @@ export function useRunSSE(runId?: string){
             if (!alive) return;
             setConnected(false);
             setError("SSE Desconectado");
+            console.log("[RUN DIAG] Error de conexión.");
         }
 
         return () => {
             alive = false;
             es.close();
+            console.log("[RUN DIAG] Conexión SSE cerrada.");
             esRef.current = null;
         };
 
@@ -191,7 +245,6 @@ export function useRunSSE(runId?: string){
         windows,
         finished,
         airportOccupancy,
-        disconnect, //<- opcional por ahora
+        disconnect,
     };
-
 }

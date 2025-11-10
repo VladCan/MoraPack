@@ -1,4 +1,4 @@
-package pe.edu.pucp.morapack.airscheduler.api.controllers;
+package pe.edu.pucp.morapack.airscheduler.api.response;
 
 import io.quarkus.runtime.annotations.RegisterForReflection;
 

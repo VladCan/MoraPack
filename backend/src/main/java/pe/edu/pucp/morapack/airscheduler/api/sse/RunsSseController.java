@@ -14,20 +14,17 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-
 import java.time.format.DateTimeFormatter;
+
+// Imports para la anotación de reflexión
+import io.quarkus.runtime.annotations.RegisterForReflection; // <-- NUEVO IMPORT CRÍTICO
 
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunContext;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunId;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.StopReason;
 
-/**
- * SSE de resultados por ventana para una corrida.
- * Emite objetos JSON con dos tipos (POR AHORA):
- *  - { type: "WINDOW", runId, windowIndex, windowStartUtc, windowEndUtc }
- *  - { type: "FINISHED", runId, reason }  // y se completa el stream
- */
+// ... (El método stream() se mantiene sin cambios) ...
 
 @Path("/runs")
 @RequestScoped
@@ -47,12 +44,6 @@ public class RunsSseController {
 
             //Apenas se conecta, va a emitir un RUN_STARTED
             RunContext ctx = runManager.requireContext(runId.value());
-            //Internamente se hace un throw, por eso no se pone. Aunque es local
-            /*if (ctx == null) {
-                emitter.fail(new NotFoundException("Run no encontrado: " + runId.value()));
-                return;
-            }*/
-
             emitter.emit(new RunStartedEvt(runId.value(), ctx.simStartUtc().toString(),
                     ctx.wallAnchor().toString(), ctx.speed()));
 
@@ -77,17 +68,17 @@ public class RunsSseController {
             ScheduledFuture<?> tickFuture = tickExec.scheduleAtFixedRate(() -> {
                 try {
                    Instant now = Instant.now();
-                    Instant simNow = runManager.currentSimNow(runId.value());
+                   Instant simNow = runManager.currentSimNow(runId.value());
 
-                    // Imprime una sola línea, bien formateada
-                    System.out.printf("Tick executed at %s | simNow=%s%n",
+                   // Imprime una sola línea, bien formateada
+                   System.out.printf("Tick executed at %s | simNow=%s%n",
                             ISO.format(now),
                             ISO.format(simNow));
 
-                    // Obtener ocupación actual de aeropuertos
-                    var ocupacionAeropuertos = runManager.getCurrentAirportOccupancy(runId.value());
+                   // Obtener ocupación actual de aeropuertos
+                   var ocupacionAeropuertos = runManager.getCurrentAirportOccupancy(runId.value());
 
-                    emitter.emit(new TickEvt(runId.value(), simNow.toString(), ocupacionAeropuertos));
+                   emitter.emit(new TickEvt(runId.value(), simNow.toString(), ocupacionAeropuertos));
                 }
                 catch (Exception e) {
                     e.printStackTrace();
@@ -104,8 +95,9 @@ public class RunsSseController {
         });
     }
 
-    // ---------- DTOs mínimos del SSE (solo metadatos por ahora) ----------
+    // ---------- DTOs mínimos del SSE (AÑADIR @RegisterForReflection a TODOS) ----------
 
+    @RegisterForReflection // <-- ¡Añadir!
     public static final class RunStartedEvt {
         public final String type = "RUN_STARTED";
         public final String runId;
@@ -117,6 +109,7 @@ public class RunsSseController {
         }
     }
 
+    @RegisterForReflection // <-- ¡Añadir!
     public static final class TickEvt{
         public final String type = "TICK";
         public final String runId;
@@ -127,6 +120,7 @@ public class RunsSseController {
         }
     }
 
+    @RegisterForReflection // <-- ¡Añadir!
     public static final class WindowEvt {
         public final String type = "WINDOW";
         public final String runId;
@@ -148,6 +142,7 @@ public class RunsSseController {
         }
     }
 
+    @RegisterForReflection // <-- ¡Añadir!
     public static final class FinishedEvt {
         public final String type = "FINISHED";
         public final String runId;

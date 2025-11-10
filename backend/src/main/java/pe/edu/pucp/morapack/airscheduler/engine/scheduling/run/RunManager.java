@@ -1,6 +1,7 @@
 package pe.edu.pucp.morapack.airscheduler.engine.scheduling.run;
 
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -12,8 +13,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoManager;
 // Imports para la lógica de planificación
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.VentanaPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
@@ -38,6 +39,13 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.ssp.SSPGeneradorSeed;
 
 @ApplicationScoped
 public class RunManager {
+
+    @Inject
+    ArchivoManager archivoManager;
+    private static final String AEROPUERTOS_FILENAME = "aereopuertos.txt";
+    private static final String VUELOS_FILENAME = "vuelos.txt";
+    private static final String PEDIDOS_FILENAME = "pedidos.txt";
+
     private final ExecutorService executor = Executors.newCachedThreadPool((r -> {
         Thread t = new Thread(r, "run-" + UUID.randomUUID());
         t.setDaemon(true);
@@ -123,6 +131,7 @@ public class RunManager {
     private final Map<String, SolucionProgramacion> solucionesAnteriores = new ConcurrentHashMap<>();
     private final Map<String, OcupacionPorAeropuerto> ocupacionesPorRun = new ConcurrentHashMap<>();
     private final Map<String, Set<String>> ventanasEnviadas = new ConcurrentHashMap<>();
+    private static final Duration PICKUP_WAIT = Duration.ofHours(2);
 
     public void addContext(String idRun, RunContext context) {
         contexts.put(idRun, context);
@@ -137,44 +146,53 @@ public class RunManager {
             
             // Cargar aeropuertos
             aeropuertosMap = new AeropuertosMap();
-            try (Scanner sc = ArchivoUtils.getScannerFromResource(
-                    "c.1inf54.25.2.Aeropuerto.husos.v1.20250818__estudiantes.txt")) {
+            
+            // **USO DE ARCHIVOMANAGER:** Usar el manager para el archivo de aeropuertos
+            try (Scanner sc = archivoManager.getScannerForDataFile(AEROPUERTOS_FILENAME).orElse(null)) {
                 if (sc != null) {
                     aeropuertosMap.leerDatos(sc);
                     System.out.println("[RunManager] Aeropuertos cargados: " + aeropuertosMap.size());
                 } else {
-                    System.err.println("[RunManager] No se encontró archivo de aeropuertos");
+                    // El manager ya imprimió el error, pero reconfirmamos
+                    System.err.println("[RunManager] Falló la carga del archivo de aeropuertos."); 
                 }
+            } catch (Exception e) {
+                System.err.println("[RunManager] Error procesando archivo de aeropuertos: " + e.getMessage());
             }
             
             // Cargar vuelos
             vuelosMap = new VuelosMap(aeropuertosMap);
-            try (Scanner sc = ArchivoUtils.getScannerFromResource(
-                    "c.1inf54.25.2.planes_vuelo.v4.20250818.txt")) {
+            
+            // **USO DE ARCHIVOMANAGER:** Usar el manager para el archivo de vuelos
+            try (Scanner sc = archivoManager.getScannerForDataFile(VUELOS_FILENAME).orElse(null)) {
                 if (sc != null) {
                     vuelosMap.leerDatos(sc);
                     System.out.println("[RunManager] Vuelos cargados");
                 } else {
-                    System.err.println("[RunManager] No se encontró archivo de vuelos");
+                    System.err.println("[RunManager] Falló la carga del archivo de vuelos.");
                 }
+            } catch (Exception e) {
+                 System.err.println("[RunManager] Error procesando archivo de vuelos: " + e.getMessage());
             }
             
             // Cargar pedidos (solo fuera de OPERACION)
             pedidosCargados = new CargarPedidos();
 
             if (scenario != RunConfig.Scenario.OPERACION){
-                try (Scanner sc = ArchivoUtils.getScannerFromResource("pedidosProfe.txt")) {
+                // **USO DE ARCHIVOMANAGER:** Usar el manager para el archivo de pedidos
+                try (Scanner sc = archivoManager.getScannerForDataFile(PEDIDOS_FILENAME).orElse(null)) {
                     if (sc != null) {
                         pedidosCargados.leerDatosProfe(sc);
                         pedidosCargados.normalizarUtc(aeropuertosMap);
                         pedidosCargados.ordenarPorUTC();
                         System.out.println("[RunManager] Pedidos cargados: " + pedidosCargados.getLista().size());
                     } else {
-                        System.err.println("[RunManager] No se encontró archivo de pedidos");
+                        System.err.println("[RunManager] Falló la carga del archivo de pedidos.");
                     }
+                } catch (Exception e) {
+                    System.err.println("[RunManager] Error procesando archivo de pedidos: " + e.getMessage());
                 }
             }
-
             
             // Definir sedes
             sedes = new HashSet<>(Arrays.asList("SPIM", "EBCI", "UBBB"));
@@ -466,7 +484,8 @@ public class RunManager {
                 ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto);
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
-                // 6. Guardar solución para la siguiente ventana
+                // 6. Guardar solución para la siguiente ventana y sincronizar ocupación
+                actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
                 solucionesAnteriores.put(id, solucionOptima);
 
                 // 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
@@ -621,7 +640,8 @@ public class RunManager {
                 ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto);
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
-                /// 6. Guardar solución para la siguiente ventana
+                /// 6. Guardar solución para la siguiente ventana y sincronizar ocupación
+                actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
                 solucionesAnteriores.put(id, solucionOptima);
 
                 /// 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
@@ -762,6 +782,89 @@ public class RunManager {
         }
         
         return result;
+    }
+    
+    private void actualizarOcupacionDesdeSolucion(String runId,
+                                                  SolucionProgramacion solucionOptima,
+                                                  List<OcupacionAlmacen> reservasPrevias,
+                                                  Map<String, List<ArriboExogeno>> arribosEnVuelo) {
+        OcupacionPorAeropuerto nuevaOcupacion = construirOcupacionDesdeSolucion(solucionOptima);
+        if (reservasPrevias != null && !reservasPrevias.isEmpty()) {
+            for (OcupacionAlmacen reserva : reservasPrevias) {
+                if (reserva == null || reserva.cantidad() <= 0) continue;
+                Instant inicio = reserva.desde();
+                Instant fin = reserva.hasta();
+                if (inicio != null && fin != null && inicio.isBefore(fin)) {
+                    nuevaOcupacion.reservar(reserva.aeropuerto(), inicio, fin, reserva.cantidad());
+                }
+            }
+        }
+        if (arribosEnVuelo != null && !arribosEnVuelo.isEmpty()) {
+            for (Map.Entry<String, List<ArriboExogeno>> entry : arribosEnVuelo.entrySet()) {
+                String aeropuerto = entry.getKey();
+                if (aeropuerto == null) continue;
+                List<ArriboExogeno> llegadas = entry.getValue();
+                if (llegadas == null) continue;
+                for (ArriboExogeno arribo : llegadas) {
+                    if (arribo == null || arribo.cantidad() <= 0) continue;
+                    Instant llegada = arribo.arriboUtc();
+                    if (llegada == null) continue;
+                    Instant fin = llegada.plus(PICKUP_WAIT);
+                    nuevaOcupacion.reservar(aeropuerto, llegada, fin, arribo.cantidad());
+                }
+            }
+        }
+        ocupacionesPorRun.put(runId, nuevaOcupacion);
+    }
+
+    private OcupacionPorAeropuerto construirOcupacionDesdeSolucion(SolucionProgramacion solucionOptima) {
+        OcupacionPorAeropuerto nueva = new OcupacionPorAeropuerto(aeropuertosMap);
+        if (solucionOptima == null || solucionOptima.getPlanPorPedido() == null) {
+            return nueva;
+        }
+
+        for (PlanPedido plan : solucionOptima.getPlanPorPedido().values()) {
+            if (plan == null || plan.getRutas() == null) {
+                continue;
+            }
+
+            for (RutaAsignada ruta : plan.getRutas()) {
+                if (ruta == null) continue;
+                int cantidad = ruta.getCantidad();
+                if (cantidad <= 0) continue;
+
+                List<TramoAsignado> tramos = ruta.getTramos();
+                if (tramos == null || tramos.isEmpty()) {
+                    continue;
+                }
+
+                for (int i = 0; i < tramos.size() - 1; i++) {
+                    TramoAsignado actual = tramos.get(i);
+                    TramoAsignado siguiente = tramos.get(i + 1);
+                    if (actual == null || siguiente == null) continue;
+                    VueloProgramadoId vueloActual = actual.getVuelo();
+                    VueloProgramadoId vueloSiguiente = siguiente.getVuelo();
+                    if (vueloActual == null || vueloSiguiente == null) continue;
+
+                    Instant inicio = vueloActual.getLlegadaUtc();
+                    Instant fin = vueloSiguiente.getSalidaUtc();
+                    if (inicio != null && fin != null && inicio.isBefore(fin)) {
+                        nueva.reservar(vueloActual.getDestino(), inicio, fin, cantidad);
+                    }
+                }
+
+                TramoAsignado ultimo = tramos.get(tramos.size() - 1);
+                if (ultimo != null && ultimo.getVuelo() != null) {
+                    Instant llegadaFinal = ultimo.getVuelo().getLlegadaUtc();
+                    if (llegadaFinal != null) {
+                        Instant fin = llegadaFinal.plus(PICKUP_WAIT);
+                        nueva.reservar(ultimo.getVuelo().getDestino(), llegadaFinal, fin, cantidad);
+                    }
+                }
+            }
+        }
+
+        return nueva;
     }
 
     private static void sleepQuietly(Duration d) {

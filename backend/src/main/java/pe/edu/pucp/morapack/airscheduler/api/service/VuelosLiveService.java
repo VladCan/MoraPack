@@ -1,4 +1,3 @@
-// src/main/java/.../flights/service/VuelosLiveService.java
 package pe.edu.pucp.morapack.airscheduler.api.service;
 
 import jakarta.annotation.PostConstruct;
@@ -8,7 +7,7 @@ import pe.edu.pucp.morapack.airscheduler.api.dto.FlightLiveDTO;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Vuelo;
 import io.smallrye.mutiny.Multi;
 
-import java.io.File;
+// Importaciones necesarias
 import java.time.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -16,8 +15,14 @@ import java.util.stream.Collectors;
 @ApplicationScoped
 public class VuelosLiveService {
 
-    @Inject AeropuertosService aeropuertosService;
-    @Inject Clock clock; // <- usa Clock.systemUTC() por defecto (configurable en tests)
+    @Inject 
+    AeropuertosService aeropuertosService;
+    
+    @Inject 
+    Clock clock; 
+    
+    @Inject
+    VuelosArchivoService vuelosArchivoService; // <-- Nuevo: Inyectamos el servicio que maneja el archivo
 
     private final List<Vuelo> vuelos = new ArrayList<>();
     private static final String DEFAULT_PLANE = "#005097";
@@ -27,12 +32,15 @@ public class VuelosLiveService {
 
     @PostConstruct
     void init() {
-        File f = new File("src/main/resources/planesDeVuelo.txt");
-        if (!f.exists()) {
-            System.err.println("[VuelosLiveService] No se encontró planesDeVuelo.txt");
+        // **USO DEL VUELOSARCHIVOSERVICE:** Obtenemos el Scanner del servicio
+        Optional<Scanner> scOpt = vuelosArchivoService.getScannerForInitialLoad(); 
+        
+        if (scOpt.isEmpty()) {
+            System.err.println("[VuelosLiveService] No se encontró vuelos.txt. Carga inicial omitida.");
             return;
         }
-        try (Scanner sc = new Scanner(f)) {
+        
+        try (Scanner sc = scOpt.get()) { // Usamos el Scanner si está presente
             for (int i = 1; sc.hasNextLine(); i++) {
                 Vuelo v = new Vuelo();
                 String key = v.leer(sc, i);
@@ -49,7 +57,7 @@ public class VuelosLiveService {
             }
             System.out.println("[VuelosLiveService] Vuelos cargados: " + vuelos.size());
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("[VuelosLiveService] Error cargando vuelos: " + e.getMessage());
         }
     }
 
