@@ -3,7 +3,9 @@ package pe.edu.pucp.morapack.airscheduler.engine.scheduling.model;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -223,6 +225,43 @@ public class OcupacionPorAeropuerto {
             midnight = midnight.plusSeconds(24 * 60 * 60); // siguiente medianoche
         }
     }
+
+    /**
+     * Expone reservas activas por aeropuerto, útil para depuración o reporting.
+     */
+    public Map<String, List<IntervaloOcupacion>> snapshotActual() {
+        Map<String, List<IntervaloOcupacion>> resultado = new HashMap<>();
+        for (var entry : eventos.entrySet()) {
+            String aeropuerto = entry.getKey();
+            TreeMap<Instant, Integer> deltas = entry.getValue();
+            if (deltas == null || deltas.isEmpty()) continue;
+
+            int acumulado = 0;
+            Instant anterior = null;
+            List<IntervaloOcupacion> intervalos = new ArrayList<>();
+
+            for (var punto : deltas.entrySet()) {
+                Instant instante = punto.getKey();
+                int delta = punto.getValue();
+
+                if (anterior != null && acumulado > 0 && anterior.isBefore(instante)) {
+                    IntervaloOcupacion intervalo = new IntervaloOcupacion(anterior, instante, acumulado);
+                    intervalos.add(intervalo);
+                }
+
+                acumulado += delta;
+                if (acumulado < 0) acumulado = 0;
+                anterior = instante;
+            }
+
+            if (!intervalos.isEmpty()) {
+                resultado.put(aeropuerto, intervalos);
+            }
+        }
+        return resultado;
+    }
+
+    public record IntervaloOcupacion(Instant inicio, Instant fin, int cantidad) {}
 
     ///
     /// Funciones secundarias-helpers: disponible, ocupacion, maxReservable, reservar, liberar.

@@ -52,7 +52,7 @@ export default function Operacion() {
   }, [airportsDtoRaw]);
 
   // SSE vuelos
-  const { data: liveFlights } = useFlightsSSE("/vuelos/live?limit=200");
+  const { data: liveFlights } = useFlightsSSE("vuelos/live?limit=200");
   const flightPaths = useMemo(() => {
     const arr = (liveFlights ?? []) as FlightDto[];
     return arr.map((f) => ({

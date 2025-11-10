@@ -57,15 +57,15 @@ public class Rutas_1a4_48h {
     private void run() throws Exception {
         // ===== Catálogos base =====
         AeropuertosMap aeropuertosMap = new AeropuertosMap();
-        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(
-                "c.1inf54.25.2.Aeropuerto.husos.v1.20250818__estudiantes.txt")) {
+        try (Scanner sc = ArchivoUtils.getScannerFromResource(
+                "aereopuertos.txt")) {
             if (sc == null) throw new IllegalStateException("No se encontró archivo de husos.");
             aeropuertosMap.leerDatos(sc);
         }
 
         VuelosMap vuelosMaestro = new VuelosMap(aeropuertosMap);
-        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(
-                "c.1inf54.25.2.planes_vuelo.v4.20250818.txt")) {
+        try (Scanner sc = ArchivoUtils.getScannerFromResource(
+                "vuelos.txt")) {
             if (sc == null) throw new IllegalStateException("No se encontró catálogo de vuelos.");
             vuelosMaestro.leerDatos(sc);
         }

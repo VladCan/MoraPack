@@ -46,16 +46,16 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
          */
         final Set<String> sedes = new HashSet<>(Arrays.asList("SPIM", "EBCI", "UBBB"));
         AeropuertosMap aeropuertosMap = new AeropuertosMap();// Aeropuertos (incluye husos horarios)
-        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(
-                "c.1inf54.25.2.Aeropuerto.husos.v1.20250818__estudiantes.txt")) {
+        try (Scanner sc = ArchivoUtils.getScannerFromResource(
+                "aereopuertos.txt")) {
             if (sc == null)
                 return;
             aeropuertosMap.leerDatos(sc);
         }
         // Vuelos (catálogo maestro)
         VuelosMap mapa = new VuelosMap(aeropuertosMap);
-        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(
-                "c.1inf54.25.2.planes_vuelo.v4.20250818.txt")) {
+        try (Scanner sc = ArchivoUtils.getScannerFromResource(
+                "vuelos.txt")) {
             if (sc == null)
                 return;
             mapa.leerDatos(sc);
@@ -68,39 +68,61 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
          * =======================
          */
         CargarPedidos pedidos = new CargarPedidos();
-        try (Scanner sc = ArchivoUtils.getScannerFromFilePath("pedidosProfe.txt")) {
+        try (Scanner sc = ArchivoUtils.getScannerFromResource("pedidos.txt")) {
             if (sc == null)
                 return;
             pedidos.leerDatosProfe(sc);
         } // localtime no localdatetime
         pedidos.normalizarUtc(aeropuertosMap);
-
+        //pedidos.sort("out/pedidos.txt");
+        //System.exit(1);
         // Para asegurar que siempre estén ordenados por fecha de creación UTC
         pedidos.ordenarPorUTC();
 
         Instant reloj = pedidos.primerInstanteUTC();
+        System.out.println("🚦 Inicio de simulación en UTC: " +
+                DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm 'UTC'")
+                        .withZone(ZoneOffset.UTC).format(reloj));
+        System.out.println("📦 Pedidos cargados: " + pedidos.getLista().size());
         if (reloj == null)
             return; // no hay pedidos que simular
         limpiarArchivosPrevios();
         // guardaremos la solución anterior para poder replanificar
         SolucionProgramacion solucionAnterior = null;
         OcupacionPorAeropuerto ocupacionPorAeropuerto = new OcupacionPorAeropuerto(aeropuertosMap);
+        
         while (!pedidos.isEmpty()) {
             // reloj avanza hacia el futuro el valro de HORAS_VENTANA
             reloj = reloj.plus(Duration.ofHours(HORAS_VENTANA));
             Instant presenteUTC = reloj;
             Instant finUTC = presenteUTC.plus(HORIZONTE_TEG_H, ChronoUnit.HOURS);// para TEG
+            System.out.print(String.format("Fecha y hora de ejecución (UTC): %s%n",
+                        DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss 'UTC'", 
+                        Locale.forLanguageTag("es-ES"))
+                        .withZone(ZoneOffset.UTC).format(presenteUTC)));
             // quitamos pedidos cumplidos y actualizamos los pedidos medio cumplidos
+            //System.out.println("pedidos antes de eliminar: " + pedidos.getLista().size());
             if (solucionAnterior != null)
                 pedidos.eliminarYActualizarCumplidosHasta(presenteUTC, solucionAnterior);
+            //System.out.println("pedidos después de eliminar: " + pedidos.getLista().size());
             // imprimimos un reporte del estado de los pedididos en el tiempo presenteUTC
             if (solucionAnterior != null)
                 solucionAnterior.imprimirEnArchivo(presenteUTC, "out/reporteSimulacion.txt");
             // solo copia los pedidos no desencola
             VentanaPedidos ventana = pedidos.acumuladoHasta(presenteUTC);// solo sacamos los pedidos de la ventana
+            //System.out.println("cantidad de pedidos en la ventana: "+ventana.pedidos().size() + " pedidos para programar hasta "
+            //        + DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm 'UTC'")
+            //                .withZone(ZoneOffset.UTC).format(presenteUTC));
             List<Pedido> listaPedidos = ventana.pedidos();
-            if (listaPedidos.isEmpty())
-                break;
+            if (listaPedidos.isEmpty()){
+                if(pedidos.isEmpty()){
+                    System.out.println("No hay más pedidos por procesar. Finalizando simulación.");
+                    break;
+                }
+                System.out.println("No hay pedidos nuevos en esta ventana. Avanzando al siguiente periodo.");
+                continue;
+            }
+                
             // guardamos los vuelos en curso y las reservas de espacio en aereopuertos de la
             // solución anterior
             Map<String, List<ArriboExogeno>> enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior,
@@ -161,11 +183,6 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                     presenteUTC, finUTC,
                     "out/reporteCapacidadVuelos_" + presenteUTC.toString().replace(':', '-') + ".txt");
             */
-            System.out.print(String.format("Fecha y hora de ejecución (UTC): %s%n",
-                        DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss 'UTC'", 
-                        Locale.forLanguageTag("es-ES"))
-                        .withZone(ZoneOffset.UTC).format(presenteUTC)));
-
             VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46),mapa);
         }
         System.out.println("─────────────────────────────────────────────");
