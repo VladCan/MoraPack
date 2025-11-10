@@ -14,7 +14,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.Aeropuerto
 
 public class GeneraP {
 
-    private static final String AIRPORTS_RESOURCE = "c.1inf54.25.2.Aeropuerto.husos.v1.20250818__estudiantes.txt";
+    private static final String AIRPORTS_RESOURCE = "aereopuertos.txt";
 
     private static final String[] DESTINOS = {
             "SKBO", "SEQM", "SVMI", "SBBR", "SLLP", "SCEL", "SABE", "SGAS", "SUAA",
@@ -25,7 +25,7 @@ public class GeneraP {
     // ====== KNOBS (ajusta intensidades aquí) ======
     // Cantidad por pedido
     private static final int PISO_CANT = 250;     // mínimo
-    private static final int CANT_MAX = 500;      // máximo duro del archivo (3 dígitos)
+    private static final int CANT_MAX = 999;      // máximo duro del archivo (3 dígitos)
     private static final double QUANTITY_DAY_BOOST_MAX = 0.35; // +35% al final del horizonte (sobre tu logística)
 
     // Ritmo de llegadas (pedidos/día): el factor final vs el inicial (p.e. 3.0 => 3x más rápido al final)
@@ -54,7 +54,7 @@ public class GeneraP {
      */
     public static void generarArchivo(Path baseRuta, int cantidadPedidos, int horasHorizonte) {
         AeropuertosMap aMap = new AeropuertosMap();
-        try (Scanner sc = ArchivoUtils.getScannerFromResource(AIRPORTS_RESOURCE)) {
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(AIRPORTS_RESOURCE)) {
             if (sc == null)
                 throw new IllegalStateException("No se pudo abrir " + AIRPORTS_RESOURCE);
             aMap.leerDatos(sc);
@@ -249,6 +249,6 @@ public class GeneraP {
         } catch (IOException e) {
             throw new RuntimeException("No pude crear carpeta: " + out, e);
         }
-        generarArchivo(out, 5000, 1168);
+        generarArchivo(out, 10000, 168);
     }
 }

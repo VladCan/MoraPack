@@ -4,15 +4,14 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import org.eclipse.microprofile.config.inject.ConfigProperty;
+// Importante: Calificamos jakarta.ws.rs.Path para evitar colisiones con java.nio.file.Path
 
 import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
@@ -21,7 +20,6 @@ import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.FormParam;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
@@ -30,53 +28,59 @@ import jakarta.ws.rs.core.Response;
 import pe.edu.pucp.morapack.airscheduler.api.dto.AeropuertoDTO;
 import pe.edu.pucp.morapack.airscheduler.api.mapper.AeropuertoMapper;
 import pe.edu.pucp.morapack.airscheduler.api.service.AeropuertosService;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoManager; // <-- Nuevo
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Aeropuerto;
 
 
-@Path("/aereopuertos")
+@jakarta.ws.rs.Path("/aereopuertos")
 @RequestScoped
 @Produces(MediaType.APPLICATION_JSON)
 public class AereopuertosController {
-    @ConfigProperty(name = "morapack.upload.dir")
-    String uploadDir;
-    private final String DIRECTORY = uploadDir;
-    private static final String FILENAME  = "/aereopuertos.txt";
+    
+    // Eliminamos @ConfigProperty(name = "morapack.upload.dir") String uploadDir;
+    // Eliminamos private static final String FILENAME = "/aereopuertos.txt";
 
     @Inject
     AeropuertosService service;
-    // Endpoint para recibir el archivo y guardarlo
+    
+    @Inject // Inyectamos el Manager para los GETs (status, preview, download)
+    ArchivoManager archivoManager;
+    private static final String FILENAME = "aereopuertos.txt";
+
+    // Endpoint para recibir el archivo y guardarlo (DELEGACIÓN AL SERVICE)
     @POST
-    @Path("/upload")
+    @jakarta.ws.rs.Path("/upload")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     public Response uploadPedidos(
             @FormParam("file") InputStream fileInputStream) {
-        // Directorio donde se guardará el archivo
-        File outputFile = new File(DIRECTORY + FILENAME);
-
-        // Crear el archivo y escribir los datos
+        
         try {
-            Files.copy(fileInputStream, outputFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            // DELEGACIÓN COMPLETA al Service para manejar la persistencia
+            Path targetPath = service.guardarArchivoDatos(fileInputStream); 
+            
             return Response
-                    .ok(new JsonResponse("success", "Archivo de aereopuertos guardado exitosamente", outputFile.getAbsolutePath()))
+                    .ok(Map.of("status", "success", 
+                               "message", "Archivo de aereopuertos guardado exitosamente", 
+                               "path", targetPath.toAbsolutePath().toString()))
                     .build();
         } catch (IOException e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new JsonResponse("error", "Error al guardar el archivo: " + e.getMessage(), null))
+                    .entity(Map.of("status", "error", 
+                                   "message", "Error al guardar el archivo: " + e.getMessage()))
                     .build();
         }
     }
 
     @GET
-    @Path("/status")
+    @jakarta.ws.rs.Path("/status")
     @Produces(MediaType.APPLICATION_JSON)
     public Response getStatus() {
-        /// Hay que poner java.nio.file.Path para que no se confunda con el Path de Jakarta (There's no other way)
-        java.nio.file.Path p = java.nio.file.Paths.get("src/main/resources/aereopuertos.txt");
+        Path p = filePath();
         boolean exists = Files.exists(p);
 
-        Map<String, Object> body  = new HashMap<>();
+        Map<String, Object> body = new HashMap<>();
         body.put("exists", exists);
-        body.put("filename", FILENAME);
+        body.put("filename", p.getFileName().toString());
 
         if (exists) {
             try{
@@ -88,22 +92,23 @@ public class AereopuertosController {
             }
         }
 
-        // Si usas tu JsonResponse, cámbialo aquí. Devuelvo map simple para rapidez.
         return Response.ok(body).build();
     }
 
     @GET
-    @Path("/preview")
+    @jakarta.ws.rs.Path("/preview")
     @Produces(MediaType.TEXT_PLAIN)
     public Response preview(@QueryParam("lines") @DefaultValue("20") int lines){
-        java.nio.file.Path p = filePath();
+        Path p = filePath();
+        String filename = p.getFileName().toString();
+        
         if(!Files.exists(p)){
             return Response.status(Response.Status.NOT_FOUND)
-                    .entity("No existe el archivo " + FILENAME).build();
+                    .entity("No existe el archivo " + filename).build();
         }
         if (lines <= 0) lines = 20;
 
-        try (java.io.BufferedReader br = java.nio.file.Files.newBufferedReader(
+        try (java.io.BufferedReader br = Files.newBufferedReader(
                 p, java.nio.charset.StandardCharsets.UTF_8)) {
             String content = br.lines().limit(lines).reduce((a, b) -> a + "\n" + b).orElse("");
             return Response.ok(content).build();
@@ -114,49 +119,48 @@ public class AereopuertosController {
     }
 
     @GET
-    @Path("/download")
+    @jakarta.ws.rs.Path("/download")
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
     public Response download(){
-        java.nio.file.Path p = filePath();
-        if (!java.nio.file.Files.exists(p)){
+        Path p = filePath();
+        String filename = p.getFileName().toString();
+        
+        if (!Files.exists(p)){
             return Response.status(Response.Status.NOT_FOUND)
-                    .entity("No existe el archivo " + FILENAME).build();
+                    .entity("No existe el archivo " + filename).build();
         }
 
         try{
-            java.io.File f = p.toFile();
+            File f = p.toFile();
             return Response.ok(f)
-                    .header("Content-Disposition", "attachment; filename=\"" + FILENAME + "\"")
+                    .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
                     .build();
         }
         catch (Exception e){
             return Response.serverError().entity("Error al leer el archivo: " + e.getMessage()).build();
         }
-
     }
 
     /// Privados para rutas:
-    private java.nio.file.Path filePath(){
-        return Paths.get(DIRECTORY, FILENAME);
+    private Path filePath(){
+        // Usa el Manager para obtener la carpeta base y anexarle el nombre del archivo.
+        return java.nio.file.Paths.get(archivoManager.getUploadDir(), FILENAME);
     }
-/*
-    private void ensureDirExists() throws IOException{
-        Files.createDirectories(Paths.get(DIRECTORY));
-    }
- */
-    private String lastModifiedIso(java.nio.file.Path p) throws IOException{
+
+    private String lastModifiedIso(Path p) throws IOException{
         FileTime ft = Files.getLastModifiedTime(p);
         return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ft.toInstant().atOffset(ZoneOffset.UTC));
     }
 
 
+    // ... (El resto de los métodos listar, obtener, y parseCodes se mantienen sin cambios) ...
     @GET
     public Response listar(
             @QueryParam("codes") String codes,
             @QueryParam("continente") String continente,
             @QueryParam("minCapacidad") Integer minCapacidad,
             @QueryParam("bbox") String bbox,
-            @QueryParam("soloSedes") @DefaultValue("false") boolean soloSedes // <--- opcional
+            @QueryParam("soloSedes") @DefaultValue("false") boolean soloSedes 
     ) {
         Set<String> codeSet = parseCodes(codes);
         Double minLon = null, minLat = null, maxLon = null, maxLat = null;
@@ -191,7 +195,7 @@ public class AereopuertosController {
     }
 
     @GET
-    @Path("/{codigo}")
+    @jakarta.ws.rs.Path("/{codigo}")
     public Response obtener(@PathParam("codigo") String codigo) {
         return service.obtenerPorCodigo(codigo)
                 .map(a -> Response.ok(AeropuertoMapper.toDTO(a, service.esSede(a.getCodigo()))).build())
@@ -210,5 +214,4 @@ public class AereopuertosController {
         }
         return out;
     }
-
 }

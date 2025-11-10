@@ -14,7 +14,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.Aeropuerto
 
 public class Genera {
 
-    private static final String AIRPORTS_RESOURCE = "c.1inf54.25.2.Aeropuerto.husos.v1.20250818__estudiantes.txt";
+    private static final String AIRPORTS_RESOURCE = "aereopuertos.txt";
 
     private static final String[] DESTINOS = {
             "SKBO", "SEQM", "SVMI", "SBBR", "SPIM", "SLLP", "SCEL", "SABE", "SGAS", "SUAA",
@@ -37,7 +37,7 @@ public class Genera {
     public static void generarArchivo(Path ruta, int cantidadPedidos, int horasHorizonte) {
         // 1) Cargar GMT por aeropuerto
         AeropuertosMap aMap = new AeropuertosMap();
-        try (Scanner sc = ArchivoUtils.getScannerFromResource(AIRPORTS_RESOURCE)) {
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(AIRPORTS_RESOURCE)) {
             if (sc == null)
                 throw new IllegalStateException("No se pudo abrir " + AIRPORTS_RESOURCE);
             aMap.leerDatos(sc);

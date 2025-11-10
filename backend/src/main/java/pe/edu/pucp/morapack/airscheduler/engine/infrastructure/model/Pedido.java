@@ -61,7 +61,55 @@ public class Pedido {
         cantidad = Integer.parseInt(partes[4].trim());
     }
 
+    public void leerProfeNew(Scanner sc, int id) {
+        if (!sc.hasNextLine()) return;
 
+        // 1. Leer la línea y limpiar. El separador ahora es el guion ('-').
+        String linea = sc.nextLine().trim();
+        String[] partes = linea.split("-");
+
+        // Esperamos 7 partes: ID_ARCHIVO - YYYYMMDD - HH - MM - DESTINO - CANTIDAD - ID_CLIENTE
+        if (partes.length != 7) {
+            throw new IllegalArgumentException("Formato inválido (esperado 7 campos): " + linea);
+        }
+        
+        // Asignar el idPedido incremental (desechando el ID inicial del archivo)
+        idPedido = id;
+
+        try {
+            // 2. Parsear Fecha y Hora desde los campos
+            
+            // Campo 1: YYYYMMDD (Ej: 20250102)
+            String datePart = partes[1].trim(); 
+            if (datePart.length() != 8) {
+                throw new NumberFormatException("Formato YYYYMMDD incorrecto: " + datePart);
+            }
+            int yyyy = Integer.parseInt(datePart.substring(0, 4));
+            int MM = Integer.parseInt(datePart.substring(4, 6));
+            int dd = Integer.parseInt(datePart.substring(6, 8));
+
+            // Campo 2: HH (Ej: 00 o 01)
+            int hh = Integer.parseInt(partes[2].trim());
+            
+            // Campo 3: MM (Ej: 50 o 38)
+            int mm = Integer.parseInt(partes[3].trim());
+            
+            // 3. Asignar campos de producto/cliente
+            destino = partes[4].trim(); 
+            
+            // Campo 5: CANTIDAD (Ej: 002 o 001)
+            cantidad = Integer.parseInt(partes[5].trim()); 
+
+            // Campo 6: ID_CLIENTE (Ej: 0029563 o 0009486)
+            idCliente = Integer.parseInt(partes[6].trim());
+
+            // 4. Construir la fecha (segundos se asumen 0)
+            fecha = LocalDateTime.of(yyyy, MM, dd, hh, mm, 0); // Asume segundos (ss) = 0
+            
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Error de parseo numérico/fecha en línea: " + linea + " | Causa: " + e.getMessage());
+        }
+    }
     public void leerProfe(Scanner sc, int id) {
         if (!sc.hasNextLine()) return;
 
