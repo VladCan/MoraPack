@@ -25,7 +25,6 @@ type Status = {
   sizeBytes?: number;
   lastModified?: string;
 }
-type Kind = "vuelos" | "aereopuertos" | "cancelaciones";
 
 const handleFileUpload = async (file: File, endpoint: string) => {
   const [data, error] = await uploadFile(endpoint, file);
@@ -78,42 +77,83 @@ const husosStatus  = useQuery({
   refetchOnWindowFocus: false,
 })
 
-/**Acá hay 2 handlers para subir con confirmación si ya hay archivo + refetch**/
+//todavía no tenemos para cancelaciones, pero cuando tengamos:
+const cancelacionesStatus = useQuery({
+  queryKey: ["status", "aereopuertos"],
+  queryFn: () => getJson<Status>("aereopuertos/status"),
+  refetchOnWindowFocus: false,
+});
+
+type Kind = "vuelos" | "aereopuertos" | "cancelaciones" | "operacionDiaria";
+
+//Esto es porque operaciónDiaria no necesita un status "ej: Archivo actual: vuelos.txt — 80248 bytes — 2025-11-10T19:50:31.7425859Z"
+const statuses: Partial<Record<Kind, { exists?: boolean; filename?: string } | undefined>> = {
+  vuelos: vuelosStatus.data,
+  aereopuertos: husosStatus.data,
+  cancelaciones: cancelacionesStatus?.data, // si no existe query, quedará undefined
+  operacionDiaria: undefined,               // explícitamente sin status
+}
+
+const withoutStatusCheck = new Set<Kind>(["operacionDiaria"]);
 
 //pero antes: handler de subida con confirmación + refresh (TODO falta agregar cancelaciones)
-const onUpload = async (file: File, kind: "vuelos" | "aereopuertos" | "cancelaciones" | "operacionDiaria") => {
+const onUpload = async (file: File, kind: Kind) => {
   
-  //TODO: POR AHORA SOLO TOMA VUELOS Y HUSOS
-  //EN EL BACK EL CONTROLLER TIENE QUE TENER EL ENDPOINT '/upload' (VER Línea 98)
-  
-  const status = kind === "vuelos" ? vuelosStatus.data : husosStatus.data;
+  const status = statuses[kind];
 
-  if (status?.exists){
+  //En caso no tenga statusCheck (osea, si es operacionDiaria)
+  if (!withoutStatusCheck.has(kind) && status?.exists) {
     const ok = window.confirm(
       `Ya existe un archivo (${status.filename}). Esto lo reemplazará. ¿Continuar?`
     );
     if (!ok) return;
   }
 
+  //EN EL BACK EL CONTROLLER TIENE QUE TENER EL ENDPOINT '/upload' (VER Línea 98)
   const [data, error] = await uploadFile(`${kind}/upload`, file);
   if (data){
+    console.log("✅ [Registrar] Archivos enviados para operacionDiaria:", data);
+
+    toast.custom((t) => (
+      <ToastCustom
+        t={t}
+        message={data.message +"✅"}
+        type="success"
+      />),
+    { duration: 5000});
+
     //Refrescamos 
-    qc.invalidateQueries({queryKey: ["status", kind]})
+    if (!withoutStatusCheck.has(kind)) {
+      qc.invalidateQueries({ queryKey: ["status", kind] });
+    }
+
   }
   else {
     console.error(error);
+
+    const msg =
+        (error as ApiError)?.message ??
+      "Ocurrió un error.";
+
+      toast.custom((t) => (
+        <ToastCustom
+          t={t}
+          message={msg+"❗"}
+          type="error"
+        />),
+      { duration: 5000});
   }
 }
 
 //1. handler para ver primeras 50 lineas
-const doPreview  = async (kind: "vuelos" | "aereopuertos" | "cancelaciones" ) => {
+const doPreview  = async (kind: Kind) => {
   const text = await getText(`${kind}/preview`, {lines: 50});
   //Por ahora va como un alert
   alert(text || "(archivo vacío)");
 }
 
 //2. handler de descarga
-const doDownload = async (kind: "vuelos" | "aereopuertos" | "cancelaciones", filename?: string) => {
+const doDownload = async (kind: Kind, filename?: string) => {
   await downloadFile(`${kind}/download`, filename ?? `${kind}.txt`);
 }
 
