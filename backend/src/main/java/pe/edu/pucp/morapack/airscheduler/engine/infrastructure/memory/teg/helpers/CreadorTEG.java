@@ -4,6 +4,8 @@ import static pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg
 import static pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.helpers.FechasTEG.instantesDiariosEnVentana;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
@@ -119,8 +121,13 @@ public final class CreadorTEG {
                             aeropuertosMap.getCapBodega(v.getOrigen()), false);
                     AereopuertoNode nLlegada = teg.agregarONodo(v.getDestino(), llegada,
                             aeropuertosMap.getCapBodega(v.getDestino()), false);
-
-                    teg.agregarArco(new VuelosEdge(nSalida, nLlegada, VuelosEdge.Type.FLIGHT, v.getCapacidad(), v));
+                    
+                    String idInstancia = String.format("%s-%s-%s",
+                            v.getOrigen(),
+                            v.getDestino(),
+                            DateTimeFormatter.ofPattern("yyyyMMdd").withZone(ZoneOffset.UTC).format(salida),
+                            DateTimeFormatter.ofPattern("HHmm").withZone(ZoneOffset.UTC).format(salida));
+                    teg.agregarArco(new VuelosEdge(nSalida, nLlegada, VuelosEdge.Type.FLIGHT, v.getCapacidad(), v,idInstancia));
                 }
             }
         }
