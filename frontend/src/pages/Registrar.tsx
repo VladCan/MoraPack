@@ -84,9 +84,22 @@ const cancelacionesStatus = useQuery({
   refetchOnWindowFocus: false,
 });
 
-type Kind = "vuelos" | "aereopuertos" | "cancelaciones" | "operacionDiaria";
+//husos = aeropuertos
+const pedidosStatus  = useQuery({
+  queryKey: ["status", "pedidos"],
+  queryFn: () => getJson<Status>("pedidos/status"),
+  refetchOnWindowFocus: false,
+})
 
-//Esto es porque operaciónDiaria no necesita un status "ej: Archivo actual: vuelos.txt — 80248 bytes — 2025-11-10T19:50:31.7425859Z"
+const operacionDiariaStatus = useQuery({
+  queryKey: ["status", "operacionDiaria"],
+  queryFn: () => getJson<Status>("operacionDiaria/status"),
+  refetchOnWindowFocus: false,
+})
+
+type Kind = "vuelos" | "aereopuertos" | "cancelaciones" | "pedidos" | "operacionDiaria";
+
+//Esto es porque operaciónDiaria, en principio, no necesita un status (ahora sí le puse xd) "ej: Archivo actual: vuelos.txt — 80248 bytes — 2025-11-10T19:50:31.7425859Z"
 const statuses: Partial<Record<Kind, { exists?: boolean; filename?: string } | undefined>> = {
   vuelos: vuelosStatus.data,
   aereopuertos: husosStatus.data,
@@ -123,10 +136,8 @@ const onUpload = async (file: File, kind: Kind) => {
     { duration: 5000});
 
     //Refrescamos 
-    if (!withoutStatusCheck.has(kind)) {
-      qc.invalidateQueries({ queryKey: ["status", kind] });
-    }
-
+    qc.invalidateQueries({ queryKey: ["status", kind] });
+    
   }
   else {
     console.error(error);
@@ -179,7 +190,7 @@ const renderDropzoneFooter = (
               </button>
               {" "}— {status.sizeBytes} bytes — {status.lastModified}
             </>
-          : "No hay archivo cargado"}
+          : "No se pudo recuperar el estado."}
     </div>
 
     <div className="flex gap-3 mt-2">
@@ -197,19 +208,26 @@ const renderDropzoneFooter = (
       >
         Descargar
       </button>
-      {/* si luego se añade DELETE:
-      <button
-        className="text-sm text-red-600 underline disabled:opacity-50"
-        onClick={async () => {
-          if (!confirm("¿Eliminar el archivo actual?")) return;
-          await del(`/${kind}`);
-          qc.invalidateQueries({ queryKey: ["status", kind] });
-        }}
-        disabled={!status?.exists}
-      >
-        Eliminar
-      </button> */}
     </div>
+  </>
+);
+
+const renderDropzoneFooterOP = (
+  kind: Kind,
+  status?: Status,
+  isLoading?: boolean
+) => (
+  <>
+    <div className="text-xs text-muted-foreground">
+      {isLoading
+        ? "Cargando estado..."
+        : status?.exists
+          ? <>
+              Ya se cargó un archivo de Operación Diaria. {kind}
+            </>
+          : "No se pudo recuperar el estado o no existe archivo."}
+    </div>
+
   </>
 );
 
@@ -299,10 +317,11 @@ const renderDropzoneFooter = (
           onFiles={
             (fs) =>toast.custom((t) => (
               <ToastCustom t={t} message={"No implementado archivo: "+fs[0]?.name +" no subido"} type="error" />),
-              { duration: Infinity }
+              { duration: 5000 }
             )
             } />
-          <Dropzone label="Carga masiva de pedidos" onFiles={(fs) => handleFileUpload(fs[0], "pedidos/upload")} />
+          <Dropzone label="Carga masiva de pedidos" onFiles={(fs) => handleFileUpload(fs[0], "pedidos/upload")}
+            footer={renderDropzoneFooter("pedidos", pedidosStatus.data, pedidosStatus.isLoading)} />
         </CardContent>
       </Card>
 
@@ -398,7 +417,9 @@ const renderDropzoneFooter = (
             <Dropzone
               label="Cargar archivo operación diaria"
               onFiles={(fs) => onUpload(fs[0], "operacionDiaria")}
+              footer={renderDropzoneFooterOP("aereopuertos", operacionDiariaStatus.data, operacionDiariaStatus.isLoading)}
             />
+            
           </CardContent>
         </Card>
       </div>
