@@ -5,6 +5,12 @@ import jakarta.ws.rs.*;
 // Eliminamos el import de ConfigProperty
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 // Eliminamos los imports de Files y StandardCopyOption
 
 import jakarta.ws.rs.core.MediaType;
@@ -25,6 +31,9 @@ public class PedidosController {
     // Inyectamos el nuevo PedidosService (asumimos que RunManager también es inyectado aquí si se usa directamente en crearPedido)
     @Inject 
     PedidosService pedidosService; // <-- Nuevo: Service para manejar la persistencia
+
+    // Mantenemos el FILENAME para el cuerpo de las respuestas HTTP (ES EL NOMBRE QUE MOSTRAMOS AL FRONT, NO ROMPE NADA)
+    private static final String FILENAME = "pedidos.txt";
     
     @Inject
     RunManager runManager;
@@ -55,6 +64,31 @@ public class PedidosController {
                     .entity(new JsonResponse("error", "Error al guardar el archivo: " + e.getMessage(), null))
                     .build();
         }
+    }
+
+    @GET
+    @Path("/status")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getStatus(){
+        java.nio.file.Path p = filePath();
+        boolean exists = Files.exists(p);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("exists", exists);
+        body.put("filename", FILENAME);
+
+        if (exists) {
+            try{
+                body.put("sizeBytes", Files.size(p));
+                body.put("lastModified", lastModifiedIso(p));
+            }
+            catch (IOException e){
+                body.put("error", "No se pudo leer metadatos: " + e.getMessage());
+            }
+        }
+
+        return Response.ok(body).build();
+
     }
 
     // Dado que la creación de un pedido sí o sí está conectada solamente a la operación diaria, podemos llamar
@@ -106,4 +140,15 @@ public class PedidosController {
         return Response.status(Response.Status.BAD_REQUEST).entity(new PedidosController.ErrorDTO(msg)).build();
     }
     private static final class ErrorDTO { public final String message; ErrorDTO(String m){ this.message = m; } }
+
+    /// Privados para rutas:
+    private java.nio.file.Path filePath(){
+        return pedidosService.getPedidosFilePath();
+    }
+
+    private String lastModifiedIso(java.nio.file.Path p) throws IOException{
+        FileTime ft = Files.getLastModifiedTime(p);
+        return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ft.toInstant().atOffset(ZoneOffset.UTC));
+    }
+
 }

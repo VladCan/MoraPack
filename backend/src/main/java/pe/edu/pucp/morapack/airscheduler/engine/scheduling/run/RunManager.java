@@ -80,6 +80,13 @@ public class RunManager {
         );
     }
 
+    public void pushOrders(String runId, List<Pedido> pedidos){
+        var queue = queues.computeIfAbsent(runId, k -> new ConcurrentLinkedQueue<>());
+        for (Pedido p : pedidos) queue.add(p);
+        System.out.printf("[RunManager] Se encolaron %d pedidos (runId=%s). Tamaño actual: %d%n",
+                pedidos.size(), runId, queue.size());
+    }
+
     //
     public List<Pedido> drainOrders(String runId) {
         var q = queues.getOrDefault(runId, new ConcurrentLinkedQueue<>());
