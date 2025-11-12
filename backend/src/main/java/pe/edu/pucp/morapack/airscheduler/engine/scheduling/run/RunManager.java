@@ -45,6 +45,7 @@ public class RunManager {
     private static final String AEROPUERTOS_FILENAME = "aereopuertos.txt";
     private static final String VUELOS_FILENAME = "vuelos.txt";
     private static final String PEDIDOS_FILENAME = "pedidos.txt";
+    private static boolean firstExecution = false;
 
     private final ExecutorService executor = Executors.newCachedThreadPool((r -> {
         Thread t = new Thread(r, "run-" + UUID.randomUUID());
@@ -333,18 +334,50 @@ public class RunManager {
 
                 System.out.println("Salí del bucle, mi id es:" + id);
 
+
+                firstExecution = true;
+
+                if (firstExecution) {
+                    System.out.println("Ahora firstExecution es:" + firstExecution);
+                }
+
                 // Fin normal
                 states.put(id, RunState.COMPLETED);
                 broadcastFinished(id, StopReason.FIN_DE_RANGO);
+
+                // Limpiamos
+                // Solución rápida:
+                aeropuertosMap = null;
+                vuelosMap = null;
+                pedidosCargados = null;
 
             }
             catch (Throwable e){
                 states.put(id, RunState.FAILED);
                 broadcastFinished(id, StopReason.ERROR);
             }
+            finally {
+                cleanupRunState(id);
+            }
 
         });
     }
+
+    private void cleanupRunState(String id) {
+        //try { unregisterAllListeners(id); } catch (Throwable ignored) {}
+
+        contexts.remove(id);
+        states.remove(id);
+        paused.remove(id);
+        cancelled.remove(id);
+
+        // estructuras por run:
+        ventanasEnviadas.remove(id);
+        solucionesAnteriores.remove(id);
+        ocupacionesPorRun.remove(id);
+        //queues.remove(id);          // si existe
+    }
+
 
     private void sleepToEndWindow(String id, Instant wEnd){
         //Acá vamos a que el reloj simulado cruce el fin de ventana
@@ -397,6 +430,8 @@ public class RunManager {
         System.out.println("[RunManager] Config: fechaInicio=" + config.fechaInicio() + ", fechaFin=" + config.fechaFin());
         System.out.println("[RunManager] Ventana inicial: wStart=" + wStart + ", wEnd=" + wEnd);
 
+        System.out.println("Dentro de runSimulación firstExecution es:" + firstExecution);
+
         while (!cancelled.get(id).get() && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
             /// Revisar esto:
             // Pausa cooperativa entre ventanas
@@ -406,6 +441,11 @@ public class RunManager {
             if (cancelled.get(id).get()) break;
 
             // ===== LÓGICA DE PLANIFICACIÓN POR VENTANAS =====
+
+            if (firstExecution){
+                System.out.println("Soy true");
+                int a = 0;
+            }
 
             // Inicializar catálogos si es necesario
             inicializarCatalogos(config.scenario());
@@ -462,6 +502,8 @@ public class RunManager {
                     continue;
                 }
 
+                if (cancelled.get(id).get()) break;
+
                 // 3. Construir TEG para la ventana
                 Instant finTEG = wEnd.plus(config.horizon());
                 TEGParametros params = TEGParametros.builder()
@@ -491,6 +533,8 @@ public class RunManager {
                 ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto);
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
+                if (cancelled.get(id).get()) break;
+
                 // 6. Guardar solución para la siguiente ventana y sincronizar ocupación
                 actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
                 solucionesAnteriores.put(id, solucionOptima);
@@ -498,12 +542,16 @@ public class RunManager {
                 // 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
                 final Instant wStartFinal = wStart;
                 final Instant wEndFinal = wEnd;
-                
+
+                if (cancelled.get(id).get()) break;
+
                 List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStartFinal, wEndFinal);
                 
                 // IMPORTANTE: Enviar TODOS los pedidos procesados (incluye parciales de ventanas anteriores)
                 // para que el frontend vea el estado actualizado de cada pedido
                 List<Object> pedidosVentanaDTO = convertirPedidosADTO(pedidosVentana, solucionOptima);
+
+                //Esto es para depurar
 
                 // 8. Marcar ventana como enviada y hacer broadcast
                 ventanasEnviadasRun.add(windowIdISO);
