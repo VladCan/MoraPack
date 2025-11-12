@@ -163,6 +163,7 @@ export default function Colapso() {
   
     return (
       <div className="min-h-screen bg-neutral-50 relative">
+        {/*<p className="text-rose-600">{simNowUtc}</p>*/}
         {/* Tooltip de aeropuerto */}
         {activeAirportData && (
           <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">

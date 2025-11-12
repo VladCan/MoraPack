@@ -97,6 +97,7 @@ export function useRunSSE(runId?: string){
     const [speed, setSpeed] = useState<number|undefined>();
     const [simNowUtc, setSimNow]  = useState<string|undefined>();
     const [simStartUtc, setSimStart] = useState<string|undefined>();
+    const [wallStartUtc, setWallStart] = useState<string | null>(null);
     const [windows, setWindows]   = useState<WindowData[]>([]);
     const [finished, setFinished] = useState<{reason:string}|null>(null);
     const [airportOccupancy, setAirportOccupancy] = useState<Record<string, AeropuertoOcupacion>>({});
@@ -172,6 +173,7 @@ export function useRunSSE(runId?: string){
                 switch (evt.type){
                     case "RUN_STARTED":
                         setSimStart(evt.simStartUtc);
+                        setWallStart(evt.wallAnchorUtc);
                         setSpeed(evt.speed);
                         break;
                     case "TICK":
@@ -241,6 +243,7 @@ export function useRunSSE(runId?: string){
         error,
         speed,
         simStartUtc,
+        wallStartUtc,
         simNowUtc,
         windows,
         finished,

@@ -50,7 +50,7 @@ export default function TopNav() {
   const running = status === "running" && !!runId;
   
   //Acá expone connect(url, handlers) -> () => void
-  const { simNowUtc, windows, finished } = useRunSSE(
+  const { simNowUtc, windows, finished, simStartUtc, wallStartUtc } = useRunSSE(
     status === "running" && runId ? runId : undefined
   );
 
@@ -176,7 +176,9 @@ export default function TopNav() {
             <div className="hidden md:block">
               <ClockSwitcher
                 running={running}
+                finished={!!finished}
                 runNow={simNowUtc ? new Date(simNowUtc) : null}
+                runStart={wallStartUtc ? new Date(wallStartUtc) : null}
               />
             </div>
 
@@ -228,7 +230,7 @@ export default function TopNav() {
             </button>
           )}
 
-          {showContent && (
+          {showContent && ( 
             <>
               <div className="mt-1 p-2 rounded-md text-foreground">
                 {currentContent}
