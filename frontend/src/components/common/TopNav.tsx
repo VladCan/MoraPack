@@ -107,7 +107,8 @@ export default function TopNav() {
         { duration: 5000});
     }
     else if (data) {
-      console.log("✅ [ToolsPanel] Simulación finalizada exitosamente:", data);
+      if (data.cancelled){
+        console.log("✅ [ToolsPanel] Simulación finalizada exitosamente:", data);
         toast.custom((t) => (
           <ToastCustom
             t={t}
@@ -115,6 +116,18 @@ export default function TopNav() {
             type="success"
           />),
         { duration: 5000});
+      }
+      else{
+        console.error("❌ [ToolsPanel] Error al finalizar la simulación:", error);
+        //alert(`Error al iniciar simulación: ${error.message}`);
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={error+"❗"}
+            type="error"
+          />),
+        { duration: 5000});
+      }
     }
 
   }  
@@ -220,6 +233,7 @@ export default function TopNav() {
                 finished={!!finished}
                 runNow={simNowUtc ? new Date(simNowUtc) : null}
                 runStart={wallStartUtc ? new Date(wallStartUtc) : null}
+                onCancel={handleCancelRun}
               />
             </div>
 

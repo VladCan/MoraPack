@@ -9,9 +9,11 @@ type Props = {
   runNow?: Date | null;   // tick que llega del backend/contexto
   runStart?: Date | null; // inicio exacto de la simulación (del back viene en UTC)
   simTimeZone?: string // ZonaHoraria de la simulación (por defecto es UTC)
+  onCancel?: () => void; //Para pasar la función que gestiona la cancelación
 };
 
-export default function ClockSwitcher({ className = "", running, finished, runNow, runStart, simTimeZone="UTC" }: Props) {
+export default function ClockSwitcher({ className = "", running, finished, runNow, 
+  runStart, simTimeZone="UTC", onCancel}: Props) {
     
   ///Esto es para contar el tiempo real de la simulación transcurrido
 
@@ -72,8 +74,20 @@ export default function ClockSwitcher({ className = "", running, finished, runNo
           timeZone={simTimeZone}
           className=""/>
         
+        {/*Tiempo transcurrido*/}
         {runStart && <ElapsedBadge ms={elapsedMs} finished={finished} />}
       
+        {/*Cancelar simulación*/}
+        {onCancel && running && !finished && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="mt-1 rounded-full border border-red-500/40 bg-white/80 px-3 py-1 text-xs font-semibold text-red-600 shadow-sm backdrop-blur hover:bg-red-50 disabled:opacity-50"
+            >
+              Terminar simulación
+            </button>
+        )}
+
       </div>
     </div>
   </div>
