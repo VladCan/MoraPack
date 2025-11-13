@@ -14,6 +14,10 @@ import { ModeToggle } from "../ui/mode-toggle";
 import { useRunSession } from "@/lib/runSession";
 import { useRunSSE } from "@/hooks/useRunSSE";
 import ClockSwitcher from "./ClockSwitcher";
+import { handleApi, postJson } from "@/services/api";
+import toast from "react-hot-toast";
+import ToastCustom from "@/components/common/ToastCustom";
+import type { CancelRunResponse } from "@/types/runs";
 
 const tabs = [
   { to: "/registrar", label: "Registrar envío" },
@@ -77,7 +81,44 @@ export default function TopNav() {
     if (finished) end("finished");
   }, [finished, end]);
 
-    
+  //Para finalizar/cancelar el run:
+  const handleCancelRun = async () => {
+    if (!runId) return;
+
+    //const base = import.meta.env.VITE_API_BASE_URL
+    //const base = import.meta.env.prod.VITE_API_BASE_URL
+
+    const path = `runs/${runId}/cancel`;
+
+    const [data, error] = await handleApi(
+      postJson<CancelRunResponse>(path)
+    )
+
+    if (error) {
+        // aquí tu toast o UI de error
+        console.error("❌ [ToolsPanel] Error al finalizar la simulación:", error);
+        //alert(`Error al iniciar simulación: ${error.message}`);
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={error+"❗"}
+            type="error"
+          />),
+        { duration: 5000});
+    }
+    else if (data) {
+      console.log("✅ [ToolsPanel] Simulación finalizada exitosamente:", data);
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={"¡Simulación finalizada exitosamente!"+"✅"}
+            type="success"
+          />),
+        { duration: 5000});
+    }
+
+  }  
+
 
   return (
     <header className="fixed top-0 left-0 z-50 w-full h-16">
