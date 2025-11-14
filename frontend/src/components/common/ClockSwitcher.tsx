@@ -67,7 +67,7 @@ export default function ClockSwitcher({ className = "", running, finished, runNo
         running ? "translate-y-[110%] opacity-100" : "translate-y-0 opacity-0",
       ].join(" ")}>
 
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-2 -mt-4">
         <NavClock
           variant="run"
           value={runNow ?? undefined}
