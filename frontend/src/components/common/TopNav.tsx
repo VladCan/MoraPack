@@ -48,13 +48,13 @@ export default function TopNav() {
   //Esto es para la conexión SSE de la solución
 
   //Traemos el contexto
-  const { runId, status, end, setSimNow, setWindow } = useRunSession();
+  const { runId, status, end, setSimNow, setWindow, reset } = useRunSession();
 
   //Para el reloj
   const running = status === "running" && !!runId;
   
   //Acá expone connect(url, handlers) -> () => void
-  const { simNowUtc, windows, finished, simStartUtc, wallStartUtc } = useRunSSE(
+  const { simNowUtc, windows, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(
     status === "running" && runId ? runId : undefined
   );
 
@@ -116,6 +116,13 @@ export default function TopNav() {
             type="success"
           />),
         { duration: 5000});
+
+        //Cortamos el SSE
+        disconnect();
+
+        //Limpiamos el contexto de la simulación
+        reset();
+
       }
       else{
         console.error("❌ [ToolsPanel] Error al finalizar la simulación:", error);

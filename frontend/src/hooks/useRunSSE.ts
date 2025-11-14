@@ -232,11 +232,35 @@ export function useRunSSE(runId?: string){
 
     }, [url])
 
+    //Refactorizamos el viejo disconnect
     const disconnect = () => {
-        esRef.current?.close();
-        esRef.current = null;
+
+        //Cerramos el SSE
+
+        if (esRef.current){
+            try{
+                esRef.current.close();
+                console.log("✅ [useRunSSE] Conexión cerrada exitosamente.")
+            }
+            catch{
+                console.log("❌ [useRunSSE] No se pudo cerrar la conexión correctamente.")
+            }
+            esRef.current = null;
+        }
+        
+        //Limpiamos todo el estado del hook
+
         setConnected(false);
+        setError(null);
+        setSpeed(undefined);
+        setSimStart(undefined);
+        setSimNow(undefined);
+        setWindows([]);
+        setFinished(null);
+        setAirportOccupancy({});
+
     };
+
 
     return {
         connected,

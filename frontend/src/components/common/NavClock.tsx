@@ -92,7 +92,7 @@ export default function NavClock({
     // Paleta sutil distinta para “run”
   const color =
     variant === "run"
-      ? "bg-blue-50/70 text-blue-900 ring-1 ring-blue-300 shadow-blue-100/50"
+      ? "bg-blue-50/70 text-blue-900 ring-1 ring-blue-300 shadow-lg shadow-blue-100/50"
       : "bg-card/40 text-foreground ring-1 ring-border shadow-lg";
 
   return (
