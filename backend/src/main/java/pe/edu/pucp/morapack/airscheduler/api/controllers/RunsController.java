@@ -47,6 +47,12 @@ public class RunsController {
         public String status; // "STARTED"
         public  StartRunResponse(String runId) { this.runId = runId; this.status = "STARTED"; }
     }
+    @RegisterForReflection
+    public static final class CancelRunResponse {
+        public String runId;
+        public boolean cancelled;
+        public CancelRunResponse(String runId, boolean cancelled) { this.runId = runId; this.cancelled = cancelled; }
+    }
 
     @POST
     public Response start(StartRunRequest body) {
@@ -140,5 +146,27 @@ public class RunsController {
         return Response.status(Response.Status.BAD_REQUEST).entity(new ErrorDTO(msg)).build();
     }
     private static final class ErrorDTO { public final String message; ErrorDTO(String m){ this.message = m; } }
+
+    @POST
+    @Path("/{id}/cancel")
+    public Response cancel(@PathParam("id") String runIdStr) {
+        //Intentamos cancelar
+        boolean ok = runManager.requestCancel(runIdStr);
+
+        //Si no se pudo cancelar no había run con dicho id
+        if (!ok){
+            //return Response.status(Response.Status.NOT_FOUND).build();
+            Response.status(Response.Status.CREATED)
+                    .entity(new CancelRunResponse(runIdStr, false))
+                    .build();
+        }
+
+        System.out.println("Se canceló el run. Falta que salga del bucle...");
+
+        //Se pudo cancelar
+        return Response.status(Response.Status.CREATED)
+                .entity(new CancelRunResponse(runIdStr, true))
+                .build();
+    }
 
 }

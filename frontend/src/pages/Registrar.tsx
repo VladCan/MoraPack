@@ -25,7 +25,6 @@ type Status = {
   sizeBytes?: number;
   lastModified?: string;
 }
-type Kind = "vuelos" | "aereopuertos" | "cancelaciones";
 
 const handleFileUpload = async (file: File, endpoint: string) => {
   const [data, error] = await uploadFile(endpoint, file);
@@ -78,38 +77,94 @@ const husosStatus  = useQuery({
   refetchOnWindowFocus: false,
 })
 
-/**Acá hay 2 handlers para subir con confirmación si ya hay archivo + refetch**/
+//todavía no tenemos para cancelaciones, pero cuando tengamos:
+const cancelacionesStatus = useQuery({
+  queryKey: ["status", "aereopuertos"],
+  queryFn: () => getJson<Status>("aereopuertos/status"),
+  refetchOnWindowFocus: false,
+});
+
+//husos = aeropuertos
+const pedidosStatus  = useQuery({
+  queryKey: ["status", "pedidos"],
+  queryFn: () => getJson<Status>("pedidos/status"),
+  refetchOnWindowFocus: false,
+})
+
+const operacionDiariaStatus = useQuery({
+  queryKey: ["status", "operacionDiaria"],
+  queryFn: () => getJson<Status>("operacionDiaria/status"),
+  refetchOnWindowFocus: false,
+})
+
+type Kind = "vuelos" | "aereopuertos" | "cancelaciones" | "pedidos" | "operacionDiaria";
+
+//Esto es porque operaciónDiaria, en principio, no necesita un status (ahora sí le puse xd) "ej: Archivo actual: vuelos.txt — 80248 bytes — 2025-11-10T19:50:31.7425859Z"
+const statuses: Partial<Record<Kind, { exists?: boolean; filename?: string } | undefined>> = {
+  vuelos: vuelosStatus.data,
+  aereopuertos: husosStatus.data,
+  cancelaciones: cancelacionesStatus?.data, // si no existe query, quedará undefined
+  operacionDiaria: undefined,               // explícitamente sin status
+}
+
+const withoutStatusCheck = new Set<Kind>(["operacionDiaria"]);
 
 //pero antes: handler de subida con confirmación + refresh (TODO falta agregar cancelaciones)
-const onUpload = async (file: File, kind: "vuelos" | "aereopuertos" | "cancelaciones") => {
-  const status = kind === "vuelos" ? vuelosStatus.data : husosStatus.data;
+const onUpload = async (file: File, kind: Kind) => {
+  
+  const status = statuses[kind];
 
-  if (status?.exists){
+  //En caso no tenga statusCheck (osea, si es operacionDiaria)
+  if (!withoutStatusCheck.has(kind) && status?.exists) {
     const ok = window.confirm(
       `Ya existe un archivo (${status.filename}). Esto lo reemplazará. ¿Continuar?`
     );
     if (!ok) return;
   }
 
+  //EN EL BACK EL CONTROLLER TIENE QUE TENER EL ENDPOINT '/upload' (VER Línea 98)
   const [data, error] = await uploadFile(`${kind}/upload`, file);
   if (data){
+    console.log("✅ [Registrar] Archivos enviados para operacionDiaria:", data);
+
+    toast.custom((t) => (
+      <ToastCustom
+        t={t}
+        message={data.message +"✅"}
+        type="success"
+      />),
+    { duration: 5000});
+
     //Refrescamos 
-    qc.invalidateQueries({queryKey: ["status", kind]})
+    qc.invalidateQueries({ queryKey: ["status", kind] });
+    
   }
   else {
     console.error(error);
+
+    const msg =
+        (error as ApiError)?.message ??
+      "Ocurrió un error.";
+
+      toast.custom((t) => (
+        <ToastCustom
+          t={t}
+          message={msg+"❗"}
+          type="error"
+        />),
+      { duration: 5000});
   }
 }
 
 //1. handler para ver primeras 50 lineas
-const doPreview  = async (kind: "vuelos" | "aereopuertos" | "cancelaciones" ) => {
+const doPreview  = async (kind: Kind) => {
   const text = await getText(`${kind}/preview`, {lines: 50});
   //Por ahora va como un alert
   alert(text || "(archivo vacío)");
 }
 
 //2. handler de descarga
-const doDownload = async (kind: "vuelos" | "aereopuertos" | "cancelaciones", filename?: string) => {
+const doDownload = async (kind: Kind, filename?: string) => {
   await downloadFile(`${kind}/download`, filename ?? `${kind}.txt`);
 }
 
@@ -135,7 +190,7 @@ const renderDropzoneFooter = (
               </button>
               {" "}— {status.sizeBytes} bytes — {status.lastModified}
             </>
-          : "No hay archivo cargado"}
+          : "No se pudo recuperar el estado."}
     </div>
 
     <div className="flex gap-3 mt-2">
@@ -153,19 +208,26 @@ const renderDropzoneFooter = (
       >
         Descargar
       </button>
-      {/* si luego se añade DELETE:
-      <button
-        className="text-sm text-red-600 underline disabled:opacity-50"
-        onClick={async () => {
-          if (!confirm("¿Eliminar el archivo actual?")) return;
-          await del(`/${kind}`);
-          qc.invalidateQueries({ queryKey: ["status", kind] });
-        }}
-        disabled={!status?.exists}
-      >
-        Eliminar
-      </button> */}
     </div>
+  </>
+);
+
+const renderDropzoneFooterOP = (
+  kind: Kind,
+  status?: Status,
+  isLoading?: boolean
+) => (
+  <>
+    <div className="text-xs text-muted-foreground font-bold">
+      {isLoading
+        ? "Cargando estado..."
+        : status?.exists
+          ? <>
+              ☑️ Ya se cargó un archivo de Operación Diaria - {kind}.
+            </>
+          : "No se pudo recuperar el estado o no existe archivo."}
+    </div>
+
   </>
 );
 
@@ -255,10 +317,11 @@ const renderDropzoneFooter = (
           onFiles={
             (fs) =>toast.custom((t) => (
               <ToastCustom t={t} message={"No implementado archivo: "+fs[0]?.name +" no subido"} type="error" />),
-              { duration: Infinity }
+              { duration: 5000 }
             )
             } />
-          <Dropzone label="Carga masiva de pedidos" onFiles={(fs) => handleFileUpload(fs[0], "pedidos/upload")} />
+          <Dropzone label="Carga masiva de pedidos" onFiles={(fs) => handleFileUpload(fs[0], "pedidos/upload")}
+            footer={renderDropzoneFooter("pedidos", pedidosStatus.data, pedidosStatus.isLoading)} />
         </CardContent>
       </Card>
 
@@ -344,6 +407,23 @@ const renderDropzoneFooter = (
           </Form>
         </CardContent>
       </Card>
+
+      <div className="md: col-span-2">
+        <Card className="w-full backdrop-blur-lg bg-background/30 border-white/40 shadow-lg ring-1 ring-black/5">
+          <CardHeader>
+            <CardTitle className="text-blue-900">Carga para Operación Diaria</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Dropzone
+              label="Cargar archivo operación diaria"
+              onFiles={(fs) => onUpload(fs[0], "operacionDiaria")}
+              footer={renderDropzoneFooterOP("operacionDiaria", operacionDiariaStatus.data, operacionDiariaStatus.isLoading)}
+            />
+            
+          </CardContent>
+        </Card>
+      </div>
+
     </div>
   );
 }
