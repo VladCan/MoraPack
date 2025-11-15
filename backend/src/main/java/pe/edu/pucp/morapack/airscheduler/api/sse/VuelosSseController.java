@@ -8,18 +8,23 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import pe.edu.pucp.morapack.airscheduler.api.dto.FlightLiveDTO;
 import pe.edu.pucp.morapack.airscheduler.api.service.VuelosLiveService;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 
 import org.jboss.resteasy.reactive.RestStreamElementType;
 
+import java.time.Duration;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 @Path("/vuelos")
 @RequestScoped
 public class VuelosSseController {
 
     @Inject VuelosLiveService service;
+    
+    @Inject RunManager runManager;
 
         /**
          * SSE: cada ~1s emite un array JSON con los vuelos EN EL AIRE.
@@ -52,6 +57,55 @@ public class VuelosSseController {
         final int effectiveLimit = (limit <= 0) ? Integer.MAX_VALUE : Math.min(limit, 500);
 
         return service.streamLiveFlights(nowSupplier, effectiveLimit);
+    }
+
+    /**
+     * SSE: cada ~1s emite un array JSON con todos los vuelos planificados del día siguiente.
+     * Incluye vuelos planificados del día siguiente desde el tiempo actual de simulación.
+     * No tiene límite de cantidad (solo muestra información, no renderiza vuelos).
+     * 
+     * Este endpoint está diseñado para permitir la cancelación de vuelos planificados
+     * antes de que despeguen, mostrando todos los vuelos relevantes sin límite.
+     * 
+     * @param runId ID del run activo (opcional). Si no se proporciona, usa el run de operación activo.
+     * @return Multi que emite cada segundo la lista de vuelos planificados del día siguiente
+     */
+    @GET
+    @Path("/scheduled/next-day")
+    @Produces(MediaType.SERVER_SENT_EVENTS)
+    @RestStreamElementType(MediaType.APPLICATION_JSON)
+    public Multi<List<Map<String, Object>>> scheduledNextDay(@QueryParam("runId") String runIdParam) {
+        return Multi.createFrom().ticks().every(Duration.ofSeconds(1))
+                .onItem().transform(t -> {
+                    // Si se proporciona un runId, usarlo; sino buscar el run activo apropiado
+                    String runId = runIdParam;
+                    if (runId == null || runId.isBlank()) {
+                        // Primero intentar el run de operación
+                        runId = runManager.currentOperacionRunId();
+                        // Si no hay run de operación, buscar el último run activo (para simulaciones)
+                        if (runId == null) {
+                            runId = runManager.getLastActiveRunId();
+                        }
+                    }
+                    
+                    System.out.println("[VuelosSseController] scheduledNextDay - runIdParam: " + runIdParam + ", runId final: " + runId);
+                    
+                    if (runId == null) {
+                        System.out.println("[VuelosSseController] No hay run activo disponible");
+                        return List.<Map<String, Object>>of(); // Retornar lista vacía si no hay run activo
+                    }
+                    
+                    // Obtener vuelos planificados del día siguiente
+                    try {
+                        List<Map<String, Object>> vuelos = runManager.getScheduledFlightsNextDay(runId);
+                        System.out.println("[VuelosSseController] Vuelos programados obtenidos: " + vuelos.size());
+                        return vuelos;
+                    } catch (Exception e) {
+                        System.err.println("[VuelosSseController] Error obteniendo vuelos programados para runId " + runId + ": " + e.getMessage());
+                        e.printStackTrace();
+                        return List.<Map<String, Object>>of();
+                    }
+                });
     }
 }
 /* 
