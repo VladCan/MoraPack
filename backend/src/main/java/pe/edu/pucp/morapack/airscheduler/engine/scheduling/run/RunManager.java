@@ -64,6 +64,27 @@ public class RunManager {
 
     public String currentOperacionRunId(){ return operacionRunId.get(); }
     public boolean hasActiveOperacionRunId(){ return operacionRunId.get() != null; }
+    
+    /**
+     * Obtiene el último run activo (con estado RUNNING) de cualquier tipo.
+     * Útil para obtener vuelos programados cuando no hay run de operación activo.
+     * 
+     * @return ID del último run activo, o null si no hay ninguno
+     */
+    public String getLastActiveRunId() {
+        // Buscar el último run con estado RUNNING
+        return states.entrySet().stream()
+                .filter(entry -> entry.getValue() == RunState.RUNNING)
+                .map(Map.Entry::getKey)
+                .max((id1, id2) -> {
+                    // Ordenar por fecha de inicio del contexto (más reciente primero)
+                    RunContext ctx1 = contexts.get(id1);
+                    RunContext ctx2 = contexts.get(id2);
+                    if (ctx1 == null || ctx2 == null) return 0;
+                    return ctx1.wallAnchor().compareTo(ctx2.wallAnchor());
+                })
+                .orElse(null);
+    }
 
 
     public void pushOrder(String runId, Pedido p){
@@ -1204,6 +1225,99 @@ public class RunManager {
         }
         
         return pedidosDTO;
+    }
+
+    /**
+     * Obtiene todos los vuelos planificados del día siguiente desde el tiempo actual de simulación.
+     * Incluye vuelos planificados incluso si ya despegaron o no, siempre que su salida esté
+     * dentro de las próximas 24 horas desde el tiempo actual.
+     * 
+     * @param runId ID del run para obtener la solución y el tiempo actual
+     * @return Lista de vuelos planificados (DTOs) sin límite de cantidad
+     */
+    public List<Map<String, Object>> getScheduledFlightsNextDay(String runId) {
+        List<Map<String, Object>> vuelosPlanificados = new ArrayList<>();
+        
+        try {
+            System.out.println("[RunManager] getScheduledFlightsNextDay - runId: " + runId);
+            
+            // Obtener el tiempo actual de simulación
+            Instant simNow = currentSimNow(runId);
+            System.out.println("[RunManager] simNow: " + simNow);
+            
+            // Calcular el límite del día siguiente (simNow + 24 horas)
+            Instant simNowNextDay = simNow.plus(Duration.ofHours(24));
+            System.out.println("[RunManager] simNowNextDay: " + simNowNextDay);
+            
+            // Obtener la solución actual
+            SolucionProgramacion solucion = solucionesAnteriores.get(runId);
+            if (solucion == null || solucion.getCargaPorVuelo() == null) {
+                System.out.println("[RunManager] No hay solución para runId: " + runId);
+                return vuelosPlanificados; // Retornar lista vacía si no hay solución
+            }
+            
+            CargaPorVuelo cargaPorVuelo = solucion.getCargaPorVuelo();
+            System.out.println("[RunManager] Total vuelos en solución: " + cargaPorVuelo.getAsignado().size());
+            
+            // Iterar sobre todos los vuelos planificados (incluso sin carga asignada para mostrar todos)
+            // Pero para simplificar, solo incluimos vuelos con carga asignada (vuelos realmente usados)
+            for (Map.Entry<VueloProgramadoId, Integer> entry : cargaPorVuelo.getAsignado().entrySet()) {
+                VueloProgramadoId vueloId = entry.getKey();
+                
+                // Incluir vuelos planificados del día siguiente
+                // Solo incluimos vuelos cuya salida está en el futuro desde simNow hasta simNow + 24 horas
+                // Esto permite cancelar vuelos antes de que despeguen
+                // Nota: Si un vuelo ya despegó (salida < simNow), no tiene sentido mostrarlo para cancelarlo
+                if (vueloId.getSalidaUtc() != null) {
+                    Instant salida = vueloId.getSalidaUtc();
+                    
+                    // Incluir vuelos planificados del día siguiente (desde simNow hasta simNow + 24 horas)
+                    // Solo vuelos futuros que aún no han despegado
+                    // IMPORTANTE: Solo incluir vuelos cuya salida está en el futuro (>= simNow)
+                    // y dentro de las próximas 24 horas (<= simNow + 24h)
+                    if (!salida.isBefore(simNow) && !salida.isAfter(simNowNextDay)) {
+                        // Generar ID único para el vuelo
+                        String vueloIdStr = vueloId.getOrigen() + "-" + 
+                                           vueloId.getDestino() + "-" + 
+                                           vueloId.getSalidaUtc().toString().replace(":", "");
+                        
+                        // Crear DTO del vuelo
+                        Map<String, Object> vueloDTO = new HashMap<>();
+                        vueloDTO.put("id", vueloIdStr);
+                        vueloDTO.put("origen", vueloId.getOrigen());
+                        vueloDTO.put("destino", vueloId.getDestino());
+                        vueloDTO.put("salidaUtc", vueloId.getSalidaUtc().toString());
+                        vueloDTO.put("llegadaUtc", vueloId.getLlegadaUtc() != null ? vueloId.getLlegadaUtc().toString() : null);
+                        vueloDTO.put("cantidadAsignada", entry.getValue());
+                        vueloDTO.put("capacidad", cargaPorVuelo.capacidad(vueloId));
+                        vueloDTO.put("residual", cargaPorVuelo.residual(vueloId));
+                        vueloDTO.put("costo", vueloId.getCosto());
+                        
+                        // Extraer manifiesto de carga (qué pedidos van en este vuelo)
+                        List<Map<String, Object>> carga = extraerCargaDelVuelo(solucion, vueloId);
+                        vueloDTO.put("carga", carga);
+                        
+                        vuelosPlanificados.add(vueloDTO);
+                    }
+                }
+            }
+            
+            System.out.println("[RunManager] Vuelos planificados del día siguiente encontrados: " + vuelosPlanificados.size());
+            
+            // Ordenar por hora de salida
+            vuelosPlanificados.sort((a, b) -> {
+                String salidaA = (String) a.get("salidaUtc");
+                String salidaB = (String) b.get("salidaUtc");
+                if (salidaA == null || salidaB == null) return 0;
+                return salidaA.compareTo(salidaB);
+            });
+            
+        } catch (Exception e) {
+            System.err.println("[RunManager] Error obteniendo vuelos planificados del día siguiente para runId " + runId + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return vuelosPlanificados;
     }
 
 }
