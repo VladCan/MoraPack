@@ -27,6 +27,8 @@ interface RunSessionState {
     setSimNow: (iso: string) => void;
     setWindow: (w: RunWindow) => void;
     setSelectedAirport: (id: string | null) => void;
+
+    reset: () => void;
 }
 
 const RunSessionContext = createContext<RunSessionState | null>(null);
@@ -50,6 +52,15 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
 
     const end = useCallback((st: Extract<RunStatus, "finished" | "failed"> = "finished") => {
         setStatus(st);
+    }, []);
+
+    const reset = useCallback(() => {
+        setRunId(null);
+        setStatus("idle");
+        setSimNowState(null);
+        setLastWindow(null);
+        setWindows([]);
+        setSelectedAirportId(null);
     }, []);
 
     const setSimNow = useCallback((iso: string) => {
@@ -85,7 +96,8 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setSimNow,
         setWindow,
         setSelectedAirport,
-    }), [runId, status, simNow, lastWindow, windows, selectedAirportId, begin, end, setSimNow, setWindow, setSelectedAirport]);
+        reset,
+    }), [runId, status, simNow, lastWindow, windows, selectedAirportId, begin, end, setSimNow, setWindow, setSelectedAirport, reset]);
 
     return (
         <RunSessionContext.Provider value={value}>

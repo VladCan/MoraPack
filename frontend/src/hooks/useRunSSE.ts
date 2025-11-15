@@ -77,9 +77,9 @@ export type EstadisticasFuturas = {
 
 export type RunEvt = 
 | {type:"RUN_STARTED"; runId: string; simStartUtc: string; wallAnchorUtc: string; speed: number }
-| { type: "TICK";        runId: string; simNowUtc:  string; aeropuertos: Record<string, AeropuertoOcupacion> }
-| { type: "WINDOW";      runId: string; windowIndex: number; windowStartUtc: string; windowEndUtc: string; vuelos: VueloDTO[]; pedidos: PedidoDTO[] }
-| { type: "FINISHED";    runId: string; reason: string };
+| { type: "TICK"; runId: string; simNowUtc: string; aeropuertos: Record<string, AeropuertoOcupacion> }
+| { type: "WINDOW"; runId: string; windowIndex: number; windowStartUtc: string; windowEndUtc: string; vuelos: VueloDTO[]; pedidos: PedidoDTO[] }
+| { type: "FINISHED"; runId: string; reason: string };
 
 export type WindowData = {
     index: number;
@@ -97,6 +97,7 @@ export function useRunSSE(runId?: string){
     const [speed, setSpeed] = useState<number|undefined>();
     const [simNowUtc, setSimNow]  = useState<string|undefined>();
     const [simStartUtc, setSimStart] = useState<string|undefined>();
+    const [wallStartUtc, setWallStart] = useState<string | null>(null);
     const [windows, setWindows]   = useState<WindowData[]>([]);
     const [finished, setFinished] = useState<{reason:string}|null>(null);
     const [airportOccupancy, setAirportOccupancy] = useState<Record<string, AeropuertoOcupacion>>({});
@@ -172,6 +173,7 @@ export function useRunSSE(runId?: string){
                 switch (evt.type){
                     case "RUN_STARTED":
                         setSimStart(evt.simStartUtc);
+                        setWallStart(evt.wallAnchorUtc);
                         setSpeed(evt.speed);
                         break;
                     case "TICK":
@@ -208,9 +210,9 @@ export function useRunSSE(runId?: string){
                         break;
                 }
 
-            }
-            catch (e) {
-
+            } catch (err: unknown) {
+                console.error("[RUN DIAG] Failed to parse SSE message or handle event:", err);
+                setError("Error procesando mensaje SSE");
             }
         }
 
@@ -230,17 +232,42 @@ export function useRunSSE(runId?: string){
 
     }, [url])
 
+    //Refactorizamos el viejo disconnect
     const disconnect = () => {
-        esRef.current?.close();
-        esRef.current = null;
+
+        //Cerramos el SSE
+
+        if (esRef.current){
+            try{
+                esRef.current.close();
+                console.log("✅ [useRunSSE] Conexión cerrada exitosamente.")
+            }
+            catch{
+                console.log("❌ [useRunSSE] No se pudo cerrar la conexión correctamente.")
+            }
+            esRef.current = null;
+        }
+        
+        //Limpiamos todo el estado del hook
+
         setConnected(false);
+        setError(null);
+        setSpeed(undefined);
+        setSimStart(undefined);
+        setSimNow(undefined);
+        setWindows([]);
+        setFinished(null);
+        setAirportOccupancy({});
+
     };
+
 
     return {
         connected,
         error,
         speed,
         simStartUtc,
+        wallStartUtc,
         simNowUtc,
         windows,
         finished,

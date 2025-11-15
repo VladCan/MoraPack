@@ -45,6 +45,7 @@ public class RunManager {
     private static final String AEROPUERTOS_FILENAME = "aereopuertos.txt";
     private static final String VUELOS_FILENAME = "vuelos.txt";
     private static final String PEDIDOS_FILENAME = "pedidos.txt";
+    private static boolean firstExecution = false;
 
     private final ExecutorService executor = Executors.newCachedThreadPool((r -> {
         Thread t = new Thread(r, "run-" + UUID.randomUUID());
@@ -86,6 +87,14 @@ public class RunManager {
                 .orElse(null);
     }
 
+    public boolean requestCancel(String runId){
+        AtomicBoolean flag = cancelled.get(runId);
+        if (flag == null) {
+            return false;      // runId desconocido (ya terminó o nunca existió)
+        }
+        flag.set(true);
+        return true;
+    }
 
     public void pushOrder(String runId, Pedido p){
         //queues.computeIfAbsent(runId, k -> new ConcurrentLinkedQueue<>()).add(p);
@@ -99,6 +108,13 @@ public class RunManager {
                 "[RunManager] Pedido agregado a cola (runId=%s). Tamaño actual: %d%n",
                 runId, queue.size()
         );
+    }
+
+    public void pushOrders(String runId, List<Pedido> pedidos){
+        var queue = queues.computeIfAbsent(runId, k -> new ConcurrentLinkedQueue<>());
+        for (Pedido p : pedidos) queue.add(p);
+        System.out.printf("[RunManager] Se encolaron %d pedidos (runId=%s). Tamaño actual: %d%n",
+                pedidos.size(), runId, queue.size());
     }
 
     //
@@ -347,29 +363,64 @@ public class RunManager {
 
                 System.out.println("Salí del bucle, mi id es:" + id);
 
+
+                firstExecution = true;
+
+                if (firstExecution) {
+                    System.out.println("Ahora firstExecution es:" + firstExecution);
+                }
+
                 // Fin normal
                 states.put(id, RunState.COMPLETED);
                 broadcastFinished(id, StopReason.FIN_DE_RANGO);
+
+                // Limpiamos
+                // Solución rápida:
+                aeropuertosMap = null;
+                vuelosMap = null;
+                pedidosCargados = null;
 
             }
             catch (Throwable e){
                 states.put(id, RunState.FAILED);
                 broadcastFinished(id, StopReason.ERROR);
             }
+            finally {
+                cleanupRunState(id);
+            }
 
         });
     }
 
-    private void sleepToEndWindow(String id, Instant wEnd){
+    private void cleanupRunState(String id) {
+        //try { unregisterAllListeners(id); } catch (Throwable ignored) {}
+
+        contexts.remove(id);
+        states.remove(id);
+        paused.remove(id);
+        cancelled.remove(id);
+
+        // estructuras por run:
+        ventanasEnviadas.remove(id);
+        solucionesAnteriores.remove(id);
+        ocupacionesPorRun.remove(id);
+        //queues.remove(id);          // si existe
+    }
+
+    private boolean isCancelled(String id){
+        return cancelled.get(id).get();
+    }
+
+    private boolean sleepToEndWindow(String id, Instant wEnd){
         //Acá vamos a que el reloj simulado cruce el fin de ventana
         while (true){
             //En caso de existir pausa o cancelación (por ahora, esto no ocurrirá)
-            if (cancelled.get(id).get()) break;
+            if (isCancelled(id)) return true;
 
             while (paused.get(id).get() && !cancelled.get(id).get()) {
                 sleepQuietly(Duration.ofMillis(100)); // dormimos cortito mientras esté pausado
             }
-            if (cancelled.get(id).get()) break;
+            if (isCancelled(id)) return true;
 
             Instant simNow = currentSimNow(id);
 
@@ -393,7 +444,9 @@ public class RunManager {
             long napMs = Math.min(Math.max(remainingRealMs, 50L), 500L);
             sleepQuietly(Duration.ofMillis(napMs));
 
+            if (isCancelled(id)) return true;
         }
+        return false;
     }
 
     /// Funciones para cada escenario.
@@ -411,15 +464,22 @@ public class RunManager {
         System.out.println("[RunManager] Config: fechaInicio=" + config.fechaInicio() + ", fechaFin=" + config.fechaFin());
         System.out.println("[RunManager] Ventana inicial: wStart=" + wStart + ", wEnd=" + wEnd);
 
-        while (!cancelled.get(id).get() && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
+        System.out.println("Dentro de runSimulación firstExecution es:" + firstExecution);
+
+        while (!isCancelled(id) && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
             /// Revisar esto:
             // Pausa cooperativa entre ventanas
-            while (paused.get(id).get() && !cancelled.get(id).get()) {
+            while (paused.get(id).get() && !isCancelled(id)) {
                 sleepQuietly(Duration.ofMillis(80));
             }
-            if (cancelled.get(id).get()) break;
+            if (isCancelled(id)) break;
 
             // ===== LÓGICA DE PLANIFICACIÓN POR VENTANAS =====
+
+            if (firstExecution){
+                System.out.println("Soy true");
+                int a = 0;
+            }
 
             // Inicializar catálogos si es necesario
             inicializarCatalogos(config.scenario());
@@ -467,7 +527,8 @@ public class RunManager {
                             convertirPedidosADTO(List.of(), null)));
 
                     //Llamamos al sleep (para que el reloj simulado cruce fin de ventana):
-                    sleepToEndWindow(id, wEnd);
+                    //Si se cancela durante el sleep, salimos del bucle
+                    if (sleepToEndWindow(id, wEnd)) break;
 
                     // Avanzar a la siguiente ventana antes de continuar
                     idx++;
@@ -475,6 +536,8 @@ public class RunManager {
                     wEnd = wEnd.plus(config.horasVentana());
                     continue;
                 }
+
+                if (isCancelled(id)) break;
 
                 // 3. Construir TEG para la ventana
                 Instant finTEG = wEnd.plus(config.horizon());
@@ -505,6 +568,8 @@ public class RunManager {
                 ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto);
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
+                if (isCancelled(id)) break;
+
                 // 6. Guardar solución para la siguiente ventana y sincronizar ocupación
                 actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
                 solucionesAnteriores.put(id, solucionOptima);
@@ -512,12 +577,16 @@ public class RunManager {
                 // 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
                 final Instant wStartFinal = wStart;
                 final Instant wEndFinal = wEnd;
-                
+
+                if (isCancelled(id)) break;
+
                 List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStartFinal, wEndFinal);
                 
                 // IMPORTANTE: Enviar TODOS los pedidos procesados (incluye parciales de ventanas anteriores)
                 // para que el frontend vea el estado actualizado de cada pedido
                 List<Object> pedidosVentanaDTO = convertirPedidosADTO(pedidosVentana, solucionOptima);
+
+                //Esto es para depurar
 
                 // 8. Marcar ventana como enviada y hacer broadcast
                 ventanasEnviadasRun.add(windowIdISO);
@@ -532,7 +601,7 @@ public class RunManager {
             }
 
             //Llamamos al sleep (para que el reloj simulado cruce fin de ventana):
-            sleepToEndWindow(id, wEnd);
+            if (sleepToEndWindow(id, wEnd)) break;
 
             // Siguiente ventana
             idx++;
