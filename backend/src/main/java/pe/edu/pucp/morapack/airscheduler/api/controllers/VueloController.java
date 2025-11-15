@@ -204,4 +204,23 @@ public class VueloController {
         return s == null || s.isEmpty() || s.isBlank();
     }
 
+    @POST
+    @jakarta.ws.rs.Path("/{runId}/cancelar-test")
+    public Response cancelarTest(@PathParam("runId") String runId) {
+
+        // ⚠️ Vuelos hardcodeado: copia EXACTA de lo que viste en el debugger
+        VueloProgramadoId vueloId = new VueloProgramadoId(
+                "UBBB",                           // origen
+                "OOMS",                           // destino
+                Instant.parse("2025-01-02T15:23:00Z"), // salidaUtc
+                Instant.parse("2025-01-02T19:56:00Z")  // llegadaUtc
+        );
+
+        runManager.registrarCancelacionVuelo(runId, vueloId);
+
+        return Response.accepted()
+                .entity("Vuelo marcado como cancelado en run " + runId + ": " + vueloId)
+                .build();
+    }
+
 }

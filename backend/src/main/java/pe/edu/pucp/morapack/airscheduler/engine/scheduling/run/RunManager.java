@@ -12,6 +12,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoManager;
 // Imports para la lógica de planificación
@@ -498,13 +499,15 @@ public class RunManager {
                     System.out.println("[RunManager] Antes de eliminarYActualizarCumplidosHasta: " + 
                         pedidosCargados.getLista().size() + " pedidos en cola");
 
-                    Set<VueloProgramadoId> vuelosCancelados = vuelosCanceladosPorRun.get(runId);
+                    Set<VueloProgramadoId> vuelosCancelados =
+                            vuelosCanceladosPorRun.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
+
                     if (!vuelosCancelados.isEmpty()) {
                         System.out.println("[RunManager]: Procesando cancelaciones: " + vuelosCancelados.size());
 
                         //Considerar si hay que colocar los vuelos cancelados en algun otro lado para enchufar en el TEG
 
-                        procesarCancelaciones(vuelosCancelados, solucionAnterior);
+                        procesarCancelaciones(id, vuelosCancelados, solucionAnterior);
                     }
 
                     pedidosCargados.eliminarYActualizarCumplidosHasta(wStart, solucionAnterior);
@@ -785,16 +788,119 @@ public class RunManager {
 
         //Realizamos el mismo proceso de normalizar y ordenar
         pedidosCargados.normalizarUtc(aeropuertosMap);
-        pedidosCargados.ordenarPorUTC();
+            pedidosCargados.ordenarPorUTC();
         System.out.println("[cargarPedidosDesdeQueue] Pedidos cargados: " + pedidosCargados.getLista().size());
 
     }
 
-    private void procesarCancelaciones(Set<VueloProgramadoId> vuelosCancelados, SolucionProgramacion solucionAnterior){
+    private void procesarCancelaciones(String runId, Set<VueloProgramadoId> vuelosCancelados, SolucionProgramacion solucionAnterior){
         /// Aca hay que poner la lógica
         /// 1) Para cada vuelo de vuelosCancelados, recorrer toda la solucionProgramacion.
         /// Podríamos también, para ahorrar tiempo, revisar si tiene carga asignada en CargaPorVuelo
         /// 2) En cualquier caso, si tiene una ruta simplemente eliminarla como en los destructores del ALNS.
+
+
+        CargaPorVuelo cargaPorVuelo = solucionAnterior.getCargaPorVuelo();
+        Map<VueloProgramadoId, Integer> asignados = solucionAnterior.getCargaPorVuelo().getAsignado();
+        Map<Integer, PlanPedido> planes = solucionAnterior.asMap();
+        OcupacionPorAeropuerto ocupacionPorAeropuerto = ocupacionesPorRun.get(runId);
+
+
+        /// 1) Con esto nos quedamos solamente con los vuelos cancelados que tienen carga asignada
+        Set<VueloProgramadoId> canceladosConCarga = vuelosCancelados.stream()
+                .filter(v -> cargaPorVuelo.getAsignado().containsKey(v))
+                .collect(Collectors.toSet());
+
+        //Si no hay vuelos con carga:
+        if (canceladosConCarga.isEmpty()) {
+            System.out.println("[Cancel] No hay vuelos cancelados con carga. Nada que hacer.");
+            return;
+        }
+
+        //Caso contrario:
+        System.out.println("[Cancel] Vuelos cancelados con carga: " + canceladosConCarga.size());
+
+        /// 2) Ahora, recorremos cada pedido una única vez
+        for (PlanPedido plan : planes.values()) {
+            List<RutaAsignada> rutas = plan.getRutas();
+            List<RutaAsignada> rutasFiltradas = new ArrayList<>();
+
+            //Para trackear si se eliminó como mínimo 1 ruta
+            boolean deleted = false;
+
+            //Recorremos cada ruta (ej: una ruta es A->B->C->D)
+
+            for (RutaAsignada ruta : rutas) {
+                boolean rutaVueloCancelado = ruta.getTramos().stream()
+                        .map(TramoAsignado::getVuelo)
+                        .anyMatch(canceladosConCarga::contains);
+
+                //Si es que tiene un vuelo cancelado
+                if (rutaVueloCancelado) {
+                    int qRuta = ruta.getCantidad();
+                    final List<TramoAsignado> tr = ruta.getTramos();
+
+                    //Acá liberamos las capacidades de los almacenes que están en la ruta + 2h de espera
+
+                    //1) ESCALAS: liberar [llegada(tr i), salida(tr i+1)) en aeropuerto destino del tramo
+                    for (int i = 0; i < tr.size() - 1; i++) {
+                        TramoAsignado tPrev = tr.get(i);
+                        TramoAsignado tNext = tr.get(i + 1);
+
+                        String apEscala = tPrev.getVuelo().getDestino();
+                        Instant ini = tPrev.getLlegadaUtc();
+                        Instant fin = tNext.getVuelo().getSalidaUtc();
+
+                        if (ini != null && fin != null && ini.isBefore(fin)) {
+                            ocupacionPorAeropuerto.liberar(apEscala, ini, fin, qRuta);
+                        }
+                    }
+
+                    // 2) DESTINO FINAL: liberar +2h
+                    TramoAsignado last = tr.get(tr.size() - 1);
+                    String apFinal = last.getVuelo().getDestino();
+                    Instant arr = last.getLlegadaUtc();
+                    if (arr != null) {
+                        Instant fin2h = arr.plus(Duration.ofHours(2));
+                        ocupacionPorAeropuerto.liberar(apFinal, arr, fin2h, qRuta);
+                    }
+
+                    // 3) CARGA EN VUELOS: revertir asignaciones por tramo
+                    /// Igual sospecho que esto es innecesario, ya que el vuelo se va a cancelar xd
+                    for (TramoAsignado t : tr) {
+                        int qTramo = t.getCantidad();                      // usa la cantidad efectiva del tramo
+                        if (qTramo != 0) {
+                            solucionAnterior.getCargaPorVuelo().asignar(t.getVuelo(), -qTramo);
+                        }
+                    }
+
+                    deleted = true;
+                }
+                else {
+                    rutasFiltradas.add(ruta);
+                }
+
+            }
+
+            //Si se eliminó una ruta como mínimo
+            if (deleted){
+                PlanPedido nuevo = PlanPedido.builder()
+                        .idPedido(plan.getIdPedido())
+                        .aeropuertoDestino(plan.getAeropuertoDestino())
+                        .creadoUtc(plan.getCreadoUtc())
+                        .demanda(plan.getDemanda())
+                        .rutas(rutasFiltradas)
+                        .build();
+                solucionAnterior.getPlanPorPedido().put(nuevo.getIdPedido(), nuevo);
+
+
+                System.out.println("[Cancel]   Pedido " + plan.getIdPedido()
+                        + " → rutas después de cancelar: " + rutasFiltradas.size());
+            }
+        }
+
+        int x = 0;
+
     }
 
 
