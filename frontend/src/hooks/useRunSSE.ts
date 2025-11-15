@@ -75,11 +75,13 @@ export type EstadisticasFuturas = {
     cargaSaliente: number;
 };
 
+export type StopReason = "FIN_DE_RANGO" | "MANUAL" | "COLAPSO" | "ERROR";
+
 export type RunEvt = 
 | {type:"RUN_STARTED"; runId: string; simStartUtc: string; wallAnchorUtc: string; speed: number }
 | { type: "TICK"; runId: string; simNowUtc: string; aeropuertos: Record<string, AeropuertoOcupacion> }
 | { type: "WINDOW"; runId: string; windowIndex: number; windowStartUtc: string; windowEndUtc: string; vuelos: VueloDTO[]; pedidos: PedidoDTO[] }
-| { type: "FINISHED"; runId: string; reason: string };
+| { type: "FINISHED"; runId: string; reason: StopReason };
 
 export type WindowData = {
     index: number;
@@ -99,7 +101,7 @@ export function useRunSSE(runId?: string){
     const [simStartUtc, setSimStart] = useState<string|undefined>();
     const [wallStartUtc, setWallStart] = useState<string | null>(null);
     const [windows, setWindows]   = useState<WindowData[]>([]);
-    const [finished, setFinished] = useState<{reason:string}|null>(null);
+    const [finished, setFinished] = useState<{reason: StopReason}|null>(null);
     const [airportOccupancy, setAirportOccupancy] = useState<Record<string, AeropuertoOcupacion>>({});
 
     const esRef = useRef<EventSource | null>(null);
@@ -207,6 +209,7 @@ export function useRunSSE(runId?: string){
                         es.close();
                         esRef.current = null;
                         setConnected(false);
+                        console.log("✅ [useRunSSE] Conexión cerrada exitosamente. (Fuera de disconnect() )")
                         break;
                 }
 
@@ -243,7 +246,7 @@ export function useRunSSE(runId?: string){
                 console.log("✅ [useRunSSE] Conexión cerrada exitosamente.")
             }
             catch{
-                console.log("❌ [useRunSSE] No se pudo cerrar la conexión correctamente.")
+                console.log("❌ [useRunSSE] No se pudo cerrar la conexión correctamente. (Cerrada fuera de disconnect() maybe)")
             }
             esRef.current = null;
         }
