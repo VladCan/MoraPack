@@ -147,6 +147,7 @@ public class RunManager {
     private final Map<String, SolucionProgramacion> solucionesAnteriores = new ConcurrentHashMap<>();
     private final Map<String, OcupacionPorAeropuerto> ocupacionesPorRun = new ConcurrentHashMap<>();
     private final Map<String, Set<String>> ventanasEnviadas = new ConcurrentHashMap<>();
+    private final Map<String, Set<VueloProgramadoId>> vuelosCanceladosPorRun = new ConcurrentHashMap<>();
     private static final Duration PICKUP_WAIT = Duration.ofHours(2);
 
     public void addContext(String idRun, RunContext context) {
@@ -221,6 +222,15 @@ public class RunManager {
      * Inicializa los catálogos compartidos PARA OPERACIÓN DIARIA si no están cargados
      */
 
+    //Registramos las cancelaciones de vuelos por runId
+    public void registrarCancelacionVuelo(String runId, VueloProgramadoId vueloProgramadoId){
+        vuelosCanceladosPorRun
+                .computeIfAbsent(runId, k -> ConcurrentHashMap.newKeySet())
+                .add(vueloProgramadoId);
+
+        System.out.println("[RunManager] Vuelo cancelado registrado para run "
+                + runId + ": " + vueloProgramadoId);
+    }
 
     /*Devolvemos el ahora simulado del run*/
     /*public Instant currentSimNow(RunId runId){
@@ -487,6 +497,16 @@ public class RunManager {
                 if (solucionAnterior != null) {
                     System.out.println("[RunManager] Antes de eliminarYActualizarCumplidosHasta: " + 
                         pedidosCargados.getLista().size() + " pedidos en cola");
+
+                    Set<VueloProgramadoId> vuelosCancelados = vuelosCanceladosPorRun.get(runId);
+                    if (!vuelosCancelados.isEmpty()) {
+                        System.out.println("[RunManager]: Procesando cancelaciones: " + vuelosCancelados.size());
+
+                        //Considerar si hay que colocar los vuelos cancelados en algun otro lado para enchufar en el TEG
+
+                        procesarCancelaciones(vuelosCancelados, solucionAnterior);
+                    }
+
                     pedidosCargados.eliminarYActualizarCumplidosHasta(wStart, solucionAnterior);
                     System.out.println("[RunManager] Después de eliminarYActualizarCumplidosHasta: " + 
                         pedidosCargados.getLista().size() + " pedidos en cola");
@@ -768,6 +788,13 @@ public class RunManager {
         pedidosCargados.ordenarPorUTC();
         System.out.println("[cargarPedidosDesdeQueue] Pedidos cargados: " + pedidosCargados.getLista().size());
 
+    }
+
+    private void procesarCancelaciones(Set<VueloProgramadoId> vuelosCancelados, SolucionProgramacion solucionAnterior){
+        /// Aca hay que poner la lógica
+        /// 1) Para cada vuelo de vuelosCancelados, recorrer toda la solucionProgramacion.
+        /// Podríamos también, para ahorrar tiempo, revisar si tiene carga asignada en CargaPorVuelo
+        /// 2) En cualquier caso, si tiene una ruta simplemente eliminarla como en los destructores del ALNS.
     }
 
 
