@@ -33,6 +33,7 @@ import toast from "react-hot-toast";
 import ToastCustom from "@/components/common/ToastCustom";
 import type { VueloDTO, PedidoDTO } from "@/hooks/useRunSSE";
 import { useFlightsSSE } from "@/hooks/useFlightsSSE";
+import type { CancelarVueloRequest, CancelarVueloResponse } from "@/types/vuelos";
 
 type NivelCarga = "disponible" | "limitado" | "saturado";
 
@@ -552,6 +553,7 @@ export default function ToolsPanel({
       {/* Selecciones principales (botones) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 relative">
         <FlightSelectCard
+          runId={currentRunId}
           label="Vuelo"
           icon={<Plane className="h-4 w-4" />}
           placeholder="Seleccionar vuelo"
@@ -883,6 +885,7 @@ function WarehouseSelectCard({
 }
 
 function FlightSelectCard({
+  runId,
   label,
   icon,
   placeholder,
@@ -892,6 +895,7 @@ function FlightSelectCard({
   scheduledFlights,
   showScheduledToggle,
 }: {
+  runId: string | null,
   label: string;
   icon: React.ReactNode;
   placeholder: string;
@@ -933,11 +937,63 @@ function FlightSelectCard({
     [currentItems, q, originFilter, destFilter]
   );
 
-  const handleCancelar = (vuelo: VueloDTO, e: React.MouseEvent) => {
+  const handleCancelar = async (vuelo: VueloDTO, e: React.MouseEvent) => {
     e.stopPropagation();
+
+    try {
+      const req : CancelarVueloRequest = {
+        origen: vuelo.origen,
+        destino: vuelo.destino,
+        salidaUtc: vuelo.salidaUtc,
+        llegadaUtc: vuelo.llegadaUtc
+      }
+
+      //Porseaca xd
+      if (runId == null) return;
+
+      const path = `vuelos/${runId}/cancelar`;
+
+      console.log("📤 [ToolsPanel] Request construido:", req);
+      console.log("🌐 [ToolsPanel] API URL:", import.meta.env.VITE_API_BASE_URL);
+
+      const [data, error] = await handleApi(
+        postJson<CancelarVueloResponse>(path, req)
+      )
+
+      if (error) {
+        // aquí tu toast o UI de error
+        console.error("❌ [ToolsPanel] Error al cancelar el vuelo:", error);
+        
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={error+"❗"}
+            type="error"
+          />),
+        { duration: 5000});
+
+      } else if (data) {
+        // éxito
+        console.log("✅ [ToolsPanel] Vuelo cancelado exitosamente:", data);
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={"Vuelo cancelado exitosamente!"+"✅"}
+            type="success"
+          />),
+        { duration: 5000});
+      }
+
+    }
+    catch(err) {
+      console.error("💥 [ToolsPanel] Error inesperado:", err);
+    }
+
+
+
     // TODO: Implementar cancelación de vuelo
     console.log("Cancelar vuelo:", vuelo.id);
-    toast.success(`Cancelación de vuelo ${vuelo.id} pendiente de implementar`);
+    //toast.success(`Cancelación de vuelo ${vuelo.id} pendiente de implementar`);
   };
 
   return (
