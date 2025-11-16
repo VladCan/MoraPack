@@ -250,7 +250,7 @@ public class RunManager {
                 .computeIfAbsent(runId, k -> ConcurrentHashMap.newKeySet())
                 .add(vueloProgramadoId);
 
-        System.out.println("[RunManager] Vuelo cancelado registrado para run "
+        System.out.println("[RunManager] \uD83D\uDEA9 Vuelo cancelado registrado para run "
                 + runId + ": " + vueloProgramadoId);
     }
 
@@ -529,6 +529,9 @@ public class RunManager {
                         //Considerar si hay que colocar los vuelos cancelados en algun otro lado para enchufar en el TEG
 
                         procesarCancelaciones(id, vuelosCancelados, solucionAnterior);
+
+                        /// Dejamos el set vacío (por ahora):
+                        vuelosCanceladosPorRun.get(id).clear();
                     }
 
                     pedidosCargados.eliminarYActualizarCumplidosHasta(wStart, solucionAnterior);

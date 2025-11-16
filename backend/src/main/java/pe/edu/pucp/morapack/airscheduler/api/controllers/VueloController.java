@@ -161,6 +161,7 @@ public class VueloController {
 
         //Primero, validamos
         if (body == null){
+            System.out.println("[VueloController - Cancelar ]El body es null");
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
         if (isBlank(runId) || isBlank(body.origen) || isBlank(body.destino) || isBlank(body.salidaUtc)) {
