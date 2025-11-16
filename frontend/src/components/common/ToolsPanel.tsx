@@ -91,27 +91,19 @@ export default function ToolsPanel({
   // Obtener vuelos planificados del día siguiente (solo en modo simulacion/operacion semanal)
   // IMPORTANTE: Solo consumir el endpoint si estamos en modo simulacion
   // Si no estamos en simulacion, no consumir ningún endpoint (evitar consumo innecesario)
-  const shouldFetchScheduled = variant === "simulacion";
+  const shouldFetchScheduled = variant === "simulacion" && !!currentRunId;
   
   // Construir el endpoint con el runId si está disponible
   const scheduledEndpoint = useMemo(() => {
-    if (!shouldFetchScheduled) return "vuelos/live?limit=0";
+    if (!shouldFetchScheduled) return null;
     const endpoint = "vuelos/scheduled/next-day";
     // Si hay un runId activo, pasarlo como parámetro
-    if (currentRunId) {
-      return `${endpoint}?runId=${currentRunId}`;
-    }
-    return endpoint;
+    return `${endpoint}?runId=${currentRunId}`;
   }, [shouldFetchScheduled, currentRunId]);
   
-  const { data: scheduledFlightsRaw, connected: scheduledConnected } = useFlightsSSE(scheduledEndpoint);
+  const { data: scheduledFlightsRaw } = useFlightsSSE(scheduledEndpoint);
   
-  // Debug solo en modo simulacion
-  if (variant === "simulacion") {
-    console.log('[ToolsPanel] Variant: simulacion - Cargando vuelos programados del día siguiente');
-    console.log('[ToolsPanel] Scheduled flights raw:', scheduledFlightsRaw);
-    console.log('[ToolsPanel] Scheduled connected:', scheduledConnected);
-  }
+  // Debug desactivado
   
   const vuelosProgramados = useMemo<VueloDTO[]>(() => {
     // Solo procesar si estamos en modo simulacion (operacion semanal)
@@ -120,11 +112,8 @@ export default function ToolsPanel({
     }
     
     if (!scheduledFlightsRaw || !Array.isArray(scheduledFlightsRaw)) {
-      console.log('[ToolsPanel] No hay datos raw o no es array');
       return [];
     }
-    
-    console.log('[ToolsPanel] Procesando', scheduledFlightsRaw.length, 'vuelos raw del día siguiente');
     
     // Convertir los datos del endpoint a VueloDTO
     const result = scheduledFlightsRaw.map((v: any) => ({
@@ -140,7 +129,6 @@ export default function ToolsPanel({
       carga: v.carga || [],
     })).filter((v: VueloDTO) => v.id && v.origen && v.destino);
     
-    console.log('[ToolsPanel] Vuelos programados del día siguiente filtrados:', result.length);
     return result;
   }, [scheduledFlightsRaw, shouldFetchScheduled]);
 
@@ -215,10 +203,6 @@ export default function ToolsPanel({
       return lastWindow?.vuelos ?? [];
     }
     
-    console.log('[ToolsPanel] Vuelos EN EL AIRE:', resultado.length);
-    console.log('[ToolsPanel] simNowUtc:', simNowUtc);
-    console.log('[ToolsPanel] windows.length:', windows.length);
-    console.log('[ToolsPanel] Total vuelos en windows:', windows.reduce((sum, w) => sum + w.vuelos.length, 0));
     return resultado;
   }, [windows, simNowUtc]);
 
@@ -256,9 +240,6 @@ export default function ToolsPanel({
       return lastWindow?.pedidos ?? [];
     }
 
-    console.log('[ToolsPanel] Pedidos EN VUELO:', resultado.length);
-    console.log('[ToolsPanel] Pedidos IDs en vuelo:', Array.from(pedidosEnVueloSet));
-    console.log('[ToolsPanel] Total pedidos en último window:', lastWindow?.pedidos?.length || 0);
     return resultado;
   }, [windows, simNowUtc]);
 
@@ -288,16 +269,9 @@ export default function ToolsPanel({
   const [loading, setLoading] = useState(false);
 
   const handleRun = async () => {
-    console.log("🚀 [ToolsPanel] Iniciando run...");
-    console.log("📅 [ToolsPanel] Fechas seleccionadas:", { inicio, fin });
-    console.log("📊 [ToolsPanel] Variant:", variant);
-    
     setLoading(true);
     try {
       const req = buildStartRunRequest(variant, {inicio, fin});
-
-      console.log("📤 [ToolsPanel] Request construido:", req);
-      console.log("🌐 [ToolsPanel] API URL:", import.meta.env.VITE_API_BASE_URL);
 
       const [data, error] = await handleApi(
         postJson<StartRunResponse>("runs", req)
@@ -317,7 +291,6 @@ export default function ToolsPanel({
 
       } else if (data) {
         // éxito
-        console.log("✅ [ToolsPanel] Simulación iniciada exitosamente:", data);
         toast.custom((t) => (
           <ToastCustom
             t={t}
@@ -331,8 +304,6 @@ export default function ToolsPanel({
 
         //setShowContent(false); //opcional para cerrar el panel
         //navigate("/simulacion"); 
-
-        console.log("🎯 [ToolsPanel] Run iniciado con ID:", data.runId);
       }
     } catch (err) {
       console.error("💥 [ToolsPanel] Error inesperado:", err);
@@ -953,9 +924,6 @@ function FlightSelectCard({
 
       const path = `vuelos/${runId}/cancelar`;
 
-      console.log("📤 [ToolsPanel] Request construido:", req);
-      console.log("🌐 [ToolsPanel] API URL:", import.meta.env.VITE_API_BASE_URL);
-
       const [data, error] = await handleApi(
         postJson<CancelarVueloResponse>(path, req)
       )
@@ -974,7 +942,6 @@ function FlightSelectCard({
 
       } else if (data) {
         // éxito
-        console.log("✅ [ToolsPanel] Vuelo cancelado exitosamente:", data);
         toast.custom((t) => (
           <ToastCustom
             t={t}
@@ -991,9 +958,7 @@ function FlightSelectCard({
 
 
 
-    // TODO: Implementar cancelación de vuelo
-    console.log("Cancelar vuelo:", vuelo.id);
-    //toast.success(`Cancelación de vuelo ${vuelo.id} pendiente de implementar`);
+    // TODO: Implementar cancelación de vuelo (acciones adicionales si aplica)
   };
 
   return (
