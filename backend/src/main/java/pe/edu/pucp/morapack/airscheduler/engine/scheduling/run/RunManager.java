@@ -763,8 +763,14 @@ public class RunManager {
                 /// 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
                 final Instant wStartFinal = wStart;
                 final Instant wEndFinal = wEnd;
+                
+                // En operación diaria, incluir vuelos que salen dentro del horizonte completo (24 horas)
+                // porque las ventanas son de 1 minuto pero los vuelos se planifican hasta 24h adelante
+                final Instant finExtraccion = config.scenario() == RunConfig.Scenario.OPERACION 
+                    ? wStart.plus(config.horizon())  // wStart + 24 horas
+                    : wEndFinal;                      // Para otros escenarios, usar wEnd normal
 
-                List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStartFinal, wEndFinal);
+                List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStartFinal, finExtraccion);
 
                 // IMPORTANTE: Enviar TODOS los pedidos procesados (incluye parciales de ventanas anteriores)
                 // para que el frontend vea el estado actualizado de cada pedido
