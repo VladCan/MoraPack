@@ -522,6 +522,7 @@ public class RunManager {
 
                     Set<VueloProgramadoId> vuelosCancelados =
                             vuelosCanceladosPorRun.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
+                    //
 
                     if (!vuelosCancelados.isEmpty()) {
                         System.out.println("[RunManager]: Procesando cancelaciones: " + vuelosCancelados.size());
