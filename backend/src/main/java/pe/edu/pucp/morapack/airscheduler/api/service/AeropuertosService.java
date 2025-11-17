@@ -32,6 +32,7 @@ public class AeropuertosService {
 
     @PostConstruct
     void init() {
+
         // CORRECCIÓN: Llamar a la versión genérica con el nombre del archivo
         Optional<Scanner> scOpt = archivoManager.getScannerForDataFile(FILENAME); 
         

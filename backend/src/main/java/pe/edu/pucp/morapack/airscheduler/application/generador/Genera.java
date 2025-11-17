@@ -37,7 +37,7 @@ public class Genera {
     public static void generarArchivo(Path ruta, int cantidadPedidos, int horasHorizonte) {
         // 1) Cargar GMT por aeropuerto
         AeropuertosMap aMap = new AeropuertosMap();
-        try (Scanner sc = ArchivoUtils.getScannerFromResource(AIRPORTS_RESOURCE)) {
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(AIRPORTS_RESOURCE)) {
             if (sc == null)
                 throw new IllegalStateException("No se pudo abrir " + AIRPORTS_RESOURCE);
             aMap.leerDatos(sc);

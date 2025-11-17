@@ -54,7 +54,7 @@ public class GeneraP {
      */
     public static void generarArchivo(Path baseRuta, int cantidadPedidos, int horasHorizonte) {
         AeropuertosMap aMap = new AeropuertosMap();
-        try (Scanner sc = ArchivoUtils.getScannerFromResource(AIRPORTS_RESOURCE)) {
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(AIRPORTS_RESOURCE)) {
             if (sc == null)
                 throw new IllegalStateException("No se pudo abrir " + AIRPORTS_RESOURCE);
             aMap.leerDatos(sc);

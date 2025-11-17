@@ -5,9 +5,14 @@ public record VuelosEdge(
         AereopuertoNode destino,
         Type tipo,
         int capacidad,
-        Vuelo vuelo
+        Vuelo vuelo,
+        String idInstancia
 ) {
     public enum Type { FLIGHT, WAIT, SUPPLY }
+
+    public VuelosEdge(AereopuertoNode salida, AereopuertoNode destino, Type tipo, int capacidad, Vuelo vuelo) {
+        this(salida, destino, tipo, capacidad, vuelo, null);
+    }
 
     public boolean isFlight()  { return tipo == Type.FLIGHT; }
     public boolean isWait()    { return tipo == Type.WAIT; }
