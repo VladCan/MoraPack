@@ -92,7 +92,7 @@ public class GeneraCancel {
         Path out = Paths.get("E:\\PUCP\\2025-2\\DP1\\MoraPack\\backend\\target\\classes");
         AeropuertosMap aeropuertosMap = new AeropuertosMap();
 
-        try (Scanner sc = ArchivoUtils.getScannerFromResource("c.1inf54.25.2.Aeropuerto.husos.v1.20250818__estudiantes.txt")) {
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath("c.1inf54.25.2.Aeropuerto.husos.v1.20250818__estudiantes.txt")) {
             if (sc == null) {
                 System.err.println("No se pudo abrir el archivo de aeropuertos.");
                 return;
@@ -102,7 +102,7 @@ public class GeneraCancel {
 
         VuelosMap mapa = new VuelosMap(aeropuertosMap);
 
-        try (Scanner sc = ArchivoUtils.getScannerFromResource("c.1inf54.25.2.planes_vuelo.v4.20250818.txt")) {
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath("c.1inf54.25.2.planes_vuelo.v4.20250818.txt")) {
             if (sc == null) {
                 System.err.println("No se pudo abrir el archivo de vuelos.");
                 return;
