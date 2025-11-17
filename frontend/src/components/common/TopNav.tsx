@@ -54,7 +54,7 @@ export default function TopNav() {
   const running = status === "running" && !!runId;
   
   //Acá expone connect(url, handlers) -> () => void
-  const { simNowUtc, windows, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(
+  const { simNowUtc, windows, finished, wallStartUtc, disconnect } = useRunSSE(
     status === "running" && runId ? runId : undefined
   );
 
