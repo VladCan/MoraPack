@@ -6,13 +6,14 @@ import type { FlightLiveDTO } from "@/types/api";
  * Suscribe a vuelos en vivo via SSE.
  */
 // 🛑 CORRECCIÓN 1: El valor por defecto no debe tener barra inicial
-export function useFlightsSSE(endpoint: string = "vuelos/live?limit=50") {
+export function useFlightsSSE(endpoint?: string | null) {
     const [data, setData] = useState<FlightLiveDTO[]>([]);
     const [connected, setConnected] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
     // Construye URL absoluta de forma segura (evita /api/vuelos/live)
     const fullUrl = useMemo(() => {
+        if (!endpoint) return null;
         const base = import.meta.env.VITE_API_BASE_URL as string | undefined; // Base: https://.../api/ (DEBE tener barra final)
         
         // 1. Lógica robusta: Eliminar la barra inicial del endpoint si existe (para evitar que new URL() anule la base).
@@ -32,7 +33,13 @@ export function useFlightsSSE(endpoint: string = "vuelos/live?limit=50") {
     }, [endpoint]);
 
     useEffect(() => {
-        if (!fullUrl) return;
+        if (!fullUrl) {
+            // Resetear estado cuando no hay endpoint (deshabilitado)
+            setConnected(false);
+            setError(null);
+            setData([]);
+            return;
+        }
 
         // La URL (fullUrl) ahora debe ser correcta (e.g., https://.../api/vuelos/live?limit=200)
         const es = new EventSource(fullUrl, { withCredentials: false });

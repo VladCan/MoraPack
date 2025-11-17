@@ -12,6 +12,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoManager;
 // Imports para la lógica de planificación
@@ -46,7 +47,11 @@ public class RunManager {
     private static final String AEROPUERTOS_FILENAME = "aereopuertos.txt";
     private static final String VUELOS_FILENAME = "vuelos.txt";
     private static final String PEDIDOS_FILENAME = "pedidos.txt";
+
+    private static boolean firstExecution = false;
+
     private static final String VUELOS_CANCELADOS_FILENAME = "vuelos_cancelados.txt";
+
 
     private final ExecutorService executor = Executors.newCachedThreadPool((r -> {
         Thread t = new Thread(r, "run-" + UUID.randomUUID());
@@ -66,7 +71,36 @@ public class RunManager {
 
     public String currentOperacionRunId(){ return operacionRunId.get(); }
     public boolean hasActiveOperacionRunId(){ return operacionRunId.get() != null; }
+    
+    /**
+     * Obtiene el último run activo (con estado RUNNING) de cualquier tipo.
+     * Útil para obtener vuelos programados cuando no hay run de operación activo.
+     * 
+     * @return ID del último run activo, o null si no hay ninguno
+     */
+    public String getLastActiveRunId() {
+        // Buscar el último run con estado RUNNING
+        return states.entrySet().stream()
+                .filter(entry -> entry.getValue() == RunState.RUNNING)
+                .map(Map.Entry::getKey)
+                .max((id1, id2) -> {
+                    // Ordenar por fecha de inicio del contexto (más reciente primero)
+                    RunContext ctx1 = contexts.get(id1);
+                    RunContext ctx2 = contexts.get(id2);
+                    if (ctx1 == null || ctx2 == null) return 0;
+                    return ctx1.wallAnchor().compareTo(ctx2.wallAnchor());
+                })
+                .orElse(null);
+    }
 
+    public boolean requestCancel(String runId){
+        AtomicBoolean flag = cancelled.get(runId);
+        if (flag == null) {
+            return false;      // runId desconocido (ya terminó o nunca existió)
+        }
+        flag.set(true);
+        return true;
+    }
 
     public void pushOrder(String runId, Pedido p){
         //queues.computeIfAbsent(runId, k -> new ConcurrentLinkedQueue<>()).add(p);
@@ -80,6 +114,13 @@ public class RunManager {
                 "[RunManager] Pedido agregado a cola (runId=%s). Tamaño actual: %d%n",
                 runId, queue.size()
         );
+    }
+
+    public void pushOrders(String runId, List<Pedido> pedidos){
+        var queue = queues.computeIfAbsent(runId, k -> new ConcurrentLinkedQueue<>());
+        for (Pedido p : pedidos) queue.add(p);
+        System.out.printf("[RunManager] Se encolaron %d pedidos (runId=%s). Tamaño actual: %d%n",
+                pedidos.size(), runId, queue.size());
     }
 
     //
@@ -133,6 +174,7 @@ public class RunManager {
     private final Map<String, SolucionProgramacion> solucionesAnteriores = new ConcurrentHashMap<>();
     private final Map<String, OcupacionPorAeropuerto> ocupacionesPorRun = new ConcurrentHashMap<>();
     private final Map<String, Set<String>> ventanasEnviadas = new ConcurrentHashMap<>();
+    private final Map<String, Set<VueloProgramadoId>> vuelosCanceladosPorRun = new ConcurrentHashMap<>();
     private static final Duration PICKUP_WAIT = Duration.ofHours(2);
 
     public void addContext(String idRun, RunContext context) {
@@ -220,6 +262,15 @@ public class RunManager {
      * Inicializa los catálogos compartidos PARA OPERACIÓN DIARIA si no están cargados
      */
 
+    //Registramos las cancelaciones de vuelos por runId
+    public void registrarCancelacionVuelo(String runId, VueloProgramadoId vueloProgramadoId){
+        vuelosCanceladosPorRun
+                .computeIfAbsent(runId, k -> ConcurrentHashMap.newKeySet())
+                .add(vueloProgramadoId);
+
+        System.out.println("[RunManager] \uD83D\uDEA9 Vuelo cancelado registrado para run "
+                + runId + ": " + vueloProgramadoId);
+    }
 
     /*Devolvemos el ahora simulado del run*/
     /*public Instant currentSimNow(RunId runId){
@@ -341,29 +392,64 @@ public class RunManager {
 
                 System.out.println("Salí del bucle, mi id es:" + id);
 
+
+                firstExecution = true;
+
+                if (firstExecution) {
+                    System.out.println("Ahora firstExecution es:" + firstExecution);
+                }
+
                 // Fin normal
                 states.put(id, RunState.COMPLETED);
                 broadcastFinished(id, StopReason.FIN_DE_RANGO);
+
+                // Limpiamos
+                // Solución rápida:
+                aeropuertosMap = null;
+                vuelosMap = null;
+                pedidosCargados = null;
 
             }
             catch (Throwable e){
                 states.put(id, RunState.FAILED);
                 broadcastFinished(id, StopReason.ERROR);
             }
+            finally {
+                cleanupRunState(id);
+            }
 
         });
     }
 
-    private void sleepToEndWindow(String id, Instant wEnd){
+    private void cleanupRunState(String id) {
+        //try { unregisterAllListeners(id); } catch (Throwable ignored) {}
+
+        contexts.remove(id);
+        states.remove(id);
+        paused.remove(id);
+        cancelled.remove(id);
+
+        // estructuras por run:
+        ventanasEnviadas.remove(id);
+        solucionesAnteriores.remove(id);
+        ocupacionesPorRun.remove(id);
+        //queues.remove(id);          // si existe
+    }
+
+    private boolean isCancelled(String id){
+        return cancelled.get(id).get();
+    }
+
+    private boolean sleepToEndWindow(String id, Instant wEnd){
         //Acá vamos a que el reloj simulado cruce el fin de ventana
         while (true){
             //En caso de existir pausa o cancelación (por ahora, esto no ocurrirá)
-            if (cancelled.get(id).get()) break;
+            if (isCancelled(id)) return true;
 
             while (paused.get(id).get() && !cancelled.get(id).get()) {
                 sleepQuietly(Duration.ofMillis(100)); // dormimos cortito mientras esté pausado
             }
-            if (cancelled.get(id).get()) break;
+            if (isCancelled(id)) return true;
 
             Instant simNow = currentSimNow(id);
 
@@ -387,7 +473,9 @@ public class RunManager {
             long napMs = Math.min(Math.max(remainingRealMs, 50L), 500L);
             sleepQuietly(Duration.ofMillis(napMs));
 
+            if (isCancelled(id)) return true;
         }
+        return false;
     }
 
     /// Funciones para cada escenario.
@@ -405,15 +493,22 @@ public class RunManager {
         System.out.println("[RunManager] Config: fechaInicio=" + config.fechaInicio() + ", fechaFin=" + config.fechaFin());
         System.out.println("[RunManager] Ventana inicial: wStart=" + wStart + ", wEnd=" + wEnd);
 
-        while (!cancelled.get(id).get() && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
+        System.out.println("Dentro de runSimulación firstExecution es:" + firstExecution);
+
+        while (!isCancelled(id) && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
             /// Revisar esto:
             // Pausa cooperativa entre ventanas
-            while (paused.get(id).get() && !cancelled.get(id).get()) {
+            while (paused.get(id).get() && !isCancelled(id)) {
                 sleepQuietly(Duration.ofMillis(80));
             }
-            if (cancelled.get(id).get()) break;
+            if (isCancelled(id)) break;
 
             // ===== LÓGICA DE PLANIFICACIÓN POR VENTANAS =====
+
+            if (firstExecution){
+                System.out.println("Soy true");
+                int a = 0;
+            }
 
             // Inicializar catálogos si es necesario
             inicializarCatalogos(config.scenario());
@@ -442,6 +537,22 @@ public class RunManager {
                 if (solucionAnterior != null) {
                     System.out.println("[RunManager] Antes de eliminarYActualizarCumplidosHasta: " + 
                         pedidosCargados.getLista().size() + " pedidos en cola");
+
+                    Set<VueloProgramadoId> vuelosCancelados =
+                            vuelosCanceladosPorRun.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
+                    //
+
+                    if (!vuelosCancelados.isEmpty()) {
+                        System.out.println("[RunManager]: Procesando cancelaciones: " + vuelosCancelados.size());
+
+                        //Considerar si hay que colocar los vuelos cancelados en algun otro lado para enchufar en el TEG
+
+                        procesarCancelaciones(id, vuelosCancelados, solucionAnterior);
+
+                        /// Dejamos el set vacío (por ahora):
+                        vuelosCanceladosPorRun.get(id).clear();
+                    }
+
                     pedidosCargados.eliminarYActualizarCumplidosHasta(wStart, solucionAnterior);
                     System.out.println("[RunManager] Después de eliminarYActualizarCumplidosHasta: " + 
                         pedidosCargados.getLista().size() + " pedidos en cola");
@@ -461,7 +572,8 @@ public class RunManager {
                             convertirPedidosADTO(List.of(), null)));
 
                     //Llamamos al sleep (para que el reloj simulado cruce fin de ventana):
-                    sleepToEndWindow(id, wEnd);
+                    //Si se cancela durante el sleep, salimos del bucle
+                    if (sleepToEndWindow(id, wEnd)) break;
 
                     // Avanzar a la siguiente ventana antes de continuar
                     idx++;
@@ -469,6 +581,8 @@ public class RunManager {
                     wEnd = wEnd.plus(config.horasVentana());
                     continue;
                 }
+
+                if (isCancelled(id)) break;
 
                 // 3. Construir TEG para la ventana
                 Instant finTEG = wEnd.plus(config.horizon());
@@ -506,6 +620,8 @@ public class RunManager {
                 ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto);
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
+                if (isCancelled(id)) break;
+
                 // 6. Guardar solución para la siguiente ventana y sincronizar ocupación
                 actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
                 solucionesAnteriores.put(id, solucionOptima);
@@ -513,12 +629,16 @@ public class RunManager {
                 // 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
                 final Instant wStartFinal = wStart;
                 final Instant wEndFinal = wEnd;
-                
+
+                if (isCancelled(id)) break;
+
                 List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStartFinal, wEndFinal);
                 
                 // IMPORTANTE: Enviar TODOS los pedidos procesados (incluye parciales de ventanas anteriores)
                 // para que el frontend vea el estado actualizado de cada pedido
                 List<Object> pedidosVentanaDTO = convertirPedidosADTO(pedidosVentana, solucionOptima);
+
+                //Esto es para depurar
 
                 // 8. Marcar ventana como enviada y hacer broadcast
                 ventanasEnviadasRun.add(windowIdISO);
@@ -533,7 +653,7 @@ public class RunManager {
             }
 
             //Llamamos al sleep (para que el reloj simulado cruce fin de ventana):
-            sleepToEndWindow(id, wEnd);
+            if (sleepToEndWindow(id, wEnd)) break;
 
             // Siguiente ventana
             idx++;
@@ -718,8 +838,118 @@ public class RunManager {
 
         //Realizamos el mismo proceso de normalizar y ordenar
         pedidosCargados.normalizarUtc(aeropuertosMap);
-        pedidosCargados.ordenarPorUTC();
+            pedidosCargados.ordenarPorUTC();
         System.out.println("[cargarPedidosDesdeQueue] Pedidos cargados: " + pedidosCargados.getLista().size());
+
+    }
+
+    private void procesarCancelaciones(String runId, Set<VueloProgramadoId> vuelosCancelados, SolucionProgramacion solucionAnterior){
+        /// Aca hay que poner la lógica
+        /// 1) Para cada vuelo de vuelosCancelados, recorrer toda la solucionProgramacion.
+        /// Podríamos también, para ahorrar tiempo, revisar si tiene carga asignada en CargaPorVuelo
+        /// 2) En cualquier caso, si tiene una ruta simplemente eliminarla como en los destructores del ALNS.
+
+
+        CargaPorVuelo cargaPorVuelo = solucionAnterior.getCargaPorVuelo();
+        Map<VueloProgramadoId, Integer> asignados = solucionAnterior.getCargaPorVuelo().getAsignado();
+        Map<Integer, PlanPedido> planes = solucionAnterior.asMap();
+        OcupacionPorAeropuerto ocupacionPorAeropuerto = ocupacionesPorRun.get(runId);
+
+
+        /// 1) Con esto nos quedamos solamente con los vuelos cancelados que tienen carga asignada
+        Set<VueloProgramadoId> canceladosConCarga = vuelosCancelados.stream()
+                .filter(v -> cargaPorVuelo.getAsignado().containsKey(v))
+                .collect(Collectors.toSet());
+
+        //Si no hay vuelos con carga:
+        if (canceladosConCarga.isEmpty()) {
+            System.out.println("[Cancel] No hay vuelos cancelados con carga. Nada que hacer.");
+            return;
+        }
+
+        //Caso contrario:
+        System.out.println("[Cancel] Vuelos cancelados con carga: " + canceladosConCarga.size());
+
+        /// 2) Ahora, recorremos cada pedido una única vez
+        for (PlanPedido plan : planes.values()) {
+            List<RutaAsignada> rutas = plan.getRutas();
+            List<RutaAsignada> rutasFiltradas = new ArrayList<>();
+
+            //Para trackear si se eliminó como mínimo 1 ruta
+            boolean deleted = false;
+
+            //Recorremos cada ruta (ej: una ruta es A->B->C->D)
+
+            for (RutaAsignada ruta : rutas) {
+                boolean rutaVueloCancelado = ruta.getTramos().stream()
+                        .map(TramoAsignado::getVuelo)
+                        .anyMatch(canceladosConCarga::contains);
+
+                //Si es que tiene un vuelo cancelado
+                if (rutaVueloCancelado) {
+                    int qRuta = ruta.getCantidad();
+                    final List<TramoAsignado> tr = ruta.getTramos();
+
+                    //Acá liberamos las capacidades de los almacenes que están en la ruta + 2h de espera
+
+                    //1) ESCALAS: liberar [llegada(tr i), salida(tr i+1)) en aeropuerto destino del tramo
+                    for (int i = 0; i < tr.size() - 1; i++) {
+                        TramoAsignado tPrev = tr.get(i);
+                        TramoAsignado tNext = tr.get(i + 1);
+
+                        String apEscala = tPrev.getVuelo().getDestino();
+                        Instant ini = tPrev.getLlegadaUtc();
+                        Instant fin = tNext.getVuelo().getSalidaUtc();
+
+                        if (ini != null && fin != null && ini.isBefore(fin)) {
+                            ocupacionPorAeropuerto.liberar(apEscala, ini, fin, qRuta);
+                        }
+                    }
+
+                    // 2) DESTINO FINAL: liberar +2h
+                    TramoAsignado last = tr.get(tr.size() - 1);
+                    String apFinal = last.getVuelo().getDestino();
+                    Instant arr = last.getLlegadaUtc();
+                    if (arr != null) {
+                        Instant fin2h = arr.plus(Duration.ofHours(2));
+                        ocupacionPorAeropuerto.liberar(apFinal, arr, fin2h, qRuta);
+                    }
+
+                    // 3) CARGA EN VUELOS: revertir asignaciones por tramo
+                    /// Igual sospecho que esto es innecesario, ya que el vuelo se va a cancelar xd
+                    for (TramoAsignado t : tr) {
+                        int qTramo = t.getCantidad();                      // usa la cantidad efectiva del tramo
+                        if (qTramo != 0) {
+                            solucionAnterior.getCargaPorVuelo().asignar(t.getVuelo(), -qTramo);
+                        }
+                    }
+
+                    deleted = true;
+                }
+                else {
+                    rutasFiltradas.add(ruta);
+                }
+
+            }
+
+            //Si se eliminó una ruta como mínimo
+            if (deleted){
+                PlanPedido nuevo = PlanPedido.builder()
+                        .idPedido(plan.getIdPedido())
+                        .aeropuertoDestino(plan.getAeropuertoDestino())
+                        .creadoUtc(plan.getCreadoUtc())
+                        .demanda(plan.getDemanda())
+                        .rutas(rutasFiltradas)
+                        .build();
+                solucionAnterior.getPlanPorPedido().put(nuevo.getIdPedido(), nuevo);
+
+
+                System.out.println("[Cancel]   Pedido " + plan.getIdPedido()
+                        + " → rutas después de cancelar: " + rutasFiltradas.size());
+            }
+        }
+
+        int x = 0;
 
     }
 
@@ -1226,6 +1456,99 @@ public class RunManager {
         }
         
         return pedidosDTO;
+    }
+
+    /**
+     * Obtiene todos los vuelos planificados del día siguiente desde el tiempo actual de simulación.
+     * Incluye vuelos planificados incluso si ya despegaron o no, siempre que su salida esté
+     * dentro de las próximas 24 horas desde el tiempo actual.
+     * 
+     * @param runId ID del run para obtener la solución y el tiempo actual
+     * @return Lista de vuelos planificados (DTOs) sin límite de cantidad
+     */
+    public List<Map<String, Object>> getScheduledFlightsNextDay(String runId) {
+        List<Map<String, Object>> vuelosPlanificados = new ArrayList<>();
+        
+        try {
+            System.out.println("[RunManager] getScheduledFlightsNextDay - runId: " + runId);
+            
+            // Obtener el tiempo actual de simulación
+            Instant simNow = currentSimNow(runId);
+            System.out.println("[RunManager] simNow: " + simNow);
+            
+            // Calcular el límite del día siguiente (simNow + 24 horas)
+            Instant simNowNextDay = simNow.plus(Duration.ofHours(24));
+            System.out.println("[RunManager] simNowNextDay: " + simNowNextDay);
+            
+            // Obtener la solución actual
+            SolucionProgramacion solucion = solucionesAnteriores.get(runId);
+            if (solucion == null || solucion.getCargaPorVuelo() == null) {
+                System.out.println("[RunManager] No hay solución para runId: " + runId);
+                return vuelosPlanificados; // Retornar lista vacía si no hay solución
+            }
+            
+            CargaPorVuelo cargaPorVuelo = solucion.getCargaPorVuelo();
+            System.out.println("[RunManager] Total vuelos en solución: " + cargaPorVuelo.getAsignado().size());
+            
+            // Iterar sobre todos los vuelos planificados (incluso sin carga asignada para mostrar todos)
+            // Pero para simplificar, solo incluimos vuelos con carga asignada (vuelos realmente usados)
+            for (Map.Entry<VueloProgramadoId, Integer> entry : cargaPorVuelo.getAsignado().entrySet()) {
+                VueloProgramadoId vueloId = entry.getKey();
+                
+                // Incluir vuelos planificados del día siguiente
+                // Solo incluimos vuelos cuya salida está en el futuro desde simNow hasta simNow + 24 horas
+                // Esto permite cancelar vuelos antes de que despeguen
+                // Nota: Si un vuelo ya despegó (salida < simNow), no tiene sentido mostrarlo para cancelarlo
+                if (vueloId.getSalidaUtc() != null) {
+                    Instant salida = vueloId.getSalidaUtc();
+                    
+                    // Incluir vuelos planificados del día siguiente (desde simNow hasta simNow + 24 horas)
+                    // Solo vuelos futuros que aún no han despegado
+                    // IMPORTANTE: Solo incluir vuelos cuya salida está en el futuro (>= simNow)
+                    // y dentro de las próximas 24 horas (<= simNow + 24h)
+                    if (!salida.isBefore(simNow) && !salida.isAfter(simNowNextDay)) {
+                        // Generar ID único para el vuelo
+                        String vueloIdStr = vueloId.getOrigen() + "-" + 
+                                           vueloId.getDestino() + "-" + 
+                                           vueloId.getSalidaUtc().toString().replace(":", "");
+                        
+                        // Crear DTO del vuelo
+                        Map<String, Object> vueloDTO = new HashMap<>();
+                        vueloDTO.put("id", vueloIdStr);
+                        vueloDTO.put("origen", vueloId.getOrigen());
+                        vueloDTO.put("destino", vueloId.getDestino());
+                        vueloDTO.put("salidaUtc", vueloId.getSalidaUtc().toString());
+                        vueloDTO.put("llegadaUtc", vueloId.getLlegadaUtc() != null ? vueloId.getLlegadaUtc().toString() : null);
+                        vueloDTO.put("cantidadAsignada", entry.getValue());
+                        vueloDTO.put("capacidad", cargaPorVuelo.capacidad(vueloId));
+                        vueloDTO.put("residual", cargaPorVuelo.residual(vueloId));
+                        vueloDTO.put("costo", vueloId.getCosto());
+                        
+                        // Extraer manifiesto de carga (qué pedidos van en este vuelo)
+                        List<Map<String, Object>> carga = extraerCargaDelVuelo(solucion, vueloId);
+                        vueloDTO.put("carga", carga);
+                        
+                        vuelosPlanificados.add(vueloDTO);
+                    }
+                }
+            }
+            
+            System.out.println("[RunManager] Vuelos planificados del día siguiente encontrados: " + vuelosPlanificados.size());
+            
+            // Ordenar por hora de salida
+            vuelosPlanificados.sort((a, b) -> {
+                String salidaA = (String) a.get("salidaUtc");
+                String salidaB = (String) b.get("salidaUtc");
+                if (salidaA == null || salidaB == null) return 0;
+                return salidaA.compareTo(salidaB);
+            });
+            
+        } catch (Exception e) {
+            System.err.println("[RunManager] Error obteniendo vuelos planificados del día siguiente para runId " + runId + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return vuelosPlanificados;
     }
 
 }

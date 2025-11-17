@@ -71,4 +71,13 @@ public class ArchivoUtils {
             return null;
         }
     }
+
+
+    //Esto usamos en OperacionDiariaController
+    public static Scanner getScanner(InputStream is) {
+        if (is == null) return null;
+        return new Scanner(is);
+    }
+
 }
+

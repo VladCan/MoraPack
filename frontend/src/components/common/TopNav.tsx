@@ -13,6 +13,11 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ModeToggle } from "../ui/mode-toggle";
 import { useRunSession } from "@/lib/runSession";
 import { useRunSSE } from "@/hooks/useRunSSE";
+import ClockSwitcher from "./ClockSwitcher";
+import { handleApi, postJson } from "@/services/api";
+import toast from "react-hot-toast";
+import ToastCustom from "@/components/common/ToastCustom";
+import type { CancelRunResponse } from "@/types/runs";
 
 const tabs = [
   { to: "/registrar", label: "Registrar envío" },
@@ -43,10 +48,13 @@ export default function TopNav() {
   //Esto es para la conexión SSE de la solución
 
   //Traemos el contexto
-  const { runId, status, end, setSimNow, setWindow } = useRunSession();
+  const { runId, status, end, setSimNow, setWindow, reset } = useRunSession();
+
+  //Para el reloj
+  const running = status === "running" && !!runId;
   
   //Acá expone connect(url, handlers) -> () => void
-  const { simNowUtc, windows, finished } = useRunSSE(
+  const { simNowUtc, windows, finished, wallStartUtc, disconnect } = useRunSSE(
     status === "running" && runId ? runId : undefined
   );
 
@@ -73,7 +81,64 @@ export default function TopNav() {
     if (finished) end("finished");
   }, [finished, end]);
 
-    
+  //Para finalizar/cancelar el run:
+  const handleCancelRun = async () => {
+    if (!runId) return;
+
+    //const base = import.meta.env.VITE_API_BASE_URL
+    //const base = import.meta.env.prod.VITE_API_BASE_URL
+
+    const path = `runs/${runId}/cancel`;
+
+    const [data, error] = await handleApi(
+      postJson<CancelRunResponse>(path)
+    )
+
+    if (error) {
+        // aquí tu toast o UI de error
+        console.error("❌ [ToolsPanel] Error al finalizar la simulación:", error);
+        //alert(`Error al iniciar simulación: ${error.message}`);
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={error+"❗"}
+            type="error"
+          />),
+        { duration: 5000});
+    }
+    else if (data) {
+      if (data.cancelled){
+        console.log("✅ [ToolsPanel] Simulación finalizada exitosamente:", data);
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={"¡Simulación finalizada exitosamente!"+"✅"}
+            type="success"
+          />),
+        { duration: 5000});
+
+        //Cortamos el SSE
+        disconnect();
+
+        //Limpiamos el contexto de la simulación
+        reset();
+
+      }
+      else{
+        console.error("❌ [ToolsPanel] Error al finalizar la simulación:", error);
+        //alert(`Error al iniciar simulación: ${error.message}`);
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={error+"❗"}
+            type="error"
+          />),
+        { duration: 5000});
+      }
+    }
+
+  }  
+
 
   return (
     <header className="fixed top-0 left-0 z-50 w-full h-16">
@@ -170,7 +235,13 @@ export default function TopNav() {
           <>
             {/* Desktop: reloj fijo */}
             <div className="hidden md:block">
-              <NavClock className="fixed top-2 right-3 z-[50] shrink-0 whitespace-nowrap" />
+              <ClockSwitcher
+                running={running}
+                finished={!!finished}
+                runNow={simNowUtc ? new Date(simNowUtc) : null}
+                runStart={wallStartUtc ? new Date(wallStartUtc) : null}
+                onCancel={handleCancelRun}
+              />
             </div>
 
             {/* ===== MÓVIL: FAB reloj (izquierda) ===== */}
@@ -221,7 +292,7 @@ export default function TopNav() {
             </button>
           )}
 
-          {showContent && (
+          {showContent && ( 
             <>
               <div className="mt-1 p-2 rounded-md text-foreground">
                 {currentContent}

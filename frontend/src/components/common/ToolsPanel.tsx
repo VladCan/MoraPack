@@ -10,6 +10,8 @@ import {
   Check,
   ChevronDown,
   Search,
+  Calendar,
+  Trash2,
 } from "lucide-react";
 import { DateTimePicker } from "@/components/ui/DatetimePicker";
 import { es } from "date-fns/locale";
@@ -30,6 +32,8 @@ import { useAirports } from "@/hooks/useAirports";
 import toast from "react-hot-toast";
 import ToastCustom from "@/components/common/ToastCustom";
 import type { VueloDTO, PedidoDTO } from "@/hooks/useRunSSE";
+import { useFlightsSSE } from "@/hooks/useFlightsSSE";
+import type { CancelarVueloRequest, CancelarVueloResponse } from "@/types/vuelos";
 
 type NivelCarga = "disponible" | "limitado" | "saturado";
 
@@ -81,8 +85,52 @@ export default function ToolsPanel({
   const [almacen, setAlmacen] = useState<string | null>(null);
   const [pedido, setPedido] = useState<PedidoDTO | null>(null);
 
-  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport } = useRunSession();
+  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId } = useRunSession();
   const { data: airportsData } = useAirports();
+
+  // Obtener vuelos planificados del día siguiente (solo en modo simulacion/operacion semanal)
+  // IMPORTANTE: Solo consumir el endpoint si estamos en modo simulacion
+  // Si no estamos en simulacion, no consumir ningún endpoint (evitar consumo innecesario)
+  const shouldFetchScheduled = variant === "simulacion" && !!currentRunId;
+  
+  // Construir el endpoint con el runId si está disponible
+  const scheduledEndpoint = useMemo(() => {
+    if (!shouldFetchScheduled) return null;
+    const endpoint = "vuelos/scheduled/next-day";
+    // Si hay un runId activo, pasarlo como parámetro
+    return `${endpoint}?runId=${currentRunId}`;
+  }, [shouldFetchScheduled, currentRunId]);
+  
+  const { data: scheduledFlightsRaw } = useFlightsSSE(scheduledEndpoint);
+  
+  // Debug desactivado
+  
+  const vuelosProgramados = useMemo<VueloDTO[]>(() => {
+    // Solo procesar si estamos en modo simulacion (operacion semanal)
+    if (!shouldFetchScheduled) {
+      return [];
+    }
+    
+    if (!scheduledFlightsRaw || !Array.isArray(scheduledFlightsRaw)) {
+      return [];
+    }
+    
+    // Convertir los datos del endpoint a VueloDTO
+    const result = scheduledFlightsRaw.map((v: any) => ({
+      id: v.id || "",
+      origen: v.origen || "",
+      destino: v.destino || "",
+      salidaUtc: v.salidaUtc || "",
+      llegadaUtc: v.llegadaUtc || "",
+      cantidadAsignada: v.cantidadAsignada || 0,
+      capacidad: v.capacidad || 0,
+      residual: v.residual || 0,
+      costo: v.costo || 0,
+      carga: v.carga || [],
+    })).filter((v: VueloDTO) => v.id && v.origen && v.destino);
+    
+    return result;
+  }, [scheduledFlightsRaw, shouldFetchScheduled]);
 
   const warehouseOptions = useMemo(() => {
     if (!airportsData) return [];
@@ -155,10 +203,6 @@ export default function ToolsPanel({
       return lastWindow?.vuelos ?? [];
     }
     
-    console.log('[ToolsPanel] Vuelos EN EL AIRE:', resultado.length);
-    console.log('[ToolsPanel] simNowUtc:', simNowUtc);
-    console.log('[ToolsPanel] windows.length:', windows.length);
-    console.log('[ToolsPanel] Total vuelos en windows:', windows.reduce((sum, w) => sum + w.vuelos.length, 0));
     return resultado;
   }, [windows, simNowUtc]);
 
@@ -196,9 +240,6 @@ export default function ToolsPanel({
       return lastWindow?.pedidos ?? [];
     }
 
-    console.log('[ToolsPanel] Pedidos EN VUELO:', resultado.length);
-    console.log('[ToolsPanel] Pedidos IDs en vuelo:', Array.from(pedidosEnVueloSet));
-    console.log('[ToolsPanel] Total pedidos en último window:', lastWindow?.pedidos?.length || 0);
     return resultado;
   }, [windows, simNowUtc]);
 
@@ -228,16 +269,9 @@ export default function ToolsPanel({
   const [loading, setLoading] = useState(false);
 
   const handleRun = async () => {
-    console.log("🚀 [ToolsPanel] Iniciando run...");
-    console.log("📅 [ToolsPanel] Fechas seleccionadas:", { inicio, fin });
-    console.log("📊 [ToolsPanel] Variant:", variant);
-    
     setLoading(true);
     try {
       const req = buildStartRunRequest(variant, {inicio, fin});
-
-      console.log("📤 [ToolsPanel] Request construido:", req);
-      console.log("🌐 [ToolsPanel] API URL:", import.meta.env.VITE_API_BASE_URL);
 
       const [data, error] = await handleApi(
         postJson<StartRunResponse>("runs", req)
@@ -257,7 +291,6 @@ export default function ToolsPanel({
 
       } else if (data) {
         // éxito
-        console.log("✅ [ToolsPanel] Simulación iniciada exitosamente:", data);
         toast.custom((t) => (
           <ToastCustom
             t={t}
@@ -271,8 +304,6 @@ export default function ToolsPanel({
 
         //setShowContent(false); //opcional para cerrar el panel
         //navigate("/simulacion"); 
-
-        console.log("🎯 [ToolsPanel] Run iniciado con ID:", data.runId);
       }
     } catch (err) {
       console.error("💥 [ToolsPanel] Error inesperado:", err);
@@ -493,12 +524,15 @@ export default function ToolsPanel({
       {/* Selecciones principales (botones) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 relative">
         <FlightSelectCard
+          runId={currentRunId}
           label="Vuelo"
           icon={<Plane className="h-4 w-4" />}
           placeholder="Seleccionar vuelo"
           value={vuelo}
           items={vuelosActivos}
           onSelect={setVuelo}
+          scheduledFlights={variant === "simulacion" ? (vuelosProgramados || []) : undefined}
+          showScheduledToggle={variant === "simulacion"}
         />
         <WarehouseSelectCard
           label="Almacén"
@@ -519,7 +553,7 @@ export default function ToolsPanel({
         />
       </div>
 
-      {/* Barra de control con glassmorphism “estilo reloj” */}
+      {/* Barra de control con glassmorphism "estilo reloj" */}
       <div className={`rounded-2xl ${GLASS}`}>
         {/* encabezado */}
         <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border">
@@ -822,37 +856,48 @@ function WarehouseSelectCard({
 }
 
 function FlightSelectCard({
+  runId,
   label,
   icon,
   placeholder,
   value,
   items,
   onSelect,
+  scheduledFlights,
+  showScheduledToggle,
 }: {
+  runId: string | null,
   label: string;
   icon: React.ReactNode;
   placeholder: string;
   value: VueloDTO | null;
   items: VueloDTO[];
   onSelect: (val: VueloDTO) => void;
+  scheduledFlights?: VueloDTO[];
+  showScheduledToggle?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [originFilter, setOriginFilter] = useState<string>("all");
   const [destFilter, setDestFilter] = useState<string>("all");
+  const [showScheduled, setShowScheduled] = useState(false);
+  
+  // Determinar qué lista de vuelos usar
+  const hasScheduledFlights = showScheduledToggle || (scheduledFlights !== undefined);
+  const currentItems = showScheduled && scheduledFlights ? scheduledFlights : items;
 
   const origins = useMemo(
-    () => Array.from(new Set(items.map((v) => v.origen))).sort(),
-    [items]
+    () => Array.from(new Set(currentItems.map((v) => v.origen))).sort(),
+    [currentItems]
   );
   const dests = useMemo(
-    () => Array.from(new Set(items.map((v) => v.destino))).sort(),
-    [items]
+    () => Array.from(new Set(currentItems.map((v) => v.destino))).sort(),
+    [currentItems]
   );
 
   const filtered = useMemo(
     () =>
-      items
+      currentItems
         .filter((v) =>
           v.id.toLowerCase().includes(q.toLowerCase()) ||
           v.origen.toLowerCase().includes(q.toLowerCase()) ||
@@ -860,8 +905,61 @@ function FlightSelectCard({
         )
         .filter((v) => (originFilter === "all" ? true : v.origen === originFilter))
         .filter((v) => (destFilter === "all" ? true : v.destino === destFilter)),
-    [items, q, originFilter, destFilter]
+    [currentItems, q, originFilter, destFilter]
   );
+
+  const handleCancelar = async (vuelo: VueloDTO, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    try {
+      const req : CancelarVueloRequest = {
+        origen: vuelo.origen,
+        destino: vuelo.destino,
+        salidaUtc: vuelo.salidaUtc,
+        llegadaUtc: vuelo.llegadaUtc
+      }
+
+      //Porseaca xd
+      if (runId == null) return;
+
+      const path = `vuelos/${runId}/cancelar`;
+
+      const [data, error] = await handleApi(
+        postJson<CancelarVueloResponse>(path, req)
+      )
+
+      if (error) {
+        // aquí tu toast o UI de error
+        console.error("❌ [ToolsPanel] Error al cancelar el vuelo:", error);
+        
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={error+"❗"}
+            type="error"
+          />),
+        { duration: 5000});
+
+      } else if (data) {
+        // éxito
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={"Vuelo cancelado exitosamente!"+"✅"}
+            type="success"
+          />),
+        { duration: 5000});
+      }
+
+    }
+    catch(err) {
+      console.error("💥 [ToolsPanel] Error inesperado:", err);
+    }
+
+
+
+    // TODO: Implementar cancelación de vuelo (acciones adicionales si aplica)
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -896,6 +994,42 @@ function FlightSelectCard({
         ].join(" ")}
       >
         <div className="space-y-2 mb-2">
+          {/* Toggle para alternar entre vuelos activos y programados */}
+          {hasScheduledFlights && (
+            <div className="flex items-center gap-2 pb-2 border-b border-border/50">
+              <button
+                onClick={() => {
+                  setShowScheduled(false);
+                  setQ("");
+                }}
+                className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  !showScheduled
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-card/50 text-muted-foreground hover:bg-card/70"
+                }`}
+              >
+                Activos
+              </button>
+              <button
+                onClick={() => {
+                  setShowScheduled(true);
+                  setQ("");
+                }}
+                className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-1 ${
+                  showScheduled
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-card/50 text-muted-foreground hover:bg-card/70"
+                }`}
+              >
+                <Calendar className="h-3 w-3" />
+                Programados
+                {scheduledFlights && scheduledFlights.length > 0 && (
+                  <span className="ml-1 text-[10px] opacity-75">({scheduledFlights.length})</span>
+                )}
+              </button>
+            </div>
+          )}
+          
           {(origins.length > 1 || dests.length > 1) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {origins.length > 1 && (
@@ -947,21 +1081,70 @@ function FlightSelectCard({
           <ul className="space-y-1">
             {filtered.map((v) => (
               <li key={v.id}>
-                <button
-                  onClick={() => {
-                    onSelect(v);
-                    setOpen(false);
-                    setQ("");
-                  }}
-                  className="w-full text-left px-2 py-2 rounded-md hover:bg-accent/40 text-sm"
+                <div
+                  className={`w-full px-2 py-2 rounded-md text-sm ${
+                    showScheduled
+                      ? "bg-card/50 border border-border/50 hover:bg-card/70"
+                      : "hover:bg-accent/40"
+                  }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono">{v.id}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {v.origen} → {v.destino}
-                    </span>
-                  </div>
-                </button>
+                  {showScheduled ? (
+                    // Vista de vuelos programados con botón cancelar
+                    <div className="flex items-start justify-between gap-2">
+                      <button
+                        onClick={() => {
+                          onSelect(v);
+                          setOpen(false);
+                          setQ("");
+                        }}
+                        className="flex-1 text-left min-w-0"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-mono text-xs truncate">{v.id}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span className="font-mono">{v.origen}</span>
+                          <span>→</span>
+                          <span className="font-mono">{v.destino}</span>
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {new Date(v.salidaUtc).toLocaleString('es-PE', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'UTC'
+                          })} UTC
+                        </div>
+                      </button>
+                      <button
+                        onClick={(e) => handleCancelar(v, e)}
+                        className="flex-shrink-0 px-2 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 rounded border border-red-200 dark:border-red-900/50 transition-colors flex items-center gap-1"
+                        title={`Cancelar vuelo ${v.id}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    // Vista normal de vuelos activos
+                    <button
+                      onClick={() => {
+                        onSelect(v);
+                        setOpen(false);
+                        setQ("");
+                      }}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono">{v.id}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {v.origen} → {v.destino}
+                        </span>
+                      </div>
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

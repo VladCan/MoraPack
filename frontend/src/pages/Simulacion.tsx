@@ -8,6 +8,7 @@ import { useRunSSE } from "@/hooks/useRunSSE";
 import { useRunSession } from "@/lib/runSession";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
+import SimulationFinishedOverlay from "@/components/common/SimulationFinishedOverlay";
 
 const COLOR_SEDE   = "#005097";
 const COLOR_NORMAL = "#38bdf8";
@@ -74,8 +75,8 @@ export default function Simulacion() {
   }, [airports]);
 
   // Conectar al SSE
-  const { runId, selectedAirportId, setSelectedAirport } = useRunSession();
-  const { simNowUtc, windows, airportOccupancy } = useRunSSE(runId || undefined);
+  const { runId, selectedAirportId, setSelectedAirport, reset } = useRunSession();
+  const { simNowUtc, windows, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
 
   // Procesar vuelos para renderizar
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
@@ -187,9 +188,52 @@ export default function Simulacion() {
     ? airportOccupancy[selectedAirportId]
     : null;
 
+
+  //Para la pantalla de fin:
+
+  const [finishedAt, setFinishedAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!finished) return;
+    console.log ("🔚 [Simulación] Terminó:", finished.reason);
+
+    setOverlayVisible(true);
+  }, [finished, disconnect, reset]);
+
+  useEffect(() => {
+    if (finished && !finishedAt) {
+      setFinishedAt(Date.now());
+    }
+  }, [finished, finishedAt]);
+
+  useEffect(() => {
+    setFinishedAt(null);
+  }, [runId]);
+
+  const handleDownloadReports = () => {
+    if (!runId) return;
+    // Endpoint a crear, por ejemplo:
+    // GET /runs/{id}/report  -> devuelve ZIP
+    // downloadFile(`runs/${runId}/report`, `reporte-simulacion-${runId}.zip`);
+  };
+
+  const handleCloseOverlay = () => {
+    setOverlayVisible(false);
+
+    //Cortamos el SSE
+    disconnect();
+
+    //Limpiamos el contexto de la simulación
+    reset();
+  };
+
+  const [overlayVisible, setOverlayVisible] = useState(true);
+
+  const showFinishedOverlay = !!finished && !!runId && overlayVisible;
+
   return (
     <div className="min-h-screen bg-neutral-50 relative">
-      <p className="text-rose-600">{simNowUtc}</p>
+      {/*<p className="text-rose-600">{simNowUtc}</p>*/}
       {/* Tooltip de aeropuerto */}
       {activeAirportData && (
         <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
@@ -423,6 +467,20 @@ export default function Simulacion() {
           iconSize={16}
         />
       </MainMap>
+
+      {finished && runId && (
+        <SimulationFinishedOverlay
+          open={showFinishedOverlay}
+          reason={finished.reason}
+          simStartUtc={simStartUtc ?? null}
+          simEndUtc={simNowUtc ?? null}
+          wallAnchor={wallStartUtc}
+          finishedAt={finishedAt}
+          onClose={handleCloseOverlay}
+          onDownloadReports={handleDownloadReports}
+        />
+      )}
+
     </div>
   );
 }
