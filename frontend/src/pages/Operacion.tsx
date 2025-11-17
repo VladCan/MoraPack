@@ -6,6 +6,7 @@ import MainMap from "@/components/common/MainMap";
 import AirportMarkers, { type AirportPoint } from "@/components/common/map/AirportMarkers";
 import { useAirports } from "@/hooks/useAirports";
 import { useFlightsSSE } from "@/hooks/useFlightsSSE";
+import { useRunSession } from "@/lib/runSession";
 
 const COLOR_SEDE   = "#005097";
 const COLOR_NORMAL = "#38bdf8"; // 👈 más suave que #0ea5e9
@@ -53,17 +54,21 @@ export default function Operacion() {
 
   // SSE vuelos
   const { data: liveFlights } = useFlightsSSE("vuelos/live?limit=200");
+  const { vuelosCancelados } = useRunSession();
   const flightPaths = useMemo(() => {
     const arr = (liveFlights ?? []) as FlightDto[];
-    return arr.map((f) => ({
-      id: f.id,
-      origin: { lat: f.originLat, lon: f.originLon },
-      dest: { lat: f.destLat, lon: f.destLon },
-      progress: f.progress,
-      pathColor: f.pathColor,
-      planeColor: f.planeColor,
-    }));
-  }, [liveFlights]);
+    // Filtrar vuelos cancelados
+    return arr
+      .filter((f) => !vuelosCancelados.has(f.id))
+      .map((f) => ({
+        id: f.id,
+        origin: { lat: f.originLat, lon: f.originLon },
+        dest: { lat: f.destLat, lon: f.destLon },
+        progress: f.progress,
+        pathColor: f.pathColor,
+        planeColor: f.planeColor,
+      }));
+  }, [liveFlights, vuelosCancelados]);
 
   return (
     <div className="min-h-screen bg-neutral-50">

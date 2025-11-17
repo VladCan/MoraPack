@@ -85,7 +85,7 @@ export default function ToolsPanel({
   const [almacen, setAlmacen] = useState<string | null>(null);
   const [pedido, setPedido] = useState<PedidoDTO | null>(null);
 
-  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId } = useRunSession();
+  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId, vuelosCancelados, cancelarVuelo } = useRunSession();
   const { data: airportsData } = useAirports();
 
   // Obtener vuelos planificados del día siguiente (solo en modo simulacion/operacion semanal)
@@ -170,14 +170,16 @@ export default function ToolsPanel({
     }
   }
 
-  // Obtener SOLO vuelos que están EN EL AIRE en este momento
+  // Obtener SOLO vuelos que están EN EL AIRE en este momento (excluyendo cancelados)
   const vuelosActivos = useMemo<VueloDTO[]>(() => {
     if (windows.length === 0) return [];
     
     // Si aún no tenemos TICK (simNowUtc), mostramos los vuelos de la última ventana.
     if (!simNowUtc) {
       const lastWindow = windows[windows.length - 1];
-      return lastWindow?.vuelos ?? [];
+      const vuelos = lastWindow?.vuelos ?? [];
+      // Filtrar vuelos cancelados
+      return vuelos.filter(v => !vuelosCancelados.has(v.id));
     }
 
     const now = new Date(simNowUtc).getTime();
@@ -185,6 +187,9 @@ export default function ToolsPanel({
     
     windows.forEach(window => {
       window.vuelos.forEach(v => {
+        // Excluir vuelos cancelados
+        if (vuelosCancelados.has(v.id)) return;
+        
         if (!vuelosEnAire.has(v.id)) {
           const salida = new Date(v.salidaUtc).getTime();
           const llegada = new Date(v.llegadaUtc).getTime();
@@ -200,11 +205,13 @@ export default function ToolsPanel({
     const resultado = Array.from(vuelosEnAire.values());
     if (resultado.length === 0) {
       const lastWindow = windows[windows.length - 1];
-      return lastWindow?.vuelos ?? [];
+      const vuelos = lastWindow?.vuelos ?? [];
+      // Filtrar vuelos cancelados
+      return vuelos.filter(v => !vuelosCancelados.has(v.id));
     }
     
     return resultado;
-  }, [windows, simNowUtc]);
+  }, [windows, simNowUtc, vuelosCancelados]);
 
   // Obtener SOLO pedidos que están en vuelos activos
   const pedidosActivos = useMemo<PedidoDTO[]>(() => {
@@ -944,7 +951,8 @@ function FlightSelectCard({
         { duration: 5000});
 
       } else if (data) {
-        // éxito
+        // éxito - agregar vuelo a la lista de cancelados para ocultarlo inmediatamente
+        cancelarVuelo(vuelo.id);
         toast.custom((t) => (
           <ToastCustom
             t={t}
