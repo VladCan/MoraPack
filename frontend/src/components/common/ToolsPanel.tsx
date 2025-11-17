@@ -533,6 +533,7 @@ export default function ToolsPanel({
           onSelect={setVuelo}
           scheduledFlights={variant === "simulacion" ? (vuelosProgramados || []) : undefined}
           showScheduledToggle={variant === "simulacion"}
+          variant={variant}
         />
         <WarehouseSelectCard
           label="Almacén"
@@ -865,6 +866,7 @@ function FlightSelectCard({
   onSelect,
   scheduledFlights,
   showScheduledToggle,
+  variant,
 }: {
   runId: string | null,
   label: string;
@@ -875,6 +877,7 @@ function FlightSelectCard({
   onSelect: (val: VueloDTO) => void;
   scheduledFlights?: VueloDTO[];
   showScheduledToggle?: boolean;
+  variant?: Variant;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -1128,21 +1131,51 @@ function FlightSelectCard({
                     </div>
                   ) : (
                     // Vista normal de vuelos activos
-                    <button
-                      onClick={() => {
-                        onSelect(v);
-                        setOpen(false);
-                        setQ("");
-                      }}
-                      className="w-full text-left"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono">{v.id}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {v.origen} → {v.destino}
-                        </span>
+                    variant === "operacion" ? (
+                      // Vista con botón cancelar para operación diaria
+                      <div className="flex items-start justify-between gap-2">
+                        <button
+                          onClick={() => {
+                            onSelect(v);
+                            setOpen(false);
+                            setQ("");
+                          }}
+                          className="flex-1 text-left min-w-0"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-xs">{v.id}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {v.origen} → {v.destino}
+                            </span>
+                          </div>
+                        </button>
+                        <button
+                          onClick={(e) => handleCancelar(v, e)}
+                          className="flex-shrink-0 px-2 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 rounded border border-red-200 dark:border-red-900/50 transition-colors flex items-center gap-1"
+                          title={`Cancelar vuelo ${v.id}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          Cancelar
+                        </button>
                       </div>
-                    </button>
+                    ) : (
+                      // Vista normal sin botón cancelar
+                      <button
+                        onClick={() => {
+                          onSelect(v);
+                          setOpen(false);
+                          setQ("");
+                        }}
+                        className="w-full text-left"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono">{v.id}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {v.origen} → {v.destino}
+                          </span>
+                        </div>
+                      </button>
+                    )
                   )}
                 </div>
               </li>

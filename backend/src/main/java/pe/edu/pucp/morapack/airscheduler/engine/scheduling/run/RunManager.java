@@ -691,6 +691,21 @@ public class RunManager {
                 if (solucionAnterior != null) {
                     System.out.println("[RunManager] Antes de eliminarYActualizarCumplidosHasta: " +
                             pedidosCargados.getLista().size() + " pedidos en cola");
+
+                    Set<VueloProgramadoId> vuelosCancelados =
+                            vuelosCanceladosPorRun.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
+
+                    if (!vuelosCancelados.isEmpty()) {
+                        System.out.println("[RunManager]: Procesando cancelaciones: " + vuelosCancelados.size());
+
+                        //Considerar si hay que colocar los vuelos cancelados en algun otro lado para enchufar en el TEG
+
+                        procesarCancelaciones(id, vuelosCancelados, solucionAnterior);
+
+                        /// Dejamos el set vacío (por ahora):
+                        vuelosCanceladosPorRun.get(id).clear();
+                    }
+
                     pedidosCargados.eliminarYActualizarCumplidosHasta(wStart, solucionAnterior);
                     System.out.println("[RunManager] Después de eliminarYActualizarCumplidosHasta: " +
                             pedidosCargados.getLista().size() + " pedidos en cola");
