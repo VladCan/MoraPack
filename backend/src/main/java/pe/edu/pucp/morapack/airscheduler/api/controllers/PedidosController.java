@@ -3,6 +3,7 @@ package pe.edu.pucp.morapack.airscheduler.api.controllers;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 // Eliminamos el import de ConfigProperty
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -88,7 +89,52 @@ public class PedidosController {
         }
 
         return Response.ok(body).build();
+    }
 
+    @GET
+    @jakarta.ws.rs.Path("/preview")
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response preview(@QueryParam("lines") @DefaultValue("20") int lines){
+        java.nio.file.Path p = filePath();
+        String filename = p.getFileName().toString();
+
+        if(!Files.exists(p)){
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity("No existe el archivo " + filename).build();
+        }
+        if (lines <= 0) lines = 20;
+
+        try (java.io.BufferedReader br = Files.newBufferedReader(
+                p, java.nio.charset.StandardCharsets.UTF_8)) {
+            String content = br.lines().limit(lines).reduce((a, b) -> a + "\n" + b).orElse("");
+            return Response.ok(content).build();
+        } catch (java.io.IOException e) {
+            return Response.serverError()
+                    .entity("Error al leer el archivo: " + e.getMessage()).build();
+        }
+    }
+
+    @GET
+    @jakarta.ws.rs.Path("/download")
+    @Produces(MediaType.APPLICATION_OCTET_STREAM)
+    public Response download(){
+        java.nio.file.Path p = filePath();
+        String filename = p.getFileName().toString();
+
+        if (!Files.exists(p)){
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity("No existe el archivo " + filename).build();
+        }
+
+        try{
+            File f = p.toFile();
+            return Response.ok(f)
+                    .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+                    .build();
+        }
+        catch (Exception e){
+            return Response.serverError().entity("Error al leer el archivo: " + e.getMessage()).build();
+        }
     }
 
     // Dado que la creación de un pedido sí o sí está conectada solamente a la operación diaria, podemos llamar
