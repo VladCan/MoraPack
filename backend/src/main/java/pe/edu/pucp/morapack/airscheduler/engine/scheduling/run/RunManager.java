@@ -3,6 +3,7 @@ package pe.edu.pucp.morapack.airscheduler.engine.scheduling.run;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.io.BufferedReader;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -224,9 +225,11 @@ public class RunManager {
 
             if (scenario != RunConfig.Scenario.OPERACION){
                 // **USO DE ARCHIVOMANAGER:** Usar el manager para el archivo de pedidos
-                try (Scanner sc = archivoManager.getScannerForDataFile(PEDIDOS_FILENAME).orElse(null)) {
-                    if (sc != null) {
-                        pedidosCargados.leerDatosProfe(sc);
+                try (BufferedReader br = archivoManager.getBufferedReaderForDataFile(PEDIDOS_FILENAME).orElse(null)) {
+                    if (br != null) {
+                        //pedidosCargados.leerDatosProfe(sc);
+                        pedidosCargados.leerGigante(br);
+                        System.out.println("[RunManager] Lectura Gigante de pedidos completada");
                         pedidosCargados.normalizarUtc(aeropuertosMap);
                         pedidosCargados.ordenarPorUTC();
                         System.out.println("[RunManager] Pedidos cargados: " + pedidosCargados.getLista().size());
