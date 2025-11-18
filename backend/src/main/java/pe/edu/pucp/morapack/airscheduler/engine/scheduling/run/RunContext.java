@@ -18,8 +18,8 @@ public class RunContext {
 
     //Con esto modelamos el reloj
     //simStartUtc es la fecha de inicio, wallAnchor es el now y speed es el factor de aceleración
-    private final Instant simStartUtc;
-    private final Instant wallAnchor;
+    private  Instant simStartUtc;
+    private  Instant wallAnchor;
     private final double speed;
 
     //Ciclo de vida
@@ -38,6 +38,12 @@ public class RunContext {
         this.simStartUtc = config.fechaInicio();
         this.wallAnchor = Instant.now();
         this.speed = config.speed();
+    }
+
+    public void reAnchorClock(Instant newSimStart) {
+    this.relojActual = newSimStart;
+    this.simStartUtc = newSimStart;
+    this.wallAnchor = Instant.now();
     }
 
     /** Getters **/
