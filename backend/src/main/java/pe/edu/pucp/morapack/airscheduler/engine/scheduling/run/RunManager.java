@@ -283,26 +283,26 @@ public class RunManager {
     /*Overload, ya que vamos a usar el string y no el RunId*/
     public Instant currentSimNow(String runId){
         RunContext ctx = requireContext(runId);
-        //Acá calculamos el tiempo real transcurrido desde que arrancó el run
+
         long deltaMs = Duration.between(ctx.wallAnchor(), Instant.now()).toMillis();
-        //Acá calculamos la velocidad en segundos simulados por segundo real
         long simDeltaMs = (long) Math.floor(deltaMs * ctx.speed());
 
-        // Retornamos el ahora simulado
         Instant simulatedNow = ctx.simStartUtc().plusMillis(simDeltaMs);
-        
-        // Limitar el simNow al final de la última llegada de vuelo
+
         SolucionProgramacion ultimaSolucion = solucionesAnteriores.get(runId);
         if (ultimaSolucion != null) {
             Instant ultimaLlegada = obtenerUltimaLlegada(ultimaSolucion);
+
             if (ultimaLlegada != null && simulatedNow.isAfter(ultimaLlegada)) {
-                return ultimaLlegada;
+                System.out.println("[currentSimNow] reached end of flights → NOT clamping, letting clock move on");
+                return simulatedNow;
             }
         }
-        
+
         return simulatedNow;
     }
-    
+
+
     private Instant obtenerUltimaLlegada(SolucionProgramacion solucion) {
         if (solucion == null || solucion.getCargaPorVuelo() == null) {
             return null;
@@ -529,8 +529,8 @@ public class RunManager {
             }
 
             System.out.println("[RunManager] Procesando ventana " + idx + ": " + wStart + " - " + wEnd);
-            RunContext ctx = requireContext(id);
-            ctx.reAnchorClock(wStart);
+            //RunContext ctx = requireContext(id);
+            //ctx.reAnchorClock(wStart);
 
             try {
                 // 1. Preparar estado anterior si existe
@@ -566,7 +566,7 @@ public class RunManager {
                 }
 
                 // 2. Obtener pedidos de la ventana actual (ya actualizados)
-                VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wEnd);
+                VentanaPedidos ventana = pedidosCargados.acumuladoEntre(wStart,wEnd);
                 List<Pedido> pedidosVentana = ventana.pedidos();
 
                 if (pedidosVentana.isEmpty()) {
@@ -739,7 +739,8 @@ public class RunManager {
                     /// Si no hay nada en la ventana, duerme
                     // sleepToEndWindow(id, wEnd);
                     if (pedidosVentana.isEmpty()) {
-                        System.out.println("[RunManager] No hay pedidos en la ventana " + idx);
+                        System.out.println("[RunManager] " +
+                                " " + idx);
                         // Marcar ventana como enviada aunque esté vacía
                         ventanasEnviadasRun.add(windowIdISO);
                         broadcastWindow(new WindowPacket(id, idx, wStart, wEnd, List.of(),
