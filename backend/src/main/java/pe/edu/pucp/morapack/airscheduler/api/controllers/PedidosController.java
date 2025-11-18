@@ -2,38 +2,37 @@ package pe.edu.pucp.morapack.airscheduler.api.controllers;
 
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
-// Eliminamos el import de ConfigProperty
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
+import java.nio.file.Files; // Necesario para abrir el stream del temp
 import java.nio.file.attribute.FileTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
-// Eliminamos los imports de Files y StandardCopyOption
+
+// --- IMPORTS NUEVOS PARA SUBIDA EFICIENTE ---
+import org.jboss.resteasy.reactive.RestForm;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
+// --------------------------------------------
 
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import pe.edu.pucp.morapack.airscheduler.api.mapper.PedidoMapper;
 import pe.edu.pucp.morapack.airscheduler.api.response.JsonResponse;
 import pe.edu.pucp.morapack.airscheduler.api.response.PedidoResponse;
-import pe.edu.pucp.morapack.airscheduler.api.service.PedidosService; // <-- Nuevo: Importar el service
+import pe.edu.pucp.morapack.airscheduler.api.service.PedidosService;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
-
+import pe.edu.pucp.morapack.airscheduler.api.mapper.PedidoMapper;
 
 @Path("/pedidos")
 public class PedidosController {
-    
-    // Eliminamos: @ConfigProperty(name = "morapack.upload.dir") String uploadDir;
-    
-    // Inyectamos el nuevo PedidosService (asumimos que RunManager también es inyectado aquí si se usa directamente en crearPedido)
-    @Inject 
-    PedidosService pedidosService; // <-- Nuevo: Service para manejar la persistencia
 
-    // Mantenemos el FILENAME para el cuerpo de las respuestas HTTP (ES EL NOMBRE QUE MOSTRAMOS AL FRONT, NO ROMPE NADA)
+    @Inject 
+    PedidosService pedidosService; 
+    
     private static final String FILENAME = "pedidos.txt";
     
     @Inject
@@ -46,26 +45,46 @@ public class PedidosController {
         public Integer cantidad;
     }
 
-    // Endpoint para recibir el archivo y guardarlo (DELEGACIÓN AL SERVICE)
+    // ---------------------------------------------------------
+    // MÉTODO CORREGIDO PARA ARCHIVOS GRANDES (178MB+)
+    // ---------------------------------------------------------
     @POST
     @Path("/upload")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
-    public Response uploadPedidos(
-            @FormParam("file") InputStream fileInputStream) {
+    public Response uploadPedidos(@RestForm("file") FileUpload fileUpload) { // <--- CAMBIO AQUÍ
         
+        // Validación rápida por si el archivo llega vacío
+        if (fileUpload == null || fileUpload.fileName() == null) {
+             return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new JsonResponse("error", "No se envió ningún archivo", null))
+                    .build();
+        }
+
         try {
-            // **DELEGACIÓN:** El service se encarga de obtener la ruta, crear el directorio y copiar el archivo.
-            java.nio.file.Path targetPath = pedidosService.guardarArchivoPedidos(fileInputStream);
-            
-            return Response
+            // 1. Obtenemos el path del archivo temporal que Quarkus ya guardó en disco
+            java.nio.file.Path tempPath = fileUpload.uploadedFile();
+
+            // 2. Abrimos un stream desde ese archivo temporal
+            // Usamos try-with-resources para asegurar que se cierre el stream
+            try (InputStream fileInputStream = Files.newInputStream(tempPath)) {
+                
+                // 3. Delegamos a tu servicio (que ya usa la lógica de ArchivoManager)
+                // Tu servicio leerá este stream y lo copiará a la carpeta final
+                java.nio.file.Path targetPath = pedidosService.guardarArchivoPedidos(fileInputStream);
+
+                return Response
                     .ok(new JsonResponse("success", "Archivo de pedidos guardado exitosamente", targetPath.toAbsolutePath().toString()))
                     .build();
+            }
+
         } catch (IOException e) {
+            e.printStackTrace();
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new JsonResponse("error", "Error al guardar el archivo: " + e.getMessage(), null))
+                    .entity(new JsonResponse("error", "Error al procesar el archivo: " + e.getMessage(), null))
                     .build();
         }
     }
+    // ---------------------------------------------------------
 
     @GET
     @Path("/status")
@@ -127,6 +146,7 @@ public class PedidosController {
         }
 
         try{
+            // Nota: java.io.File está bien aquí, pero Files.newInputStream(p) sería más moderno.
             File f = p.toFile();
             return Response.ok(f)
                     .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
@@ -137,36 +157,25 @@ public class PedidosController {
         }
     }
 
-    // Dado que la creación de un pedido sí o sí está conectada solamente a la operación diaria, podemos llamar
-    // a runManager dentro del método
     @POST
     @Path("/crear")
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response crearPedido(PedidoRequest request) {
         try {
-            // ... (Validación y conversión se mantienen) ...
-            
-            //Primero, validamos
             if (request == null) return bad("Body requerido");
-            // Nota: isBlank es mejor para Strings, no para Integers.
-            // Considera validar que idCliente y cantidad no sean null y sean positivos.
             if (isBlank(String.valueOf(request.idCliente))) return bad("El idCliente es requerido"); 
             if (isBlank(request.destino)) return bad("El destino es requerido");
             if (isBlank(request.fecha)) return bad("La fecha es requerida");
             if (isBlank(String.valueOf(request.cantidad))) return bad("La cantidad es requerida");
 
-            //Si todo ok, convertimos a pedido
             Pedido pedido = PedidoMapper.toPedido(request);
             int idGenerado = pedido.getIdPedido();
 
             String msg = "Pedido del cliente (" + request.idCliente + ") con destino " +
                     "a " + request.destino + " creado correctamente con id " + idGenerado + " a las " + request.fecha;
 
-            //Ahora vamos a ver si hay un run de OperaciónDiaria activo.
             String runId = runManager.ensureOperacionStarted();
-
-            //Ahora, encolamos el pedido
             runManager.pushOrder(runId, pedido);
 
             return Response
@@ -187,7 +196,6 @@ public class PedidosController {
     }
     private static final class ErrorDTO { public final String message; ErrorDTO(String m){ this.message = m; } }
 
-    /// Privados para rutas:
     private java.nio.file.Path filePath(){
         return pedidosService.getPedidosFilePath();
     }
@@ -196,5 +204,4 @@ public class PedidosController {
         FileTime ft = Files.getLastModifiedTime(p);
         return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(ft.toInstant().atOffset(ZoneOffset.UTC));
     }
-
 }
