@@ -45,7 +45,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
          */
         final Set<String> sedes = new HashSet<>(Arrays.asList("SPIM", "EBCI", "UBBB"));
         AeropuertosMap aeropuertosMap = new AeropuertosMap();// Aeropuertos (incluye husos horarios)
-        try (Scanner sc = ArchivoUtils.getScannerFromResource(
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(
                 "aereopuertos.txt")) {
             if (sc == null)
                 return;
@@ -53,7 +53,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
         }
         // Vuelos (catálogo maestro)
         VuelosMap mapa = new VuelosMap(aeropuertosMap);
-        try (Scanner sc = ArchivoUtils.getScannerFromResource(
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(
                 "vuelos.txt")) {
             if (sc == null)
                 return;
@@ -65,7 +65,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
         int mes = 10; // octubre
         // Nombre del archivo esperado: cancelaciones_2025-10.txt
         String nombre = String.format("cancelaciones_%04d-%02d.txt", year, mes);
-        try (Scanner sc = ArchivoUtils.getScannerFromResource(nombre)) {
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(nombre)) {
             if (sc == null)
                 return;
             cancelados.leerDatos(sc);
@@ -87,7 +87,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
          * =======================
          */
         CargarPedidos pedidos = new CargarPedidos();
-        try (Scanner sc = ArchivoUtils.getScannerFromResource("pedidos.txt")) {
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath("pedidos.txt")) {
             if (sc == null)
                 return;
             pedidos.leerDatosProfe(sc);
