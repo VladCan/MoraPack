@@ -160,6 +160,30 @@ public class CargarPedidos {
         return new VentanaPedidos(presenteUTC, candidatos);
     }
 
+    public VentanaPedidos acumuladoEntre(Instant inicioUTC, Instant presenteUTC) {
+        if (!utcNormalizada)
+            throw new IllegalStateException("Primero llama a normalizarUtc(aeropuertosMap).");
+
+        if (inicioUTC == null || presenteUTC == null || colaPedidos.isEmpty())
+            return new VentanaPedidos(null, List.of());
+
+        List<Pedido> candidatos = new ArrayList<>();
+        for (Pedido p : colaPedidos) {
+            Instant t = p.getCreatedAtUtc();
+            if (t == null) continue;
+
+            // Solo pedidos dentro del intervalo [inicioUTC, presenteUTC]
+            if (!t.isBefore(inicioUTC) && !t.isAfter(presenteUTC)) {
+                candidatos.add(p);
+            } else if (t.isAfter(presenteUTC)) {
+                break; // la cola está ordenada temporalmente
+            }
+        }
+
+        return new VentanaPedidos(presenteUTC, candidatos);
+    }
+
+
     // --- NUEVO: listar sin remover ---
     /**
      * Lista (NO remueve) los pedidos con createdAtUtc <= hastaIncl, respetando el
