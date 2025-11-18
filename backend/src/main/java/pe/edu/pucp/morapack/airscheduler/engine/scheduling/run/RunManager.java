@@ -529,6 +529,8 @@ public class RunManager {
             }
 
             System.out.println("[RunManager] Procesando ventana " + idx + ": " + wStart + " - " + wEnd);
+            RunContext ctx = requireContext(id);
+            ctx.reAnchorClock(wStart);
 
             try {
                 // 1. Preparar estado anterior si existe
