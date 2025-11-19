@@ -233,11 +233,25 @@ const renderDropzoneFooterOP = (
 
   const form = useForm<FormValues>({
     resolver,
-    defaultValues: { clienteId: "", aeropuerto: "SPIM", cantidad: 1 },
+    defaultValues: { clienteId: "", aeropuerto: "SKBO", cantidad: 1 },
     mode: "onTouched",
   });
 
-  const {begin} = useRunSession();
+  const {begin, simNow} = useRunSession();
+
+  function parseUTC(dateString: string) {
+    const d = new Date(dateString);
+    return new Date(
+        d.getUTCFullYear(),
+        d.getUTCMonth(),
+        d.getUTCDate(),
+        d.getUTCHours(),
+        d.getUTCMinutes(),
+        d.getUTCSeconds(),
+        d.getUTCMilliseconds()
+    );
+}
+
 
   const createPedido = useMutation({
     mutationFn: async (v: FormValues) => {
@@ -245,7 +259,10 @@ const renderDropzoneFooterOP = (
         clienteId: v.clienteId,
         aeropuerto: v.aeropuerto,
         cantidad: v.cantidad,
+        now: simNow ? new Date(simNow) : undefined,
       });
+
+      console.log("simNow es:", simNow)
 
       const [data, error] = await handleApi(
         postJson<PedidoResponse>("pedidos/crear", req)
