@@ -96,7 +96,7 @@ export default function TopNav() {
 
     if (error) {
         // aquí tu toast o UI de error
-        console.error("❌ [ToolsPanel] Error al finalizar la simulación:", error);
+        console.error("❌ [TopNav] Error al finalizar la simulación:", error);
         //alert(`Error al iniciar simulación: ${error.message}`);
         toast.custom((t) => (
           <ToastCustom
@@ -108,7 +108,7 @@ export default function TopNav() {
     }
     else if (data) {
       if (data.cancelled){
-        console.log("✅ [ToolsPanel] Simulación finalizada exitosamente:", data);
+        console.log("✅ [TopNav] Simulación finalizada exitosamente:", data);
         toast.custom((t) => (
           <ToastCustom
             t={t}

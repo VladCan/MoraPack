@@ -61,8 +61,10 @@ export function buildStartRunRequest(
     }
 
     //Si estamos aca es operación diaría
+    if (!ui.inicio) throw new Error("Falta fecha de inicio.");
     return {
         ...base,
+        startUtc: ui.inicio.toISOString(),
         //ordersSource: ui.ordersSource,
     };
 
