@@ -18,6 +18,7 @@ import org.jboss.resteasy.reactive.RestForm;
 import org.jboss.resteasy.reactive.multipart.FileUpload;
 // --------------------------------------------
 
+import io.smallrye.common.annotation.Blocking;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import pe.edu.pucp.morapack.airscheduler.api.response.JsonResponse;
@@ -51,6 +52,7 @@ public class PedidosController {
     @POST
     @Path("/upload")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
+    @Blocking
     public Response uploadPedidos(@RestForm("file") FileUpload fileUpload) { // <--- CAMBIO AQUÍ
         
         // Validación rápida por si el archivo llega vacío
