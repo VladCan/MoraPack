@@ -76,8 +76,8 @@ export default function Simulacion() {
   }, [airports]);
 
   // Conectar al SSE
-  const { runId, selectedAirportId, setSelectedAirport, reset } = useRunSession();
-  const { simNowUtc, windows, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
+  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados } = useRunSession();
+const { simNowUtc, windows, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
 
   // Procesar vuelos para renderizar
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
@@ -104,8 +104,11 @@ export default function Simulacion() {
       });
     });
 
-    // Ahora procesamos todos los vuelos únicos
+    // Ahora procesamos todos los vuelos únicos (excluyendo cancelados)
     vuelosUnicos.forEach(vuelo => {
+        // Excluir vuelos cancelados
+        if (vuelosCancelados.has(vuelo.id)) return;
+        
         const origen = airportsMap.get(vuelo.origen);
         const destino = airportsMap.get(vuelo.destino);
 
@@ -171,7 +174,7 @@ export default function Simulacion() {
     });
 
     return allFlights;
-  }, [windows, simNowUtc, airportsMap]);
+  }, [windows, simNowUtc, airportsMap, vuelosCancelados]);
 
   // Sincronizar vuelo activo con datos actualizados
   useEffect(() => {
