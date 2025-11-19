@@ -65,6 +65,8 @@ export function buildStartRunRequest(
     return {
         ...base,
         startUtc: ui.inicio.toISOString(),
+        horizonHours: 1, //ESTO NO SE USA EN EL BACK REALMENTE
+        windowHours: 1, //ESTO TAMPOCO
         //ordersSource: ui.ordersSource,
     };
 
