@@ -18,7 +18,10 @@ public class ArchivoManager {
     String dataSourceMode; 
 
     @ConfigProperty(name = "morapack.upload.dir")
-    String uploadDir; 
+    String uploadDir;
+
+    @ConfigProperty(name = "morapack.reports.dir")
+    String reportsDir;
     
     // Eliminamos 'private static final String FILENAME = "aereopuertos.txt";' si existía
 
@@ -27,6 +30,10 @@ public class ArchivoManager {
      */
     public String getUploadDir() {
         return uploadDir; 
+    }
+
+    public String getReportsDir(){
+        return reportsDir;
     }
 
     // ELIMINAR el método getUploadFilePath() si solo se usaba para "aereopuertos.txt"
