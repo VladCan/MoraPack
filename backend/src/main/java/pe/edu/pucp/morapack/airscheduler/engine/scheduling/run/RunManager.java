@@ -660,6 +660,8 @@ public class RunManager {
 
         int idx = 0;
 
+        System.out.println("Estamos dentro de runOperacion");
+
         System.out.println("En esta iteración, wStart es: " + wStart + ", wEnd es: " + wEnd);
         System.out.println("Voy a entrar al bucle, mi id es:" + id);
 
