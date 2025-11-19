@@ -9,6 +9,7 @@ import { useRunSession } from "@/lib/runSession";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import SimulationFinishedOverlay from "@/components/common/SimulationFinishedOverlay";
+import { downloadFile } from "@/services/api";
 
 const COLOR_SEDE   = "#005097";
 const COLOR_NORMAL = "#38bdf8";
@@ -210,8 +211,11 @@ export default function Simulacion() {
     setFinishedAt(null);
   }, [runId]);
 
-  const handleDownloadReports = () => {
+  const handleDownloadReports = async () => {
     if (!runId) return;
+
+    await downloadFile(`reportes/download`, "reporteSimulacion.txt");
+
     // Endpoint a crear, por ejemplo:
     // GET /runs/{id}/report  -> devuelve ZIP
     // downloadFile(`runs/${runId}/report`, `reporte-simulacion-${runId}.zip`);
