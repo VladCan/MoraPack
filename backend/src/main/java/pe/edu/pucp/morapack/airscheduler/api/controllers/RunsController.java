@@ -111,7 +111,7 @@ public class RunsController {
                     config = RunConfig.colapso(start, sedes, windowSize);
                     break;
                 case OPERACION:
-                    config = RunConfig.operacion(sedes, windowSize);
+                    config = RunConfig.operacion(start, sedes, windowSize);
                     break;
                 default:
                     throw new BadRequestException("Scenario no soportado.");
@@ -124,6 +124,12 @@ public class RunsController {
         //Creamos runContext
         RunContext runContext = new RunContext(runId, config);
         runManager.addContext(runId.value(), runContext);
+
+        switch (scenario) {
+            case OPERACION:
+                runManager.setOperacionRunId(runId.value());
+                break;
+        }
 
         /*
         System.out.println("Estamos en RunsController y vamos a dar 30 sec para que coloques el link del SSE y " +

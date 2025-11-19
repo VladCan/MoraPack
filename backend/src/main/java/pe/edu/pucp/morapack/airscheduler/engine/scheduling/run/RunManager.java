@@ -126,11 +126,16 @@ public class RunManager {
         return list;
     }
 
+    public void setOperacionRunId(String operacionRunId) {
+        this.operacionRunId.set(operacionRunId);
+    }
+
     //Con esto estamos creando el run si no existe. Si ya existe, lo devolvemos:
     public String ensureOperacionStarted(){
         String existing = operacionRunId.get();
         if (existing != null) return existing;
 
+        /*
         //Evita que 2 primeros pedidos creen 2 runs. (Para efectos del curso nunca pasará, pero porseaca)
         synchronized (this){
             existing = operacionRunId.get();
@@ -151,7 +156,9 @@ public class RunManager {
 
             return runId.value();
         }
+        */
 
+        return null;
     }
 
 
