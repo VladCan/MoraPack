@@ -655,8 +655,11 @@ public class RunManager {
         /// Nota: Dado que ahorita solo enviamos horasVentana (osea, horas), estoy comentando esto.
         /// Tenemos que hacer cambios para que soporte por minutos (no en el algoritmo, creo que ahí no,
         /// sino en RunConfig (línea 59 en dicho archivo))
+
+        Duration minutosVentana = Duration.ofMinutes(1);
+
         //Instant wEnd = wStart.plus(config.horasVentana());
-        Instant wEnd = wStart.plus(Duration.ofMinutes(1));
+        Instant wEnd = wStart.plus(minutosVentana);
 
         int idx = 0;
 
@@ -683,7 +686,7 @@ public class RunManager {
                 // Avanzar a la siguiente ventana antes de continuar
                 idx++;
                 wStart = wEnd;
-                wEnd = wEnd.plus(config.horasVentana());
+                wEnd = wEnd.plus(minutosVentana);
                 continue;
             }
 
@@ -745,7 +748,7 @@ public class RunManager {
                         // Avanzar a la siguiente ventana antes de continuar
                         idx++;
                         wStart = wEnd;
-                        wEnd = wEnd.plus(config.horasVentana());
+                        wEnd = wEnd.plus(minutosVentana);
                         //Como se ha diseñado para que lea todo0 de un archivo, tenemos que hacer esto para que funcione por ventana
                         pedidosCargados.setUtcNormalizada(false);
                         continue;
@@ -824,7 +827,7 @@ public class RunManager {
             // Siguiente ventana
             idx++;
             wStart = wEnd;
-            wEnd   = wEnd.plus(Duration.ofMinutes(1));
+            wEnd   = wEnd.plus(minutosVentana);
             //Como se ha diseñado para que lea todo0 de un archivo, tenemos que hacer esto para que funcione por ventana
             pedidosCargados.setUtcNormalizada(false);
 
