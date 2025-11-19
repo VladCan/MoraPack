@@ -67,7 +67,10 @@ export default function ToolsPanel({
   // Estado principal
   const [inicio, setInicio] = useState<Date | undefined>();
   const [fin, setFin] = useState<Date | undefined>();
-  const showStart = variant !== "operacion";
+  //const showStart = variant !== "operacion";
+  
+  //Por los cambios del profesor, todos tienen fecha de inicio.
+  const showStart = true;
   const showEnd = variant === "simulacion";
 
   const [niveles, setNiveles] = useState<Record<NivelCarga, boolean>>({
