@@ -2,6 +2,8 @@ package pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io;
 
 import lombok.Getter;
 
+import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,6 +30,7 @@ public class CargarPedidos {
     private final Queue<Pedido> colaPedidos = new LinkedList<>();
     private boolean utcNormalizada = false; // evita doble normalización
     private static final String SEPARATOR = "-";
+
     // DTO simple de la ventana
     public record VentanaPedidos(Instant presenteUTC, List<Pedido> pedidos) {
     }
@@ -69,10 +72,21 @@ public class CargarPedidos {
     public void leerDatosProfe(Scanner sc) {
         while (sc.hasNextLine()) {
             Pedido pedido = new Pedido();
-            int idPedido=colaPedidos.size()+1;
-            //pedido.leerProfe(sc,idPedido);
-            pedido.leerProfeNew(sc,idPedido);
+            int idPedido = colaPedidos.size() + 1;
+            // pedido.leerProfe(sc,idPedido);
+            pedido.leerProfeNew(sc, idPedido);
             agregar(pedido);
+        }
+    }
+
+    public void leerGigante(BufferedReader br) throws IOException {
+        String linea;
+        int id = 1;
+
+        while ((linea = br.readLine()) != null) {
+            Pedido p = Pedido.parsearLineaGigante(linea, id);
+            colaPedidos.add(p);
+            id++;
         }
     }
 
@@ -81,12 +95,13 @@ public class CargarPedidos {
      * usando el GMT del aeropuerto DESTINO. No altera el orden de la cola.
      */
 
-    public void normalizarUtcOP(AeropuertosMap aeropuertosMap){
-        for (Pedido pedido : colaPedidos){
+    public void normalizarUtcOP(AeropuertosMap aeropuertosMap) {
+        for (Pedido pedido : colaPedidos) {
             var aeropuertoDestino = aeropuertosMap.obtener(pedido.getDestino());
             int gmt = (aeropuertoDestino != null) ? aeropuertoDestino.getGMT() : 0; // fallback seguro
-            //Verificamos si ya tiene UTC normalizada
-            if (pedido.getCreatedAtUtc() != null) continue;
+            // Verificamos si ya tiene UTC normalizada
+            if (pedido.getCreatedAtUtc() != null)
+                continue;
             pedido.computeUtcFromGmt(gmt);
         }
     }
@@ -102,8 +117,9 @@ public class CargarPedidos {
         for (Pedido pedido : colaPedidos) {
             var aeropuertoDestino = aeropuertosMap.obtener(pedido.getDestino());
             int gmt = (aeropuertoDestino != null) ? aeropuertoDestino.getGMT() : 0; // fallback seguro
-            //Verificamos si ya tiene UTC normalizada (cambio hecho para OD, no rompe nada)
-            if (pedido.getCreatedAtUtc() != null) continue;
+            // Verificamos si ya tiene UTC normalizada (cambio hecho para OD, no rompe nada)
+            if (pedido.getCreatedAtUtc() != null)
+                continue;
             pedido.computeUtcFromGmt(gmt);
         }
         utcNormalizada = true;
@@ -143,6 +159,30 @@ public class CargarPedidos {
         }
         return new VentanaPedidos(presenteUTC, candidatos);
     }
+
+    public VentanaPedidos acumuladoEntre(Instant inicioUTC, Instant presenteUTC) {
+        if (!utcNormalizada)
+            throw new IllegalStateException("Primero llama a normalizarUtc(aeropuertosMap).");
+
+        if (inicioUTC == null || presenteUTC == null || colaPedidos.isEmpty())
+            return new VentanaPedidos(null, List.of());
+
+        List<Pedido> candidatos = new ArrayList<>();
+        for (Pedido p : colaPedidos) {
+            Instant t = p.getCreatedAtUtc();
+            if (t == null) continue;
+
+            // Solo pedidos dentro del intervalo [inicioUTC, presenteUTC]
+            if (!t.isBefore(inicioUTC) && !t.isAfter(presenteUTC)) {
+                candidatos.add(p);
+            } else if (t.isAfter(presenteUTC)) {
+                break; // la cola está ordenada temporalmente
+            }
+        }
+
+        return new VentanaPedidos(presenteUTC, candidatos);
+    }
+
 
     // --- NUEVO: listar sin remover ---
     /**
@@ -201,10 +241,12 @@ public class CargarPedidos {
     }
 
     public void eliminarYActualizarCumplidosHasta(Instant presenteUTC, SolucionProgramacion solucionAnterior) {
-        if (solucionAnterior == null || presenteUTC == null) return;
+        if (solucionAnterior == null || presenteUTC == null)
+            return;
 
         Map<Integer, PlanPedido> planes = solucionAnterior.getPlanPorPedido();
-        if (planes == null || planes.isEmpty()) return;
+        if (planes == null || planes.isEmpty())
+            return;
 
         for (Iterator<Pedido> it = colaPedidos.iterator(); it.hasNext();) {
             Pedido pedido = it.next();
@@ -214,19 +256,20 @@ public class CargarPedidos {
                 continue;
             }
 
-            int entregado = 0;   // rutas ya 100% llegadas al destino ≤ corte
-            int enProgreso = 0;  // rutas que ya iniciaron (primer tramo despegó < corte) pero aún no llegaron
+            int entregado = 0; // rutas ya 100% llegadas al destino ≤ corte
+            int enProgreso = 0; // rutas que ya iniciaron (primer tramo despegó < corte) pero aún no llegaron
 
             for (RutaAsignada ruta : plan.getRutas()) {
-                if (ruta == null || ruta.getTramos() == null || ruta.getTramos().isEmpty()) continue;
+                if (ruta == null || ruta.getTramos() == null || ruta.getTramos().isEmpty())
+                    continue;
 
                 var tramos = ruta.getTramos();
                 // por convenio los tramos de una ruta están en orden cronológico origen→destino
                 TramoAsignado first = tramos.get(0);
-                TramoAsignado last  = tramos.get(tramos.size() - 1);
+                TramoAsignado last = tramos.get(tramos.size() - 1);
 
-                Instant salidaPrimera = (first.getVuelo()   != null) ? first.getVuelo().getSalidaUtc()  : null;
-                Instant llegadaFinal  = (last.getLlegadaUtc() != null) ? last.getLlegadaUtc()            : null;
+                Instant salidaPrimera = (first.getVuelo() != null) ? first.getVuelo().getSalidaUtc() : null;
+                Instant llegadaFinal = (last.getLlegadaUtc() != null) ? last.getLlegadaUtc() : null;
 
                 int q = ruta.getCantidad(); // cantidad que viaja por ESTA ruta
 
@@ -237,7 +280,8 @@ public class CargarPedidos {
                 }
 
                 // 2) Ruta ya iniciada (comprometida) pero no entregada aún:
-                //    primer tramo despegó antes del corte (aunque esté en vuelo o esperando conexión)
+                // primer tramo despegó antes del corte (aunque esté en vuelo o esperando
+                // conexión)
                 if (salidaPrimera != null && salidaPrimera.isBefore(presenteUTC)) {
                     enProgreso += q;
                 }
@@ -258,9 +302,6 @@ public class CargarPedidos {
         }
     }
 
-
-
-    
     // Añade estos formatters dentro de la clase CargarPedidos (como campos
     // estáticos)
     private static final java.time.format.DateTimeFormatter FMT_LOCAL = java.time.format.DateTimeFormatter
@@ -323,6 +364,7 @@ public class CargarPedidos {
         System.out.println("============================================================================"
                 + "==============================");
     }
+
     /** Imprime una VentanaPedidos (hasta presenteUTC) en una tabla bonita. */
     public void sort(String filename) {
         if (colaPedidos.isEmpty()) { // Usar la cola directamente
@@ -333,33 +375,35 @@ public class CargarPedidos {
         // 1. Mover la cola a una lista temporal para ordenar
         List<Pedido> tmp = new ArrayList<>(colaPedidos);
 
-        // 2. Ordenar la lista utilizando Collections.sort por el tiempo de creación UTC.
+        // 2. Ordenar la lista utilizando Collections.sort por el tiempo de creación
+        // UTC.
         // Asumimos que getCreatedAtUtc() devuelve un Instant.
-        tmp.sort(Comparator.comparing(Pedido::getCreatedAtUtc)); 
+        tmp.sort(Comparator.comparing(Pedido::getCreatedAtUtc));
 
         // 3. Volver a llenar la cola interna con la lista ordenada
         colaPedidos.clear();
-        colaPedidos.addAll(tmp); 
+        colaPedidos.addAll(tmp);
 
-        // 4. Imprimir la lista ordenada en el archivo de destino con el formato original
+        // 4. Imprimir la lista ordenada en el archivo de destino con el formato
+        // original
         try {
             Path path = Paths.get(filename);
             Files.createDirectories(path.getParent());
 
             try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(
                     path,
-                    StandardOpenOption.CREATE, 
+                    StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING))) {
 
                 // Escribir cada pedido en el formato original
                 for (int i = 0; i < tmp.size(); i++) {
                     Pedido p = tmp.get(i);
                     // 🛑 Usamos el índice + 1 como ID de archivo secuencial.
-                    out.println(formatearPedidoOriginal(p, i + 1)); 
+                    out.println(formatearPedidoOriginal(p, i + 1));
                 }
-                
-                System.out.printf("✅ Pedidos ordenados por UTC y guardados en: %s (%d registros)%n", 
-                    path.toAbsolutePath(), tmp.size());
+
+                System.out.printf("✅ Pedidos ordenados por UTC y guardados en: %s (%d registros)%n",
+                        path.toAbsolutePath(), tmp.size());
 
             }
         } catch (Exception e) {
@@ -369,27 +413,28 @@ public class CargarPedidos {
     }
 
     /**
-     * Helper para formatear el pedido al formato original (ej. 000000001-20250102-01-29-UBBB-004-0031433).
+     * Helper para formatear el pedido al formato original (ej.
+     * 000000001-20250102-01-29-UBBB-004-0031433).
      */
     private String formatearPedidoOriginal(Pedido p, int generatedId) {
-        LocalDateTime originalDate = p.getFecha(); 
-        
+        LocalDateTime originalDate = p.getFecha();
+
         // Asumiendo que el ID del cliente y la cantidad son números y necesitan padding
         String idPedidoStr = String.format("%09d", generatedId);
         String datePart = originalDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         String hh = originalDate.format(DateTimeFormatter.ofPattern("HH"));
         String mm = originalDate.format(DateTimeFormatter.ofPattern("mm"));
-        String cantidadStr = String.format("%03d", p.getCantidad()); 
-        String idClienteStr = String.format("%07d", p.getIdCliente()); 
-        
+        String cantidadStr = String.format("%03d", p.getCantidad());
+        String idClienteStr = String.format("%07d", p.getIdCliente());
+
         // Reconstrucción del formato: ID-YYYYMMDD-HH-MM-DEST-CANT-IDCLIENTE
         return idPedidoStr + SEPARATOR +
-               datePart + SEPARATOR +
-               hh + SEPARATOR +
-               mm + SEPARATOR +
-               p.getDestino() + SEPARATOR +
-               cantidadStr + SEPARATOR +
-               idClienteStr;
+                datePart + SEPARATOR +
+                hh + SEPARATOR +
+                mm + SEPARATOR +
+                p.getDestino() + SEPARATOR +
+                cantidadStr + SEPARATOR +
+                idClienteStr;
     }
 
 }

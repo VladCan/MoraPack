@@ -3,6 +3,7 @@ package pe.edu.pucp.morapack.airscheduler.engine.scheduling.run;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.io.BufferedReader;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -20,6 +21,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.VentanaPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.EstadoAnteriorExtractor;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosCancelados;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosMap;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.TEGEventBuilder;
@@ -46,7 +48,11 @@ public class RunManager {
     private static final String AEROPUERTOS_FILENAME = "aereopuertos.txt";
     private static final String VUELOS_FILENAME = "vuelos.txt";
     private static final String PEDIDOS_FILENAME = "pedidos.txt";
+
     private static boolean firstExecution = false;
+
+    private static final String VUELOS_CANCELADOS_FILENAME = "vuelos_cancelados.txt";
+
 
     private final ExecutorService executor = Executors.newCachedThreadPool((r -> {
         Thread t = new Thread(r, "run-" + UUID.randomUUID());
@@ -164,7 +170,7 @@ public class RunManager {
     private volatile VuelosMap vuelosMap;
     private volatile CargarPedidos pedidosCargados;
     private volatile Set<String> sedes;
-    
+    private volatile VuelosCancelados cancelados;
     // Estado de planificación por run
     private final Map<String, SolucionProgramacion> solucionesAnteriores = new ConcurrentHashMap<>();
     private final Map<String, OcupacionPorAeropuerto> ocupacionesPorRun = new ConcurrentHashMap<>();
@@ -219,9 +225,11 @@ public class RunManager {
 
             if (scenario != RunConfig.Scenario.OPERACION){
                 // **USO DE ARCHIVOMANAGER:** Usar el manager para el archivo de pedidos
-                try (Scanner sc = archivoManager.getScannerForDataFile(PEDIDOS_FILENAME).orElse(null)) {
-                    if (sc != null) {
-                        pedidosCargados.leerDatosProfe(sc);
+                try (BufferedReader br = archivoManager.getBufferedReaderForDataFile(PEDIDOS_FILENAME).orElse(null)) {
+                    if (br != null) {
+                        //pedidosCargados.leerDatosProfe(sc);
+                        pedidosCargados.leerGigante(br);
+                        System.out.println("[RunManager] Lectura Gigante de pedidos completada");
                         pedidosCargados.normalizarUtc(aeropuertosMap);
                         pedidosCargados.ordenarPorUTC();
                         System.out.println("[RunManager] Pedidos cargados: " + pedidosCargados.getLista().size());
@@ -235,6 +243,19 @@ public class RunManager {
             
             // Definir sedes
             sedes = new HashSet<>(Arrays.asList("SPIM", "EBCI", "UBBB"));
+
+            // Cargar vuelos cancelados de archivo
+            cancelados = new VuelosCancelados();
+            try (Scanner sc = archivoManager.getScannerForDataFile(VUELOS_CANCELADOS_FILENAME).orElse(null)) {
+                if (sc != null) {
+                    cancelados.leerDatos(sc);
+                    System.out.println("[RunManager] Vuelos cancelados cargados");
+                } else {
+                    System.err.println("[RunManager] Falló la carga del archivo de vuelos cancelados.");
+                }
+            } catch (Exception e) {
+                 System.err.println("[RunManager] Error procesando archivo de vuelos cancelados: " + e.getMessage());
+            }
             
             System.out.println("[RunManager] Catálogos inicializados correctamente");
         }
@@ -262,26 +283,26 @@ public class RunManager {
     /*Overload, ya que vamos a usar el string y no el RunId*/
     public Instant currentSimNow(String runId){
         RunContext ctx = requireContext(runId);
-        //Acá calculamos el tiempo real transcurrido desde que arrancó el run
+
         long deltaMs = Duration.between(ctx.wallAnchor(), Instant.now()).toMillis();
-        //Acá calculamos la velocidad en segundos simulados por segundo real
         long simDeltaMs = (long) Math.floor(deltaMs * ctx.speed());
 
-        // Retornamos el ahora simulado
         Instant simulatedNow = ctx.simStartUtc().plusMillis(simDeltaMs);
-        
-        // Limitar el simNow al final de la última llegada de vuelo
+
         SolucionProgramacion ultimaSolucion = solucionesAnteriores.get(runId);
         if (ultimaSolucion != null) {
             Instant ultimaLlegada = obtenerUltimaLlegada(ultimaSolucion);
+
             if (ultimaLlegada != null && simulatedNow.isAfter(ultimaLlegada)) {
-                return ultimaLlegada;
+                System.out.println("[currentSimNow] reached end of flights → NOT clamping, letting clock move on");
+                return simulatedNow;
             }
         }
-        
+
         return simulatedNow;
     }
-    
+
+
     private Instant obtenerUltimaLlegada(SolucionProgramacion solucion) {
         if (solucion == null || solucion.getCargaPorVuelo() == null) {
             return null;
@@ -508,6 +529,8 @@ public class RunManager {
             }
 
             System.out.println("[RunManager] Procesando ventana " + idx + ": " + wStart + " - " + wEnd);
+            //RunContext ctx = requireContext(id);
+            //ctx.reAnchorClock(wStart);
 
             try {
                 // 1. Preparar estado anterior si existe
@@ -522,6 +545,7 @@ public class RunManager {
 
                     Set<VueloProgramadoId> vuelosCancelados =
                             vuelosCanceladosPorRun.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
+                    //
 
                     if (!vuelosCancelados.isEmpty()) {
                         System.out.println("[RunManager]: Procesando cancelaciones: " + vuelosCancelados.size());
@@ -542,7 +566,7 @@ public class RunManager {
                 }
 
                 // 2. Obtener pedidos de la ventana actual (ya actualizados)
-                VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wEnd);
+                VentanaPedidos ventana = pedidosCargados.acumuladoEntre(wStart,wEnd);
                 List<Pedido> pedidosVentana = ventana.pedidos();
 
                 if (pedidosVentana.isEmpty()) {
@@ -576,6 +600,13 @@ public class RunManager {
                         .build();
 
                 VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, vuelosMap).construir(params);
+                // 3.5 Cancelar vuelos de archivo
+
+                List<String> vuelosCancelados = cancelados.obtenerVuelosCancelados(wStart,wEnd);
+                if(!vuelosCancelados.isEmpty()){
+                    System.out.println("[RunManager] Vuelos cancelados en la ventana " + idx + ": " + vuelosCancelados);
+                    teg.cancelarVuelos(vuelosCancelados);
+                }
 
                 // 4. Generar solución inicial (seed)
                 OcupacionPorAeropuerto ocupacionPorAeropuerto = ocupacionesPorRun.computeIfAbsent(id, k -> new OcupacionPorAeropuerto(aeropuertosMap));
@@ -723,7 +754,8 @@ public class RunManager {
                     /// Si no hay nada en la ventana, duerme
                     // sleepToEndWindow(id, wEnd);
                     if (pedidosVentana.isEmpty()) {
-                        System.out.println("[RunManager] No hay pedidos en la ventana " + idx);
+                        System.out.println("[RunManager] " +
+                                " " + idx);
                         // Marcar ventana como enviada aunque esté vacía
                         ventanasEnviadasRun.add(windowIdISO);
                         broadcastWindow(new WindowPacket(id, idx, wStart, wEnd, List.of(),

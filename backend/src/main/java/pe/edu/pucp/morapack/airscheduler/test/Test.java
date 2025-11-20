@@ -10,19 +10,18 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
+import com.arjuna.ats.internal.jdbc.drivers.modifiers.list;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.VentanaPedidos;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.EstadoAnteriorExtractor;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.*;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.TEGEventBuilder;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.helpers.TEGParametros;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.ArriboExogeno;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.OcupacionAlmacen;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Vuelo;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.ALNS;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.operators.*;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.OcupacionPorAeropuerto;
@@ -46,7 +45,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
          */
         final Set<String> sedes = new HashSet<>(Arrays.asList("SPIM", "EBCI", "UBBB"));
         AeropuertosMap aeropuertosMap = new AeropuertosMap();// Aeropuertos (incluye husos horarios)
-        try (Scanner sc = ArchivoUtils.getScannerFromResource(
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(
                 "aereopuertos.txt")) {
             if (sc == null)
                 return;
@@ -54,12 +53,32 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
         }
         // Vuelos (catálogo maestro)
         VuelosMap mapa = new VuelosMap(aeropuertosMap);
-        try (Scanner sc = ArchivoUtils.getScannerFromResource(
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(
                 "vuelos.txt")) {
             if (sc == null)
                 return;
             mapa.leerDatos(sc);
         }
+
+        VuelosCancelados cancelados = new VuelosCancelados();
+        int year = 2025;
+        int mes = 10; // octubre
+        // Nombre del archivo esperado: cancelaciones_2025-10.txt
+        String nombre = String.format("cancelaciones_%04d-%02d.txt", year, mes);
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(nombre)) {
+            if (sc == null)
+                return;
+            cancelados.leerDatos(sc);
+        }
+
+        /*List<Vuelo> hola = mapa.vuelosDesde("SUAA");
+
+        for (Vuelo v : hola) {
+            List<Integer> dias = cancelados.diasCancelado(v);
+            System.out.println("Vuelo: " + v + " -> Días cancelados: " + dias);
+        }*/
+
+
         // se va llenar de datos que no son necesarios
         // nos dificulta la replanificación
         /*
@@ -68,7 +87,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
          * =======================
          */
         CargarPedidos pedidos = new CargarPedidos();
-        try (Scanner sc = ArchivoUtils.getScannerFromResource("pedidos.txt")) {
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath("pedidos.txt")) {
             if (sc == null)
                 return;
             pedidos.leerDatosProfe(sc);
@@ -146,6 +165,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                     .reservasWaitIniciales(reservas) // <— ocupa bodega por pickup 2h
                     // .stockInicial(stockInicial) //en caso sea conveniente para el modelo (en
                     // evaluacion)
+                    .vuelosCancelados(cancelados.getCanceladosMap())
                     .build();
 
             VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, mapa).construir(params);

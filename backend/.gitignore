@@ -47,3 +47,4 @@ nb-configuration.xml
 out/*
 src/main/resources/pedidos.txt
 src/main/resources/pedidosbackup.txt
+/uploads/*
