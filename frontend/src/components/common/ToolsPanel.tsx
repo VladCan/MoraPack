@@ -445,17 +445,20 @@ export default function ToolsPanel({
                 <span className="text-muted-foreground">Estado</span>
                 <span className={`font-semibold ${
                   cantidadEnVuelo >= pedido.cantidad ? "text-emerald-600" :
-                  cantidadEnVuelo > 0 ? "text-amber-600" : "text-rose-600"
+                  cantidadEnVuelo > 0 ? "text-amber-600" :
+                  (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) ? "text-blue-600" : "text-rose-600"
                 }`}>
                   {cantidadEnVuelo >= pedido.cantidad ? "COMPLETO" :
-                   cantidadEnVuelo > 0 ? "PARCIAL" : "PENDIENTE"}
+                   cantidadEnVuelo > 0 ? "PARCIAL" :
+                   (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) ? "PROGRAMADO" : "PENDIENTE"}
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div
                   className={`h-full transition-all ${
                     cantidadEnVuelo >= pedido.cantidad ? "bg-emerald-600" :
-                    cantidadEnVuelo > 0 ? "bg-amber-600" : "bg-rose-600"
+                    cantidadEnVuelo > 0 ? "bg-amber-600" :
+                    (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) ? "bg-blue-600" : "bg-rose-600"
                   }`}
                   style={{ width: `${(cantidadEnVuelo / pedido.cantidad) * 100}%` }}
                 />
@@ -472,29 +475,38 @@ export default function ToolsPanel({
             )}
             {/* NUEVO: Desglose de rutas de entrega */}
             {pedido.rutas && pedido.rutas.length > 0 && (() => {
-              // Filtrar rutas que tienen vuelos EN EL AIRE AHORA
               const now = new Date(simNowUtc || Date.now()).getTime();
-              const rutasVisibles = pedido.rutas.filter(ruta => {
-                return ruta.vuelos.some(vuelo => {
-                  const salida = new Date(vuelo.salidaUtc).getTime();
-                  const llegada = new Date(vuelo.llegadaUtc).getTime();
-                  return now >= salida && now <= llegada;
-                });
-              });
+              const estadoPedido = cantidadEnVuelo >= pedido.cantidad ? "COMPLETO" :
+                                   cantidadEnVuelo > 0 ? "PARCIAL" : 
+                                   (variant === "operacion" && pedido.rutas.length > 0 ? "PROGRAMADO" : "PENDIENTE");
+              
+              // En operación diaria, si es PROGRAMADO, mostrar todas las rutas
+              // Si es COMPLETO o PARCIAL, mostrar solo las rutas en vuelo
+              const rutasVisibles = estadoPedido === "PROGRAMADO" && variant === "operacion"
+                ? pedido.rutas // Mostrar todas las rutas si es PROGRAMADO
+                : pedido.rutas.filter(ruta => {
+                    return ruta.vuelos.some(vuelo => {
+                      const salida = new Date(vuelo.salidaUtc).getTime();
+                      const llegada = new Date(vuelo.llegadaUtc).getTime();
+                      return now >= salida && now <= llegada;
+                    });
+                  });
               
               return rutasVisibles.length > 0 && (
                 <div className="border-t border-border pt-2">
                   <p className="text-sm font-semibold mb-2">
-                    Rutas activas ({rutasVisibles.length} {rutasVisibles.length === 1 ? 'ruta' : 'rutas'})
+                    {estadoPedido === "PROGRAMADO" ? "Rutas programadas" : "Rutas activas"} ({rutasVisibles.length} {rutasVisibles.length === 1 ? 'ruta' : 'rutas'})
                   </p>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {rutasVisibles.map((ruta, idx) => {
-                      // Filtrar vuelos de esta ruta que están EN EL AIRE
-                      const vuelosActivos = ruta.vuelos.filter(vuelo => {
-                        const salida = new Date(vuelo.salidaUtc).getTime();
-                        const llegada = new Date(vuelo.llegadaUtc).getTime();
-                        return now >= salida && now <= llegada;
-                      });
+                      // Si es PROGRAMADO, mostrar todos los vuelos. Si no, solo los activos
+                      const vuelosActivos = estadoPedido === "PROGRAMADO" && variant === "operacion"
+                        ? ruta.vuelos // Mostrar todos los vuelos si es PROGRAMADO
+                        : ruta.vuelos.filter(vuelo => {
+                            const salida = new Date(vuelo.salidaUtc).getTime();
+                            const llegada = new Date(vuelo.llegadaUtc).getTime();
+                            return now >= salida && now <= llegada;
+                          });
                       
                       return (
                         <div key={idx} className="p-2 rounded-lg bg-muted/50 border border-border/50">
@@ -561,6 +573,7 @@ export default function ToolsPanel({
           items={pedidosActivos}
           onSelect={setPedido}
           simNowUtc={simNowUtc}
+          variant={variant}
         />
       </div>
 
@@ -1206,6 +1219,7 @@ function OrderSelectCard({
   items,
   onSelect,
   simNowUtc,
+  variant,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -1214,6 +1228,7 @@ function OrderSelectCard({
   items: PedidoDTO[];
   onSelect: (val: PedidoDTO) => void;
   simNowUtc?: string | null;
+  variant?: Variant;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -1223,6 +1238,10 @@ function OrderSelectCard({
   // Función para calcular el estado basado en cantidadEnVuelo
   const calcularEstado = useCallback((pedido: PedidoDTO): string => {
     if (!pedido.rutas || !simNowUtc) {
+      // En operación diaria, si tiene rutas pero no hay simNowUtc, es PROGRAMADO
+      if (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) {
+        return "PROGRAMADO";
+      }
       return pedido.estadoAsignacion;
     }
 
@@ -1236,12 +1255,21 @@ function OrderSelectCard({
       return tieneVueloEnAire ? sum + ruta.cantidad : sum;
     }, 0);
 
-    return cantidadEnVuelo >= pedido.cantidad
-      ? "COMPLETO"
-      : cantidadEnVuelo > 0
-      ? "PARCIAL"
-      : "PENDIENTE";
-  }, [simNowUtc]);
+    // Si está completo o parcial, devolver ese estado
+    if (cantidadEnVuelo >= pedido.cantidad) {
+      return "COMPLETO";
+    }
+    if (cantidadEnVuelo > 0) {
+      return "PARCIAL";
+    }
+
+    // Si no hay vuelos en el aire pero tiene rutas planificadas, en operación diaria es PROGRAMADO
+    if (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) {
+      return "PROGRAMADO";
+    }
+
+    return "PENDIENTE";
+  }, [simNowUtc, variant]);
 
   const estados = useMemo(
     () =>
@@ -1363,6 +1391,7 @@ function OrderSelectCard({
                         <span className={`text-xs px-1.5 py-0.5 rounded ${
                           estado === "COMPLETO" ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200" :
                           estado === "PARCIAL" ? "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200" :
+                          estado === "PROGRAMADO" ? "bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-200" :
                           "bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-200"
                         }`}>
                           {estado}
