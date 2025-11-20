@@ -31,7 +31,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.ssp.SSPGeneradorSeed;
 
 public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
     // Parámetros de simulación (ajustables)
-    private static final long HORAS_VENTANA = 8;
+    private static final long HORAS_VENTANA = 4;
     private static final long HORIZONTE_TEG_H = 48; // cuánto futuro modelar
 
     public static void main(String[] args) {

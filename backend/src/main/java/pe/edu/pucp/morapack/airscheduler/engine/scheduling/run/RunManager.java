@@ -132,11 +132,16 @@ public class RunManager {
         return list;
     }
 
+    public void setOperacionRunId(String operacionRunId) {
+        this.operacionRunId.set(operacionRunId);
+    }
+
     //Con esto estamos creando el run si no existe. Si ya existe, lo devolvemos:
     public String ensureOperacionStarted(){
         String existing = operacionRunId.get();
         if (existing != null) return existing;
 
+        /*
         //Evita que 2 primeros pedidos creen 2 runs. (Para efectos del curso nunca pasará, pero porseaca)
         synchronized (this){
             existing = operacionRunId.get();
@@ -157,7 +162,9 @@ public class RunManager {
 
             return runId.value();
         }
+        */
 
+        return null;
     }
 
 
@@ -678,10 +685,15 @@ public class RunManager {
         /// Nota: Dado que ahorita solo enviamos horasVentana (osea, horas), estoy comentando esto.
         /// Tenemos que hacer cambios para que soporte por minutos (no en el algoritmo, creo que ahí no,
         /// sino en RunConfig (línea 59 en dicho archivo))
+
+        Duration minutosVentana = Duration.ofMinutes(1);
+
         //Instant wEnd = wStart.plus(config.horasVentana());
-        Instant wEnd = wStart.plus(Duration.ofMinutes(1));
+        Instant wEnd = wStart.plus(minutosVentana);
 
         int idx = 0;
+
+        System.out.println("Estamos dentro de runOperacion");
 
         System.out.println("En esta iteración, wStart es: " + wStart + ", wEnd es: " + wEnd);
         System.out.println("Voy a entrar al bucle, mi id es:" + id);
@@ -704,7 +716,7 @@ public class RunManager {
                 // Avanzar a la siguiente ventana antes de continuar
                 idx++;
                 wStart = wEnd;
-                wEnd = wEnd.plus(config.horasVentana());
+                wEnd = wEnd.plus(minutosVentana);
                 continue;
             }
 
@@ -767,7 +779,7 @@ public class RunManager {
                         // Avanzar a la siguiente ventana antes de continuar
                         idx++;
                         wStart = wEnd;
-                        wEnd = wEnd.plus(config.horasVentana());
+                        wEnd = wEnd.plus(minutosVentana);
                         //Como se ha diseñado para que lea todo0 de un archivo, tenemos que hacer esto para que funcione por ventana
                         pedidosCargados.setUtcNormalizada(false);
                         continue;
@@ -846,7 +858,7 @@ public class RunManager {
             // Siguiente ventana
             idx++;
             wStart = wEnd;
-            wEnd   = wEnd.plus(Duration.ofMinutes(1));
+            wEnd   = wEnd.plus(minutosVentana);
             //Como se ha diseñado para que lea todo0 de un archivo, tenemos que hacer esto para que funcione por ventana
             pedidosCargados.setUtcNormalizada(false);
 

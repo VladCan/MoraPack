@@ -2,7 +2,7 @@ export const airportsMap = [
     // América del Sur
   { codigo: "SKBO", ciudad: "Bogotá", pais: "Colombia" },
   { codigo: "SEQU", ciudad: "Quito", pais: "Ecuador" },
-  { codigo: "SPIM", ciudad: "Lima", pais: "Perú" },
+  //{ codigo: "SPIM", ciudad: "Lima", pais: "Perú" },
   { codigo: "SBBR", ciudad: "Brasilia", pais: "Brasil" },
   { codigo: "SCEL", ciudad: "Santiago de Chile", pais: "Chile" },
   { codigo: "SABE", ciudad: "Buenos Aires", pais: "Argentina" },
@@ -13,7 +13,7 @@ export const airportsMap = [
   { codigo: "LATI", ciudad: "Tirana", pais: "Albania" },
   { codigo: "EDDI", ciudad: "Berlín", pais: "Alemania" },
   { codigo: "LOWW", ciudad: "Viena", pais: "Austria" },
-  { codigo: "EBCI", ciudad: "Bruselas", pais: "Bélgica" },
+  //{ codigo: "EBCI", ciudad: "Bruselas", pais: "Bélgica" },
   { codigo: "UMMS", ciudad: "Minsk", pais: "Bielorrusia" },
   { codigo: "LBSF", ciudad: "Sofía", pais: "Bulgaria" },
   { codigo: "LKPR", ciudad: "Praga", pais: "Chequia" },
@@ -30,6 +30,6 @@ export const airportsMap = [
   { codigo: "OOMS", ciudad: "Mascate", pais: "Omán" },
   { codigo: "OYSN", ciudad: "Saná", pais: "Yemen" },
   { codigo: "OPKC", ciudad: "Karachi", pais: "Pakistán" },
-  { codigo: "UBBB", ciudad: "Bakú", pais: "Azerbaiyán" },
+  //{ codigo: "UBBB", ciudad: "Bakú", pais: "Azerbaiyán" },
   { codigo: "OJAI", ciudad: "Amán", pais: "Jordania" },
 ]

@@ -79,8 +79,8 @@ const husosStatus  = useQuery({
 
 //todavía no tenemos para cancelaciones, pero cuando tengamos:
 const cancelacionesStatus = useQuery({
-  queryKey: ["status", "aereopuertos"],
-  queryFn: () => getJson<Status>("aereopuertos/status"),
+  queryKey: ["status", "cancelaciones"],
+  queryFn: () => getJson<Status>("cancelaciones/status"),
   refetchOnWindowFocus: false,
 });
 
@@ -233,11 +233,25 @@ const renderDropzoneFooterOP = (
 
   const form = useForm<FormValues>({
     resolver,
-    defaultValues: { clienteId: "", aeropuerto: "SPIM", cantidad: 1 },
+    defaultValues: { clienteId: "", aeropuerto: "SKBO", cantidad: 1 },
     mode: "onTouched",
   });
 
-  const {begin} = useRunSession();
+  const {begin, simNow} = useRunSession();
+
+  function parseUTC(dateString: string) {
+    const d = new Date(dateString);
+    return new Date(
+        d.getUTCFullYear(),
+        d.getUTCMonth(),
+        d.getUTCDate(),
+        d.getUTCHours(),
+        d.getUTCMinutes(),
+        d.getUTCSeconds(),
+        d.getUTCMilliseconds()
+    );
+}
+
 
   const createPedido = useMutation({
     mutationFn: async (v: FormValues) => {
@@ -245,7 +259,10 @@ const renderDropzoneFooterOP = (
         clienteId: v.clienteId,
         aeropuerto: v.aeropuerto,
         cantidad: v.cantidad,
+        now: simNow ? new Date(simNow) : undefined,
       });
+
+      console.log("simNow es:", simNow)
 
       const [data, error] = await handleApi(
         postJson<PedidoResponse>("pedidos/crear", req)
@@ -313,13 +330,15 @@ const renderDropzoneFooterOP = (
             footer = {renderDropzoneFooter("vuelos", vuelosStatus.data, vuelosStatus.isLoading)}/>
           <Dropzone label="Carga masiva de husos horarios" onFiles={(fs) => onUpload(fs[0], "aereopuertos")} 
             footer={renderDropzoneFooter("aereopuertos", husosStatus.data, husosStatus.isLoading)}/>
-          <Dropzone label="Carga masiva de errores" 
+          <Dropzone label="Carga masiva de cancelaciones" 
           onFiles={
             (fs) =>toast.custom((t) => (
               <ToastCustom t={t} message={"No implementado archivo: "+fs[0]?.name +" no subido"} type="error" />),
               { duration: 5000 }
             )
-            } />
+            }
+            footer={renderDropzoneFooter("cancelaciones", cancelacionesStatus.data, cancelacionesStatus.isLoading)}
+            />
           <Dropzone label="Carga masiva de pedidos" onFiles={(fs) => handleFileUpload(fs[0], "pedidos/upload")}
             footer={renderDropzoneFooter("pedidos", pedidosStatus.data, pedidosStatus.isLoading)} />
         </CardContent>
