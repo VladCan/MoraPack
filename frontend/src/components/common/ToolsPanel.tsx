@@ -216,46 +216,62 @@ export default function ToolsPanel({
     return resultado;
   }, [windows, simNowUtc, vuelosCancelados]);
 
-  // Obtener SOLO pedidos que están en vuelos activos
+  // Construir mapa de pedidos (último estado conocido por id) usando TODAS las ventanas
+  const pedidosPorIdOperacion = useMemo(() => {
+    if (variant !== "operacion") return null;
+    const map = new Map<number, PedidoDTO>();
+    windows.forEach(window => {
+      window.pedidos.forEach(p => {
+        map.set(p.id, p);
+      });
+    });
+    return map;
+  }, [windows, variant]);
+
+  // Obtener pedidos activos según escenario
   const pedidosActivos = useMemo<PedidoDTO[]>(() => {
+    if (variant === "operacion") {
+      const pedidosOperacion = pedidosPorIdOperacion ? Array.from(pedidosPorIdOperacion.values()) : [];
+      if (pedidosOperacion.length === 0) return [];
+
+      if (!simNowUtc) {
+        return pedidosOperacion;
+      }
+
+      const now = new Date(simNowUtc).getTime();
+      
+      // Filtrar pedidos completados (todos sus vuelos han llegado)
+      // Usar la misma lógica que calcularEstado para consistencia
+      return pedidosOperacion.filter(pedido => {
+        // Si no tiene rutas, mostrarlo (pendiente)
+        if (!pedido.rutas || pedido.rutas.length === 0) return true;
+        
+        // Verificar si TODOS los vuelos han llegado (igual que calcularEstado)
+        // Un pedido está completo solo cuando TODOS los vuelos de TODAS sus rutas han llegado
+        let todosVuelosLlegaron = true;
+        
+        pedido.rutas.forEach(ruta => {
+          ruta.vuelos.forEach(vuelo => {
+            const llegada = new Date(vuelo.llegadaUtc).getTime();
+            
+            // Si algún vuelo aún no ha llegado, el pedido no está completo
+            if (now <= llegada) {
+              todosVuelosLlegaron = false;
+            }
+          });
+        });
+        
+        // Mostrar si NO todos los vuelos han llegado (programado, en vuelo, o parcialmente entregado)
+        // Ocultar solo si todos los vuelos han llegado (COMPLETO)
+        return !todosVuelosLlegaron;
+      });
+    }
+
     if (windows.length === 0) return [];
 
     if (!simNowUtc) {
       const lastWindow = windows[windows.length - 1];
       return lastWindow?.pedidos ?? [];
-    }
-    
-    // En operación diaria, mostrar todos los pedidos excepto los completados
-    if (variant === "operacion") {
-      const lastWindow = windows[windows.length - 1];
-      const todosPedidos = lastWindow?.pedidos ?? [];
-      const now = new Date(simNowUtc).getTime();
-      
-      // Filtrar pedidos completados (todos sus vuelos han llegado)
-      return todosPedidos.filter(pedido => {
-        // Si no tiene rutas, mostrarlo (pendiente)
-        if (!pedido.rutas || pedido.rutas.length === 0) return true;
-        
-        // Verificar si hay vuelos pendientes (programados o en vuelo)
-        // Un pedido está completo solo cuando TODOS los vuelos de TODAS sus rutas han llegado
-        let tieneVuelosPendientes = false;
-        
-        pedido.rutas.forEach(ruta => {
-          ruta.vuelos.forEach(vuelo => {
-            const salida = new Date(vuelo.salidaUtc).getTime();
-            const llegada = new Date(vuelo.llegadaUtc).getTime();
-            
-            // Si el vuelo aún no ha llegado (programado o en vuelo), el pedido tiene vuelos pendientes
-            if (now <= llegada) {
-              tieneVuelosPendientes = true;
-            }
-          });
-        });
-        
-        // Mostrar si tiene vuelos pendientes (programados o en vuelo)
-        // Ocultar solo si todos los vuelos han llegado
-        return tieneVuelosPendientes;
-      });
     }
     
     const now = new Date(simNowUtc).getTime();
@@ -284,7 +300,63 @@ export default function ToolsPanel({
     }
 
     return resultado;
-  }, [windows, simNowUtc, variant]);
+  }, [windows, simNowUtc, variant, pedidosPorIdOperacion]);
+    if (variant === "operacion") {
+      const now = new Date(simNowUtc).getTime();
+      
+      // Filtrar pedidos completados (todos sus vuelos han llegado)
+      // Usar la misma lógica que calcularEstado para consistencia
+      return todosLosPedidos.filter(pedido => {
+        // Si no tiene rutas, mostrarlo (pendiente)
+        if (!pedido.rutas || pedido.rutas.length === 0) return true;
+        
+        // Verificar si TODOS los vuelos han llegado (igual que calcularEstado)
+        // Un pedido está completo solo cuando TODOS los vuelos de TODAS sus rutas han llegado
+        let todosVuelosLlegaron = true;
+        
+        pedido.rutas.forEach(ruta => {
+          ruta.vuelos.forEach(vuelo => {
+            const llegada = new Date(vuelo.llegadaUtc).getTime();
+            
+            // Si algún vuelo aún no ha llegado, el pedido no está completo
+            if (now <= llegada) {
+              todosVuelosLlegaron = false;
+            }
+          });
+        });
+        
+        // Mostrar si NO todos los vuelos han llegado (programado, en vuelo, o parcialmente entregado)
+        // Ocultar solo si todos los vuelos han llegado (COMPLETO)
+        return !todosVuelosLlegaron;
+      });
+    }
+    
+    const now = new Date(simNowUtc).getTime();
+    
+    // Recopilar IDs de pedidos que están en vuelos activos
+    const pedidosEnVueloSet = new Set<number>();
+    windows.forEach(window => {
+      window.vuelos.forEach(vuelo => {
+        const salida = new Date(vuelo.salidaUtc).getTime();
+        const llegada = new Date(vuelo.llegadaUtc).getTime();
+        // Solo considerar vuelos que están en el aire AHORA
+        if (now >= salida && now <= llegada) {
+          // Agregar los IDs de los pedidos en la carga de este vuelo
+          vuelo.carga?.forEach(item => {
+            pedidosEnVueloSet.add(item.pedidoId);
+          });
+        }
+      });
+    });
+    
+    // Filtrar pedidos que están en vuelo AHORA
+    const resultado = todosLosPedidos.filter(p => pedidosEnVueloSet.has(p.id));
+    if (resultado.length === 0) {
+      return todosLosPedidos;
+    }
+
+    return resultado;
+  }, [todosLosPedidos, windows, simNowUtc, variant]);
 
   // Calcular cantidad EN EL AIRE del pedido seleccionado
   const cantidadEnVuelo = useMemo(() => {
