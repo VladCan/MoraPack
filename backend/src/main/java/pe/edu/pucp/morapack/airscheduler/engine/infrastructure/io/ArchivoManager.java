@@ -23,22 +23,81 @@ public class ArchivoManager {
     @ConfigProperty(name = "morapack.upload.dir")
     String uploadDir;
 
+    @ConfigProperty(name = "morapack.reports.dir")
+    String reportsDir;
+    
+    // Eliminamos 'private static final String FILENAME = "aereopuertos.txt";' si existía
+
+    /**
+     * Hace que la ruta base de uploads sea accesible para otras clases (PedidosService, VuelosArchivoService).
+     */
     public String getUploadDir() {
-        return uploadDir;
+        return uploadDir; 
     }
 
-    // ... (Tus métodos de lectura getScanner y getInputStream se quedan igual) ...
+    public String getReportsDir(){
+        return reportsDir;
+    }
+    // ELIMINAR el método getUploadFilePath() si solo se usaba para "aereopuertos.txt"
+    // Ya que cada Service ahora lo construye con getUploadDir() + su propio filename.
+
+    /**
+     * Obtiene un Scanner para leer cualquier archivo de datos iniciales.
+     * @param filename El nombre del archivo a buscar (e.g., "vuelos.txt").
+     */
+    public Optional<Scanner> getScannerForDataFile(String filename) { // <-- ¡Ahora acepta String!
+        Optional<InputStream> isOpt = getInputStreamForDataFile(filename);
+        if (isOpt.isPresent()) {
+            return Optional.of(new Scanner(isOpt.get()));
+        }
+        return Optional.empty();
+    }
     
+    /**
+     * Lógica central para obtener el InputStream, eligiendo entre resource o filesystem.
+     */
+    private Optional<InputStream> getInputStreamForDataFile(String filename) { // <-- Lógica ajustada
+        // --- 1. Modo 'filesystem' (Producción: lee del volumen) ---
+        if ("filesystem".equalsIgnoreCase(dataSourceMode)) {
+            // Construye la ruta completa: /uploads/nombreArchivo.txt
+            Path p = Paths.get(uploadDir, filename); 
+            try {
+                if (Files.exists(p)) {
+                    System.out.println("[ArchivoManager] Leyendo datos iniciales desde Filesystem: " + p);
+                    return Optional.of(Files.newInputStream(p));
+                } else {
+                    System.err.println("[ArchivoManager] Archivo no encontrado en Filesystem: " + p + ".");
+                    return Optional.empty();
+                }
+            } catch (IOException e) {
+                System.err.println("[ArchivoManager] Error leyendo de Filesystem: " + e.getMessage());
+                return Optional.empty();
+            }
+        } 
+        
+        // --- 2. Modo 'resource' (Desarrollo/Default) ---
+        else {
+            InputStream is = ArchivoManager.class.getClassLoader().getResourceAsStream(filename); 
+            if (is == null) {
+                System.err.println("[ArchivoManager] Archivo no encontrado en resources: " + filename + ".");
+                return Optional.empty();
+            }
+            System.out.println("[ArchivoManager] Leyendo datos iniciales desde Resources: " + filename);
+            return Optional.of(is);
+        }
+    }
+    // ... (Tus métodos de lectura getScanner y getInputStream se quedan igual) ...
+    /* 
     public Optional<Scanner> getScannerForDataFile(String filename) {
         Optional<InputStream> isOpt = getInputStreamForDataFile(filename);
         return isOpt.map(Scanner::new);
-    }
+    }*/
 
     public Optional<BufferedReader> getBufferedReaderForDataFile(String filename) {
         Optional<InputStream> isOpt = getInputStreamForDataFile(filename);
         return isOpt.map(inputStream -> new BufferedReader(new InputStreamReader(inputStream)));
     }
-
+    /* 
     private Optional<InputStream> getInputStreamForDataFile(String filename) {
         // ... (Tu lógica existente se mantiene igual aquí) ...
         if ("filesystem".equalsIgnoreCase(dataSourceMode)) {
@@ -60,7 +119,7 @@ public class ArchivoManager {
             System.out.println("[ArchivoManager] Leyendo desde Resources: " + filename);
             return Optional.of(is);
         }
-    }
+    }*/
 
     // -----------------------------------------------------------------------
     // NUEVO MÉTODO: Para guardar el archivo de 178MB sin explotar la memoria

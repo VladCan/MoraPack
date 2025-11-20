@@ -31,6 +31,7 @@ public final class WindowPacket {
         this.windowEndUTC = end;
         this.vuelos = vuelos != null ? vuelos : List.of();
         this.pedidos = pedidos != null ? pedidos : List.of();
+       
         this.windowIdISO = start.toString();
     }
 }
