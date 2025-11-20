@@ -556,6 +556,8 @@ export default function ToolsPanel({
           scheduledFlights={variant === "simulacion" ? (vuelosProgramados || []) : undefined}
           showScheduledToggle={variant === "simulacion"}
           variant={variant}
+          simNowUtc={simNowUtc}
+          cancelarVuelo={cancelarVuelo}
         />
         <WarehouseSelectCard
           label="Almacén"
@@ -890,6 +892,8 @@ function FlightSelectCard({
   scheduledFlights,
   showScheduledToggle,
   variant,
+  simNowUtc,
+  cancelarVuelo,
 }: {
   runId: string | null,
   label: string;
@@ -901,6 +905,8 @@ function FlightSelectCard({
   scheduledFlights?: VueloDTO[];
   showScheduledToggle?: boolean;
   variant?: Variant;
+  simNowUtc?: string | null;
+  cancelarVuelo?: (vueloId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -911,6 +917,15 @@ function FlightSelectCard({
   // Determinar qué lista de vuelos usar
   const hasScheduledFlights = showScheduledToggle || (scheduledFlights !== undefined);
   const currentItems = showScheduled && scheduledFlights ? scheduledFlights : items;
+
+  // Función para verificar si un vuelo está en el aire (no se puede cancelar)
+  const isVueloEnAire = useCallback((vuelo: VueloDTO): boolean => {
+    if (!simNowUtc) return false;
+    const now = new Date(simNowUtc).getTime();
+    const salida = new Date(vuelo.salidaUtc).getTime();
+    const llegada = new Date(vuelo.llegadaUtc).getTime();
+    return now >= salida && now <= llegada;
+  }, [simNowUtc]);
 
   const origins = useMemo(
     () => Array.from(new Set(currentItems.map((v) => v.origen))).sort(),
@@ -936,6 +951,23 @@ function FlightSelectCard({
 
   const handleCancelar = async (vuelo: VueloDTO, e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Validar que el vuelo no esté en el aire (solo para operación diaria)
+    if (variant === "operacion" && simNowUtc) {
+      const now = new Date(simNowUtc).getTime();
+      const salida = new Date(vuelo.salidaUtc).getTime();
+      const llegada = new Date(vuelo.llegadaUtc).getTime();
+      if (now >= salida && now <= llegada) {
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={"No se puede cancelar: el vuelo está en el aire"+"❗"}
+            type="error"
+          />),
+        { duration: 5000});
+        return;
+      }
+    }
 
     try {
       const req : CancelarVueloRequest = {
@@ -968,7 +1000,9 @@ function FlightSelectCard({
 
       } else if (data) {
         // éxito - agregar vuelo a la lista de cancelados para ocultarlo inmediatamente
-        cancelarVuelo(vuelo.id);
+        if (cancelarVuelo) {
+          cancelarVuelo(vuelo.id);
+        }
         toast.custom((t) => (
           <ToastCustom
             t={t}
@@ -1157,31 +1191,41 @@ function FlightSelectCard({
                     // Vista normal de vuelos activos
                     variant === "operacion" ? (
                       // Vista con botón cancelar para operación diaria
-                      <div className="flex items-start justify-between gap-2">
-                        <button
-                          onClick={() => {
-                            onSelect(v);
-                            setOpen(false);
-                            setQ("");
-                          }}
-                          className="flex-1 text-left min-w-0"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono text-xs">{v.id}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {v.origen} → {v.destino}
-                            </span>
+                      (() => {
+                        const enVuelo = isVueloEnAire(v);
+                        return (
+                          <div className="flex items-start justify-between gap-2">
+                            <button
+                              onClick={() => {
+                                onSelect(v);
+                                setOpen(false);
+                                setQ("");
+                              }}
+                              className="flex-1 text-left min-w-0"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-mono text-xs">{v.id}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {v.origen} → {v.destino}
+                                </span>
+                              </div>
+                            </button>
+                            <button
+                              onClick={(e) => handleCancelar(v, e)}
+                              disabled={enVuelo}
+                              className={`flex-shrink-0 px-2 py-1 text-xs font-medium rounded border transition-colors flex items-center gap-1 ${
+                                enVuelo
+                                  ? "text-muted-foreground bg-muted border-border cursor-not-allowed opacity-50"
+                                  : "text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-red-200 dark:border-red-900/50"
+                              }`}
+                              title={enVuelo ? `No se puede cancelar: vuelo en el aire` : `Cancelar vuelo ${v.id}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Cancelar
+                            </button>
                           </div>
-                        </button>
-                        <button
-                          onClick={(e) => handleCancelar(v, e)}
-                          className="flex-shrink-0 px-2 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 rounded border border-red-200 dark:border-red-900/50 transition-colors flex items-center gap-1"
-                          title={`Cancelar vuelo ${v.id}`}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          Cancelar
-                        </button>
-                      </div>
+                        );
+                      })()
                     ) : (
                       // Vista normal sin botón cancelar
                       <button
