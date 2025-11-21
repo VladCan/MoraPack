@@ -50,8 +50,14 @@ public class ALNS {
         System.out.println(">> Costo Inicial: " + String.format("%,.0f", costoActual));
 
         long tInicioGlobal = System.nanoTime();
+        long tiempoLimiteNs = 59L * 1_000_000_000L;
 
         for (int iter = 0; iter < maxIter; iter++) {
+
+            if ((System.nanoTime() - tInicioGlobal) > tiempoLimiteNs) {
+                System.out.println("🛑 EARLY STOP: Tiempo límite excedido (> 59s). Retornando mejor solución encontrada.");
+                break; // Rompe el bucle y va directo al return final
+            }
             StringBuilder sb = new StringBuilder();
             sb.append(String.format("[Iter %02d] ", iter));
 
