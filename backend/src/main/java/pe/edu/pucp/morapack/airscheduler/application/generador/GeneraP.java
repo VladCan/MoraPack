@@ -23,35 +23,21 @@ public class GeneraP {
     };
 
     // ====== KNOBS (ajusta intensidades aquí) ======
-    // Cantidad por pedido
-    private static final int PISO_CANT = 250;     // mínimo
-    private static final int CANT_MAX = 999;      // máximo duro del archivo (3 dígitos)
-    private static final double QUANTITY_DAY_BOOST_MAX = 0.35; // +35% al final del horizonte (sobre tu logística)
-
-    // Ritmo de llegadas (pedidos/día): el factor final vs el inicial (p.e. 3.0 => 3x más rápido al final)
+    private static final int PISO_CANT = 250;
+    private static final int CANT_MAX = 999;
+    private static final double QUANTITY_DAY_BOOST_MAX = 0.35;
     private static final double RATE_GROWTH_FACTOR = 3.0;
-
-    // Hotspots (sobrecarga por aeropuertos)
-    private static final int HOTSPOT_COUNT = 3;         // cuántos aeropuertos se vuelven calientes
-    private static final double HOTSPOT_INTENSITY = 4.0; // multiplicador de peso al final (≈ 1 al inicio, ~4 al final)
-    private static final double HOTSPOT_QTY_BONUS = 0.25; // hasta +25% de cantidad extra en hotspots al final
-
-    // Suavizado AR(1) original
+    private static final int HOTSPOT_COUNT = 3;
+    private static final double HOTSPOT_INTENSITY = 4.0;
+    private static final double HOTSPOT_QTY_BONUS = 0.25;
     private static final double ALPHA_AR1 = 0.35;
 
-    // Formato original: yyyy-MM-dd-HH-mm-ss
-    private static final DateTimeFormatter HORA_LOCAL =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss");
+    // Formato SOLO FECHA: yyyyMMdd (ej: 20261201)
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-    /**
-     * Genera solo el archivo:
-     * - pedidosProfe.txt (formato original)
-     *
-     * Ahora:
-     * - La tasa de pedidos aumenta a lo largo del horizonte (más pedidos/día).
-     * - La cantidad por pedido aumenta con el progreso del horizonte (más productos/pedido).
-     * - Algunos aeropuertos se “sobrecargan” (hotspots) al final.
-     */
+    // ID Base para simular la secuencia del ejemplo (003964189...)
+    private static final int ID_PEDIDO_BASE = 3964189;
+
     public static void generarArchivo(Path baseRuta, int cantidadPedidos, int horasHorizonte) {
         AeropuertosMap aMap = new AeropuertosMap();
         try (Scanner sc = ArchivoUtils.getScannerFromFilePath(AIRPORTS_RESOURCE)) {
@@ -65,22 +51,22 @@ public class GeneraP {
 
         // ===== Línea de tiempo global (UTC) =====
         Instant base = Instant.now().truncatedTo(ChronoUnit.SECONDS);
-        long horizonSec = Duration.ofHours(horasHorizonte).getSeconds();
-        if (horizonSec < cantidadPedidos) horizonSec = cantidadPedidos; // evita pasos 0 si horizonte es pequeño
+        // Si quieres que empiece en 2026 como tu ejemplo, descomenta esto:
+        // base = LocalDateTime.of(2026, 12, 1, 0, 0).toInstant(ZoneOffset.UTC);
 
-        // ---- 1) Construimos pasos con ritmo creciente (más pedidos hacia el final) ----
-        // Paso i ~ 1 / rateWeight(i), normalizado para que sum(pasos) ≈ horizonSec
+        long horizonSec = Duration.ofHours(horasHorizonte).getSeconds();
+        if (horizonSec < cantidadPedidos) horizonSec = cantidadPedidos;
+
         double denom = 0.0;
         double[] invWeights = new double[cantidadPedidos];
         for (int i = 0; i < cantidadPedidos; i++) {
-            double prog = cantidadPedidos == 1 ? 1.0 : i / (double) (cantidadPedidos - 1); // 0..1
-            double rateWeight = 1.0 + (RATE_GROWTH_FACTOR - 1.0) * prog; // crece linealmente
+            double prog = cantidadPedidos == 1 ? 1.0 : i / (double) (cantidadPedidos - 1);
+            double rateWeight = 1.0 + (RATE_GROWTH_FACTOR - 1.0) * prog;
             invWeights[i] = 1.0 / rateWeight;
             denom += invWeights[i];
         }
         double baseStep = horizonSec / denom;
 
-        // Hotspots (elegimos cuáles serán calientes)
         int[] hotspotIdx = pickHotspots(DESTINOS.length, HOTSPOT_COUNT, random);
         boolean[] isHotspot = new boolean[DESTINOS.length];
         for (int idx : hotspotIdx) isHotspot[idx] = true;
@@ -88,96 +74,107 @@ public class GeneraP {
         Instant t = base;
         long elapsedSec = 0L;
 
-        // ===== Variables del generador de cantidades =====
-        // Logística base (misma idea que tenías; dejamos kSoft alto para no topar rápido)
-        final double kSoft = 940 + random.nextInt(21); // 940..960
+        // Logística base
+        final double kSoft = 940 + random.nextInt(21);
         final int m = 10;
-        final double r = 0.05 + 0.02 * random.nextDouble(); // 0.05–0.07
+        final double r = 0.05 + 0.02 * random.nextDouble();
         final double x0 = m + (1.0 / r) * Math.log((kSoft / (double) PISO_CANT) - 1.0);
 
         int prevCantidad = PISO_CANT;
 
         for (int i = 1; i <= cantidadPedidos; i++) {
             int i0 = i - 1;
-            // ---- 1A) Avanzar el reloj con paso decreciente (ritmo creciente) + jitter proporcional ----
-            double prog = cantidadPedidos == 1 ? 1.0 : i0 / (double) (cantidadPedidos - 1); // 0..1
-            double stepIdeal = baseStep * invWeights[i0]; // ya es ~ 1/rateWeight
+            // 1) Avanzar reloj
+            double prog = cantidadPedidos == 1 ? 1.0 : i0 / (double) (cantidadPedidos - 1);
+            double stepIdeal = baseStep * invWeights[i0];
             long jitterAmp = Math.max(1L, Math.round(stepIdeal / 3.0));
             long step = Math.max(1L, Math.round(stepIdeal + random.nextLong(-jitterAmp, jitterAmp + 1)));
             t = t.plusSeconds(step);
             elapsedSec += step;
 
-            // ---- 2) Elegir destino con pesos dinámicos (hotspots ganan tracción hacia el final) ----
+            // 2) Elegir destino
             String destino = pickDestinoWeighted(random, prog, isHotspot);
 
-            // ---- 3) Convertir a hora local del destino ----
+            // 3) Convertir a hora local
             int gmt = Optional.ofNullable(aMap.obtener(destino))
                     .map(a -> a.getGMT())
                     .orElse(0);
             ZoneOffset offset = ZoneOffset.ofHours(gmt);
             LocalDateTime fechaLocal = LocalDateTime.ofInstant(t, offset);
 
-            // ---- 4) Generación de cantidad (logística + AR(1) + boost por día + bonus por hotspot) ----
+            // 4) Generar cantidad
             double mu = kSoft / (1.0 + Math.exp(-r * (i - x0)));
-
-            // Ruido proporcional
             double sigma = Math.max(3.0, 0.02 * mu);
             double gauss = random.nextGaussian() * sigma;
 
-            // AR(1)
             double yCont = ALPHA_AR1 * mu + (1.0 - ALPHA_AR1) * prevCantidad + gauss;
             int y = (int) Math.round(yCont);
             if (y < PISO_CANT) y = PISO_CANT;
 
-            // Progreso del día en [0,1] respecto al horizonte real transcurrido
             double dayProg = Math.max(0.0, Math.min(1.0, horizonSec > 0 ? (elapsedSec / (double) horizonSec) : 1.0));
-
-            // Boost “por día”: al final del horizonte, +QUANTITY_DAY_BOOST_MAX (suave y convexa)
             double qtyBoost = 1.0 + QUANTITY_DAY_BOOST_MAX * dayProg + 0.20 * dayProg * dayProg;
             y = (int) Math.round(y * qtyBoost);
 
-            // Bonus por hotspot que crece hacia el final
             if (isHotspotIndex(destino, isHotspot)) {
                 double hotBonus = 1.0 + HOTSPOT_QTY_BONUS * dayProg;
                 y = (int) Math.round(y * hotBonus);
             }
 
-            // Pequeño jitter entero y clamps
-            y += random.nextInt(7) - 3; // -3..+3
+            y += random.nextInt(7) - 3;
             if (y < PISO_CANT) y = PISO_CANT;
-
-            // Evitar tocar 999 demasiado temprano (hasta el 98% del horizonte)
             if (dayProg < 0.98) {
-                int softCapDyn = CANT_MAX - (5 + random.nextInt(21)); // 974..994
+                int softCapDyn = CANT_MAX - (5 + random.nextInt(21));
                 if (y > softCapDyn) y = softCapDyn;
             }
             if (y > CANT_MAX) y = CANT_MAX;
-
             prevCantidad = y;
 
-            // ---- 5) Rellenar línea formato original ----
-            int idCliente = 100 + random.nextInt(51); // [100..150]
-            String idClienteStr7 = String.format("%07d", idCliente);
+            // ==== 5) CONSTRUCCIÓN DE LA LÍNEA CORREGIDA ====
+
+            // A. ID Pedido (9 dígitos)
+            int idPedidoActual = ID_PEDIDO_BASE + i0;
+            String idPedidoStr = String.format("%09d", idPedidoActual);
+
+            // B. Fecha (yyyyMMdd)
+            String fechaStr = fechaLocal.format(DATE_FORMATTER);
+
+            // C. Hora (HH) y Minuto (mm) separados
+            String horaStr = String.format("%02d", fechaLocal.getHour());
+            String minStr = String.format("%02d", fechaLocal.getMinute());
+
+            // D. Cantidad (3 dígitos)
             String cantidadStr3 = String.format("%03d", y);
 
-            String lineaOriginal = fechaLocal.format(HORA_LOCAL) + "-" +
+            // E. Cliente (7 dígitos)
+            int idCliente = 100 + random.nextInt(51);
+            // El ejemplo mostraba IDs de cliente más largos (ej. 0025956),
+            // ajusto aquí para generar algo similar o mantengo tu rango si prefieres.
+            // Para coincidir con tu ejemplo visual '0025956', usaré un rango más alto:
+            int idClienteRandom = random.nextInt(99999); 
+            String idClienteStr7 = String.format("%07d", idClienteRandom);
+
+            // FORMATO: ID-FECHA-HH-MM-DESTINO-CANT-CLIENTE
+            // Total 7 campos separados por '-'
+            String lineaCorregida = idPedidoStr + "-" +
+                    fechaStr + "-" +
+                    horaStr + "-" +
+                    minStr + "-" +
                     destino + "-" +
                     cantidadStr3 + "-" +
                     idClienteStr7;
-            pedidosFormatoOriginal.add(lineaOriginal);
+
+            pedidosFormatoOriginal.add(lineaCorregida);
         }
 
-        // ===== Escribir archivo (solo formato original) =====
+        // ===== Escribir archivo =====
         Path rutaOriginal = baseRuta;
         escribirArchivo(rutaOriginal, pedidosFormatoOriginal);
-        System.out.println("Archivo (formato original) generado en: " + rutaOriginal.toAbsolutePath());
+        System.out.println("Archivo generado correctamente en: " + rutaOriginal.toAbsolutePath());
     }
 
-    // ------------------ Helpers ------------------
+    // ------------------ Helpers (Sin cambios) ------------------
 
     private static String pickDestinoWeighted(Random random, double prog, boolean[] isHotspot) {
-        // Peso base 1.0 para todos; los hotspots ganan peso ~ (1 + HOTSPOT_INTENSITY*prog^2)
-        // (prog^2 hace que la concentración sea fuerte solo al final)
         double[] weights = new double[DESTINOS.length];
         double sum = 0.0;
         for (int i = 0; i < DESTINOS.length; i++) {
@@ -249,6 +246,7 @@ public class GeneraP {
         } catch (IOException e) {
             throw new RuntimeException("No pude crear carpeta: " + out, e);
         }
+        // Generamos 10000 pedidos para probar
         generarArchivo(out, 10000, 168);
     }
 }

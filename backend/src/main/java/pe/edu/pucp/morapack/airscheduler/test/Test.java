@@ -29,10 +29,10 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.ssp.SSPGeneradorSeed;
 
 public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
     // Parámetros de simulación (ajustables)
-    private static final long HORAS_VENTANA = 8;
+    private static final long HORAS_VENTANA = 3;
     private static final long HORIZONTE_TEG_H = 48; // cuánto futuro modelar
 
-    public static void main(String[] args) {
+    public  static  void main(String[] args) {
 
         // contador de tiempo de ejecución
         long start = System.nanoTime();
@@ -124,8 +124,8 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                 pedidos.eliminarYActualizarCumplidosHasta(presenteUTC, solucionAnterior);
             //System.out.println("pedidos después de eliminar: " + pedidos.getLista().size());
             // imprimimos un reporte del estado de los pedididos en el tiempo presenteUTC
-            if (solucionAnterior != null)
-                solucionAnterior.imprimirEnArchivo(presenteUTC, "out/reporteSimulacion.txt");
+            //if (solucionAnterior != null)
+            //    solucionAnterior.imprimirEnArchivo(presenteUTC, "out/reporteSimulacion.txt");
             // solo copia los pedidos no desencola
             VentanaPedidos ventana = pedidos.acumuladoHasta(presenteUTC);// solo sacamos los pedidos de la ventana
             //System.out.println("cantidad de pedidos en la ventana: "+ventana.pedidos().size() + " pedidos para programar hasta "
@@ -149,11 +149,11 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             List<OcupacionAlmacen> reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior,
                     presenteUTC, Duration.ofHours(2));
             // imprimimos enVuelo y reservas para debug
-            DebugEstado.debugEstado(
-                    enVuelo,
-                    reservas,
-                    presenteUTC,
-                    Paths.get("out", "iteracionPrevia.txt"));
+            //DebugEstado.debugEstado(
+            //        enVuelo,
+            //        reservas,
+            //        presenteUTC,
+            //        Paths.get("out", "iteracionPrevia.txt"));
             // definimos los valores necesarios para el Time Elapse Event Graph TEEG
             TEGParametros params = TEGParametros.builder()
                     .inicioUtc(presenteUTC)
@@ -189,8 +189,8 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             //24x410=9840
             // System.out.println("ALNS");
             // ImpresorSolucion.imprimirEnArchivo(solucionOptima);
-            ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
-            ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
+            //ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
+            //ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
             solucionAnterior = solucionOptima;
             // verificacionTotal(solucionAnterior)
             // System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
