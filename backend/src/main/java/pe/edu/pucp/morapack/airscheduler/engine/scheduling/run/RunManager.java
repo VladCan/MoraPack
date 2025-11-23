@@ -4,6 +4,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -275,11 +276,38 @@ public class RunManager {
 
     private List<Path> construirRutasArchivosPedidos() {
         List<Path> paths = new ArrayList<>();
-        Path baseDir = Paths.get("src", "main", "resources", "archivosPedidos");
-        for (String codigo : CODIGOS) {
+
+        /// Acá obtenemos el directorio base según el entorno (para aclarar), al que luego le agregamos /archivosPedidos:
+        /// local: src/main/resources
+        /// prod:  uploads
+
+        Path baseUploadDir = Paths.get(archivoManager.getUploadDir());
+
+        /// Subcarpeta específica para los archivos de pedidos (/archivosPedidos)
+        Path baseDir = baseUploadDir.resolve("archivosPedidos");
+
+        System.out.println("[RunManager] Buscando archivos de pedidos en: " + baseDir.toAbsolutePath());
+
+        for (String codigo: CODIGOS) {
             String fileName = "_pedidos_" + codigo + "_.txt";
-            paths.add(baseDir.resolve(fileName));
+            Path path = baseDir.resolve(fileName);
+
+            if (Files.exists(path)) {
+                paths.add(path);
+            } else {
+                System.err.println("[RunManager] Advertencia: no se encontró archivo de pedidos para código "
+                        + codigo + " en " + path.toAbsolutePath());
+            }
         }
+
+        if (paths.isEmpty()) {
+            System.err.println("[RunManager] No se encontró ningún archivo de pedidos en "
+                    + baseDir.toAbsolutePath()
+                    + " (¿ya se subieron los 27 archivos?)");
+        } else {
+            System.out.println("[RunManager] Archivos de pedidos encontrados: " + paths.size());
+        }
+
         return paths;
     }
 
