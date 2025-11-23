@@ -239,19 +239,6 @@ const renderDropzoneFooterOP = (
 
   const {begin, simNow} = useRunSession();
 
-  function parseUTC(dateString: string) {
-    const d = new Date(dateString);
-    return new Date(
-        d.getUTCFullYear(),
-        d.getUTCMonth(),
-        d.getUTCDate(),
-        d.getUTCHours(),
-        d.getUTCMinutes(),
-        d.getUTCSeconds(),
-        d.getUTCMilliseconds()
-    );
-}
-
 
   const createPedido = useMutation({
     mutationFn: async (v: FormValues) => {

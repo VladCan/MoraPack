@@ -544,7 +544,9 @@ export default function ToolsPanel({
           scheduledFlights={variant === "simulacion" ? (vuelosProgramados || []) : undefined}
           showScheduledToggle={variant === "simulacion"}
           variant={variant}
-        />
+          // Añade la nueva prop aquí
+          cancelarVuelo={cancelarVuelo} // <-- ¡NUEVO!
+      />
         <WarehouseSelectCard
           label="Almacén"
           icon={<Building2 className="h-4 w-4" />}
@@ -877,6 +879,7 @@ function FlightSelectCard({
   scheduledFlights,
   showScheduledToggle,
   variant,
+  cancelarVuelo, // <-- ¡NUEVO! Aceptar la prop
 }: {
   runId: string | null,
   label: string;
@@ -888,6 +891,8 @@ function FlightSelectCard({
   scheduledFlights?: VueloDTO[];
   showScheduledToggle?: boolean;
   variant?: Variant;
+  // Definición del tipo de la función
+  cancelarVuelo: (id: string) => void; // <-- ¡NUEVO!
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
