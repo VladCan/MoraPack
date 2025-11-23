@@ -43,6 +43,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.RutaAsignada;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.SolucionProgramacion;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.TramoAsignado;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.VueloProgramadoId;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.service.VerificadorSLA;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.ssp.SSPGeneradorSeed;
 
 @ApplicationScoped
@@ -687,6 +688,8 @@ public class RunManager {
                 // 6. Guardar solución para la siguiente ventana y sincronizar ocupación
                 actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
                 solucionesAnteriores.put(id, solucionOptima);
+
+                VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46), vuelosMap);
 
                 // 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
                 final Instant wStartFinal = wStart;

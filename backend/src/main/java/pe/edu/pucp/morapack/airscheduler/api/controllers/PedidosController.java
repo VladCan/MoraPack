@@ -10,8 +10,9 @@ import java.nio.file.Files; // Necesario para abrir el stream del temp
 import java.nio.file.attribute.FileTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 // --- IMPORTS NUEVOS PARA SUBIDA EFICIENTE ---
 import org.jboss.resteasy.reactive.RestForm;
@@ -32,12 +33,25 @@ import pe.edu.pucp.morapack.airscheduler.api.mapper.PedidoMapper;
 public class PedidosController {
 
     @Inject 
-    PedidosService pedidosService; 
-    
-    private static final String FILENAME = "pedidos.txt";
-    
+    PedidosService pedidosService;
+
     @Inject
     RunManager runManager;
+
+    private static final String FILENAME = "pedidos.txt";
+
+    private static final String[] CODIGOS = {
+            "EDDI", "EHAM", "EKCH", "LATI", "LBSF", "LDZA", "LKPR","LOWW", "OAKB", "OERK", "OJAI", "OMDB", "OOMS",
+            "OPKC", "OSDI", "OYSN", "SABE", "SBBR", "SCEL", "SEQM", "SGAS", "SKBO", "SLLP", "SUAA", "SVMI", "UMMS", "VIDP"
+    };
+
+    // Conjunto para validación rápida
+    private static final Set<String> CODIGOS_VALIDOS = new HashSet<>(Arrays.asList(CODIGOS));
+
+    // Patrón para nombres del tipo _pedidos_SKBO_.txt
+    private static final Pattern PEDIDOS_FILENAME_PATTERN =
+            Pattern.compile("^_pedidos_([A-Z0-9]{4})_\\.txt$");
+    
 
     public static final class PedidoRequest{
         public Integer idCliente;
@@ -62,6 +76,34 @@ public class PedidosController {
                     .build();
         }
 
+        /// Esta parte es para validar el formato adecuado de los nombres del archivo
+
+        // Nombre que viene del front (puede ser solo el nombre, sin ruta)
+        String originalName = fileUpload.fileName().trim();
+
+        // 1) Validar formato del nombre
+        Matcher matcher = PEDIDOS_FILENAME_PATTERN.matcher(originalName);
+        if (!matcher.matches()) {
+            String msg = "Nombre de archivo inválido. Se esperaba formato _pedidos_XXXX_.txt y se recibió: "
+                    + originalName;
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new JsonResponse("error", msg, null))
+                    .build();
+        }
+
+        // 2) Extraer el código XXXX
+        String codigo = matcher.group(1).toUpperCase(Locale.ROOT);
+
+        // 3) Validar que el código esté en la lista de permitidos
+        if (!CODIGOS_VALIDOS.contains(codigo)) {
+            String msg = "Código de aeropuerto inválido en el nombre del archivo: " + codigo;
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new JsonResponse("error", msg, null))
+                    .build();
+        }
+
+        /// Si estamos aquí, el código y nombre del archivo fueron válidos. Procedemos a guardarlo
+
         try {
             // 1. Obtenemos el path del archivo temporal que Quarkus ya guardó en disco
             java.nio.file.Path tempPath = fileUpload.uploadedFile();
@@ -72,10 +114,11 @@ public class PedidosController {
                 
                 // 3. Delegamos a tu servicio (que ya usa la lógica de ArchivoManager)
                 // Tu servicio leerá este stream y lo copiará a la carpeta final
-                java.nio.file.Path targetPath = pedidosService.guardarArchivoPedidos(fileInputStream);
+                java.nio.file.Path targetPath = pedidosService.guardarArchivoPedidos(fileInputStream, codigo);
 
                 return Response
-                    .ok(new JsonResponse("success", "Archivo de pedidos guardado exitosamente", targetPath.toAbsolutePath().toString()))
+                    .ok(new JsonResponse("success", "¡Archivo de pedidos guardado exitosamente para " +
+                            "código " + codigo + "!", targetPath.toAbsolutePath().toString()))
                     .build();
             }
 
@@ -91,27 +134,56 @@ public class PedidosController {
     @GET
     @Path("/status")
     @Produces(MediaType.APPLICATION_JSON)
-    public Response getStatus(){
-        java.nio.file.Path p = filePath();
-        boolean exists = Files.exists(p);
+    public Response getStatus(@QueryParam("codigo") String codigo){
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("exists", exists);
-        body.put("filename", FILENAME);
+        int totalCodigos = CODIGOS.length;
+        int archivosPresentes = 0;
+        long totalSizeBytes = 0L;
 
-        if (exists) {
-            try{
-                body.put("sizeBytes", Files.size(p));
-                body.put("lastModified", lastModifiedIso(p));
+        java.util.List<Map<String, Object>> archivos = new java.util.ArrayList<>();
+
+        for (String cod : CODIGOS) {
+            Map<String, Object> info = new HashMap<>();
+            info.put("codigo", cod);
+
+            try {
+                // Ruta esperada, e.g. .../archivosPedidos/_pedidos_SKBO_.txt
+                java.nio.file.Path p = pedidosService.getPedidosFilePath(cod);
+                boolean exists = Files.exists(p);
+                info.put("exists", exists);
+
+                // Aunque no exista, esto devuelve el nombre esperado
+                info.put("filename", p.getFileName().toString());
+
+                if (exists) {
+                    long size = Files.size(p);
+                    info.put("sizeBytes", size);
+                    info.put("lastModified", lastModifiedIso(p));
+
+                    archivosPresentes++;
+                    totalSizeBytes += size;
+                }
+
+            } catch (IOException e) {
+                info.put("error", "No se pudo leer metadatos: " + e.getMessage());
+            } catch (Exception e) {
+                info.put("error", "Error evaluando archivo: " + e.getMessage());
             }
-            catch (IOException e){
-                body.put("error", "No se pudo leer metadatos: " + e.getMessage());
-            }
+
+            archivos.add(info);
         }
 
-        return Response.ok(body).build();
+        Map<String, Object> result = new HashMap<>();
+        result.put("totalCodigos", totalCodigos);
+        result.put("archivosPresentes", archivosPresentes);
+        result.put("totalSizeBytes", totalSizeBytes);
+        result.put("archivos", archivos);
+
+        return Response.ok(result).build();
     }
 
+    /// Dado que ahora la lógica es multi archivo, preview y download ya no van
+    /*
     @GET
     @jakarta.ws.rs.Path("/preview")
     @Produces(MediaType.TEXT_PLAIN)
@@ -158,6 +230,7 @@ public class PedidosController {
             return Response.serverError().entity("Error al leer el archivo: " + e.getMessage()).build();
         }
     }
+     */
 
     @POST
     @Path("/crear")
@@ -198,8 +271,8 @@ public class PedidosController {
     }
     private static final class ErrorDTO { public final String message; ErrorDTO(String m){ this.message = m; } }
 
-    private java.nio.file.Path filePath(){
-        return pedidosService.getPedidosFilePath();
+    private java.nio.file.Path filePath(String codigo){
+        return pedidosService.getPedidosFilePath(codigo);
     }
 
     private String lastModifiedIso(java.nio.file.Path p) throws IOException{
