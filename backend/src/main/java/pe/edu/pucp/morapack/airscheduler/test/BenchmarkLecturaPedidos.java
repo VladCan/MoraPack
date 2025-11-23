@@ -3,6 +3,8 @@ package pe.edu.pucp.morapack.airscheduler.test;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.LectorPedidoMultiArchivo;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
@@ -42,7 +44,7 @@ public class BenchmarkLecturaPedidos {
             "VIDP"
     };
 
-    String archivoLog = "pedidos_por_ventana.txt";
+    static String archivoLog = "pedidos_por_ventana.txt";
 
     public static void main(String[] args) throws Exception {
         //Construimos la lista de rutas a los archivos (NO APTO PARA PRODUCCIÓN, SOLO EN LOCAL)
@@ -50,55 +52,77 @@ public class BenchmarkLecturaPedidos {
         System.out.println("Archivos cargados: " + paths.size());
 
 
-        //Creamos el lector multiarchivo
-        try (LectorPedidoMultiArchivo lector = new LectorPedidoMultiArchivo(paths)) {
+        //Creamos el lector multiarchivo y lo envolvemos con el archivoLog
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(archivoLog))) {
+            try (LectorPedidoMultiArchivo lector = new LectorPedidoMultiArchivo(paths)) {
 
-            //Definimos el rango de la simulación
-            LocalDateTime inicio = LocalDateTime.of(2025, 12, 23, 0, 0);
-            LocalDateTime finSimulacion = inicio.plusDays(9);
+                //Definimos el rango de la simulación
+                LocalDateTime inicio = LocalDateTime.of(2025, 12, 23, 0, 0);
+                LocalDateTime finSimulacion = inicio.plusDays(9);
 
-            System.out.println("=== Benchmark lectura pedidos por ventanas de 4h ===");
-            System.out.println("Desde: " + inicio + " hasta: " + finSimulacion);
-            System.out.println("Archivos: " + paths.size());
-            System.out.println("---------------------------------------------");
+                System.out.println("=== Benchmark lectura pedidos por ventanas de 4h ===");
+                System.out.println("Desde: " + inicio + " hasta: " + finSimulacion);
+                System.out.println("Archivos: " + paths.size());
+                System.out.println("---------------------------------------------");
 
-            //Aplicamos el fast-forward
-            long t0Skip = System.nanoTime();
-            lector.saltarHasta(inicio);
-            long t1Skip  = System.nanoTime();
-            System.out.printf("Tiempo saltar data histórica: %.3f ms%n",
-                    (t1Skip - t0Skip) / 1_000_000.0);
+                //Aplicamos el fast-forward
+                long t0Skip = System.nanoTime();
+                lector.saltarHasta(inicio);
+                long t1Skip = System.nanoTime();
+                System.out.printf("Tiempo saltar data histórica: %.3f ms%n",
+                        (t1Skip - t0Skip) / 1_000_000.0);
 
-            //Recorremos ventanas de 4h
-            LocalDateTime presente = inicio;
-            int idxVentana = 0;
-            long totalPedidos = 0;
+                //Recorremos ventanas de 4h
+                LocalDateTime presente = inicio;
+                int idxVentana = 0;
+                long totalPedidos = 0;
 
-            while (presente.isBefore(finSimulacion) && !lector.terminado()) {
-                LocalDateTime finVentana = presente.plusHours(4);
+                while (presente.isBefore(finSimulacion) && !lector.terminado()) {
+                    LocalDateTime finVentana = presente.plusHours(4);
 
-                long t0 = System.nanoTime();
-                List<Pedido> pedidosVentana = lector.leerHasta(finVentana);
-                long t1 = System.nanoTime();
+                    long t0 = System.nanoTime();
+                    List<Pedido> pedidosVentana = lector.leerHasta(finVentana);
+                    long t1 = System.nanoTime();
 
-                totalPedidos += pedidosVentana.size();
+                    totalPedidos += pedidosVentana.size();
 
-                System.out.printf(
-                        "Ventana %02d [%s -> %s] - %6d pedidos - %.3f ms%n",
-                        idxVentana,
-                        presente,
-                        finVentana,
-                        pedidosVentana.size(),
-                        (t1 - t0) / 1_000_000.0
-                );
+                    System.out.printf(
+                            "Ventana %02d [%s -> %s] - %6d pedidos - %.3f ms%n",
+                            idxVentana,
+                            presente,
+                            finVentana,
+                            pedidosVentana.size(),
+                            (t1 - t0) / 1_000_000.0
+                    );
 
-                presente = finVentana;
-                idxVentana++;
+                    /// Lógica para escribir en el archivo
+                    writer.write(String.format(
+                            "Ventana %02d [%s -> %s] - %d pedidos\n",
+                            idxVentana,
+                            presente,
+                            finVentana,
+                            pedidosVentana.size()
+                    ));
+                    for (Pedido p : pedidosVentana) {
+                        writer.write(String.format(
+                                "    id=%s | destino=%s | fecha=%s | hora=%s\n",
+                                p.getIdPedido(),
+                                p.getDestino(),
+                                p.getFecha().toLocalDate(),
+                                p.getFecha().toLocalTime()
+                        ));
+                    }
+                    writer.write("\n");
+
+
+                    presente = finVentana;
+                    idxVentana++;
+                }
+
+                System.out.println("---------------------------------------------");
+                System.out.println("Total de pedidos leídos en la semana: " + totalPedidos);
+
             }
-
-            System.out.println("---------------------------------------------");
-            System.out.println("Total de pedidos leídos en la semana: " + totalPedidos);
-
         }
 
     }

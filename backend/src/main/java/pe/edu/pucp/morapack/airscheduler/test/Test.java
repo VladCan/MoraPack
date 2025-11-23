@@ -183,7 +183,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                     presenteUTC, finUTC,
                     "out/reporteCapacidadVuelos_" + presenteUTC.toString().replace(':', '-') + ".txt");
             */
-            VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46),mapa);
+            VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46), mapa);
         }
         System.out.println("─────────────────────────────────────────────");
         System.out.println("📄 Reporte de simulación guardado en: out/reporteSimulacion.txt");
