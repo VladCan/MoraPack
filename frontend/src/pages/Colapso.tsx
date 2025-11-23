@@ -75,7 +75,7 @@ export default function Colapso() {
     }, [airports]);
   
     // Conectar al SSE
-    const { runId } = useRunSession();
+    const { runId, vuelosCancelados } = useRunSession();
     const { simNowUtc, windows, airportOccupancy } = useRunSSE(runId || undefined);
   
     // Procesar vuelos para renderizar
@@ -100,11 +100,14 @@ export default function Colapso() {
         });
       });
   
-      // Ahora procesamos todos los vuelos únicos
+      // Ahora procesamos todos los vuelos únicos (excluyendo cancelados)
       vuelosUnicos.forEach(vuelo => {
+          // Excluir vuelos cancelados
+          if (vuelosCancelados.has(vuelo.id)) return;
+          
           const origen = airportsMap.get(vuelo.origen);
           const destino = airportsMap.get(vuelo.destino);
-  
+
           if (!origen || !destino) {
             console.warn(`[Simulacion] Aeropuerto no encontrado: ${vuelo.origen} o ${vuelo.destino}`);
             return;
@@ -154,7 +157,7 @@ export default function Colapso() {
       });
   
       return allFlights;
-    }, [windows, simNowUtc, airportsMap]);
+    }, [windows, simNowUtc, airportsMap, vuelosCancelados]);
   
     // Obtener datos del aeropuerto activo
     const activeAirportData = activeAirportId && airportOccupancy[activeAirportId]

@@ -112,7 +112,7 @@ public class TestWindowClient {
                     
                     // Contar vuelos y pedidos
                     int vuelos = countArrayElements(payload, "vuelos");
-                    int pedidos = countArrayElements(payload, "pedidos");
+                    int pedidos = countArrayElements(payload, "archivosPedidos");
                     
                     System.out.println("   Vuelos: " + vuelos + ", Pedidos: " + pedidos);
                     
@@ -123,7 +123,7 @@ public class TestWindowClient {
                     
                     if (pedidos > 0) {
                         System.out.println("   📦 Detalles de pedidos:");
-                        extractArrayDetails(payload, "pedidos");
+                        extractArrayDetails(payload, "archivosPedidos");
                     }
                     
                     System.out.println();

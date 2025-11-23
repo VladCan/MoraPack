@@ -23,15 +23,32 @@ public class ArchivoManager {
     @ConfigProperty(name = "morapack.upload.dir")
     String uploadDir;
 
+    @ConfigProperty(name = "morapack.reports.dir")
+    String reportsDir;
+    
+    // Eliminamos 'private static final String FILENAME = "aereopuertos.txt";' si existía
+
     public String getUploadDir() {
         return uploadDir;
     }
 
-    // ... (Tus métodos de lectura getScanner y getInputStream se quedan igual) ...
-    
-    public Optional<Scanner> getScannerForDataFile(String filename) {
+    public String getReportsDir(){
+        return reportsDir;
+    }
+
+    // ELIMINAR el método getUploadFilePath() si solo se usaba para "aereopuertos.txt"
+    // Ya que cada Service ahora lo construye con getUploadDir() + su propio filename.
+
+    /**
+     * Obtiene un Scanner para leer cualquier archivo de datos iniciales.
+     * @param filename El nombre del archivo a buscar (e.g., "vuelos.txt").
+     */
+    public Optional<Scanner> getScannerForDataFile(String filename) { // <-- ¡Ahora acepta String!
         Optional<InputStream> isOpt = getInputStreamForDataFile(filename);
-        return isOpt.map(Scanner::new);
+        if (isOpt.isPresent()) {
+            return Optional.of(new Scanner(isOpt.get()));
+        }
+        return Optional.empty();
     }
 
     public Optional<BufferedReader> getBufferedReaderForDataFile(String filename) {
