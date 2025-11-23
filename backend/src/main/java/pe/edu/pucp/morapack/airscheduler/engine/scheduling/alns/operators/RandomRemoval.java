@@ -10,21 +10,43 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.*;
 @RequiredArgsConstructor
 public class RandomRemoval implements DestructionOperator {
     private final int porcentaje;
+    private final Random rnd = new Random(); // Reutilizamos la instancia Random
 
     @Override
     public void destroy(SolucionProgramacion s, ALNS.Journal journal, Instant presenteUTC) {
         Map<Integer, PlanPedido> planes = s.asMap();
-        List<Integer> pedidos = new ArrayList<>(planes.keySet());
-        if (pedidos.isEmpty()) return;
+        
+        // 1. Optimizamos la creación de la lista.
+        // En lugar de barajar, solo necesitamos una lista de acceso aleatorio.
+        List<Integer> candidatos = new ArrayList<>(planes.keySet());
+        int totalPedidos = candidatos.size();
+        
+        if (totalPedidos == 0) return;
 
-        // Mezclar para no “siempre lo mismo”
-        Collections.shuffle(pedidos, new Random());
+        // Calculamos el objetivo
+        int n = Math.max(1, totalPedidos * porcentaje / 100);
+        int destruidos = 0;
 
-        int n = Math.max(1, pedidos.size() * porcentaje / 100);
+        // 2. Bucle optimizado: "Swap & Remove" (Fisher-Yates parcial)
+        // Mientras necesitemos destruir más y queden candidatos...
+        while (destruidos < n && !candidatos.isEmpty()) {
+            
+            // A. Elegimos un índice al azar dentro del rango disponible
+            int indexAleatorio = rnd.nextInt(candidatos.size());
+            
+            // B. Obtenemos el ID del pedido en esa posición
+            Integer idPedido = candidatos.get(indexAleatorio);
+            
+            // C. Truco de Rendimiento: Mover el último elemento a la posición actual y borrar el último.
+            // Esto elimina el elemento en O(1) en lugar de O(N) de un remove(index) normal.
+            int ultimoIndex = candidatos.size() - 1;
+            if (indexAleatorio != ultimoIndex) {
+                candidatos.set(indexAleatorio, candidatos.get(ultimoIndex));
+            }
+            candidatos.remove(ultimoIndex); 
 
-        for (int i = 0; i < n && i < pedidos.size(); i++) {
-            int id = pedidos.get(i);
-            PlanPedido plan = planes.get(id);
+            // --- Lógica de Procesamiento ---
+            PlanPedido plan = planes.get(idPedido);
             if (plan == null) continue;
 
             List<RutaAsignada> rutas = plan.getRutas();
@@ -36,7 +58,6 @@ public class RandomRemoval implements DestructionOperator {
             for (int rIdx = 0; rIdx < rutas.size(); rIdx++) {
                 RutaAsignada ruta = rutas.get(rIdx);
                 if (ruta.getTramos() == null || ruta.getTramos().isEmpty()) {
-                    // nada que liberar -> la dejamos
                     keep.add(ruta);
                     continue;
                 }
@@ -44,19 +65,17 @@ public class RandomRemoval implements DestructionOperator {
                 TramoAsignado primero = ruta.getTramos().get(0);
                 Instant salidaPrimero = primero.getVuelo().getSalidaUtc();
 
-                // Si YA despegó, no toques esa ruta (déjala)
+                // Candado temporal
                 if (!salidaPrimero.isAfter(presenteUTC)) {
                     keep.add(ruta);
                     continue;
                 }
 
-                // Esta ruta sí puede eliminarse -> liberar bodega y vuelos
                 liberarRuta(plan, ruta, journal, s);
                 cambio = true;
             }
 
             if (cambio) {
-                // Construimos un nuevo plan con solo las rutas que quedan
                 PlanPedido nuevo = PlanPedido.builder()
                         .idPedido(plan.getIdPedido())
                         .aeropuertoDestino(plan.getAeropuertoDestino())
@@ -65,11 +84,12 @@ public class RandomRemoval implements DestructionOperator {
                         .rutas(keep)
                         .build();
                 s.getPlanPorPedido().put(nuevo.getIdPedido(), nuevo);
+                destruidos++; // Solo contamos si realmente destruimos algo
             }
         }
     }
 
-    /** Libera SIMÉTRICAMENTE lo que fue reservado: origen, escalas y +2h final; y carga de vuelos. */
+    /** Libera SIMÉTRICAMENTE lo que fue reservado */
     private void liberarRuta(PlanPedido plan, RutaAsignada ruta, ALNS.Journal journal, SolucionProgramacion s) {
         int q = ruta.getCantidad();
         List<TramoAsignado> tr = ruta.getTramos();
@@ -78,14 +98,14 @@ public class RandomRemoval implements DestructionOperator {
             TramoAsignado t = tr.get(i);
             VueloProgramadoId v = t.getVuelo();
 
-            // ORIGEN de este tramo: [creado o llegada_prev, salida)
+            // ORIGEN
             Instant esperaIniOri = (i == 0) ? plan.getCreadoUtc() : tr.get(i - 1).getVuelo().getLlegadaUtc();
             Instant esperaFinOri = v.getSalidaUtc();
             if (esperaIniOri != null && esperaFinOri != null && !esperaFinOri.isBefore(esperaIniOri)) {
                 journal.liberar(v.getOrigen(), esperaIniOri, esperaFinOri, q);
             }
 
-            // ESCALA / DESTINO intermedio o final
+            // DESTINO / ESCALA
             Instant esperaIniDst = v.getLlegadaUtc();
             Instant esperaFinDst = (i + 1 < tr.size())
                     ? tr.get(i + 1).getVuelo().getSalidaUtc()
@@ -94,7 +114,7 @@ public class RandomRemoval implements DestructionOperator {
                 journal.liberar(v.getDestino(), esperaIniDst, esperaFinDst, q);
             }
 
-            // VUELO (carga asignada)
+            // VUELO
             s.getCargaPorVuelo().asignar(v, -q);
         }
     }

@@ -47,8 +47,12 @@ nb-configuration.xml
 out/*
 src/main/resources/pedidos.txt
 src/main/resources/pedidosbackup.txt
+<<<<<<< HEAD
+/uploads/*
+=======
 
 
 # Ignorar archivos de pedidos
 src/main/resources/archivosPedidos/
 
+>>>>>>> refs/remotes/origin/multiarchivos

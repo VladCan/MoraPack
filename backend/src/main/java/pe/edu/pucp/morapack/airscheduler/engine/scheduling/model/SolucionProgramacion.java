@@ -18,10 +18,14 @@ import java.util.*;
 public class SolucionProgramacion {
 
     @Singular("plan")
-    private final Map<Integer, PlanPedido> planPorPedido;
+    private Map<Integer, PlanPedido> planPorPedido;
 
     private final CargaPorVuelo cargaPorVuelo;
 
+    public void setPlanPorPedido(Map<Integer, PlanPedido> planPorPedido) {
+        this.planPorPedido = planPorPedido;
+    }
+    
     public SolucionProgramacion(Map<Integer, PlanPedido> planPorPedido, CargaPorVuelo cargaPorVuelo) {
         this.planPorPedido = new HashMap<>(planPorPedido); // <-- mutable
         this.cargaPorVuelo = cargaPorVuelo;

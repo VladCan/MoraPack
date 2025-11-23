@@ -19,6 +19,6 @@ export async function uploadFile(
 
   // Ky necesita { body: formData } (sin json)
   return apiWithLoadingToast(() =>
-    handleApi(api.post(endpoint, { body: formData }).json<ApiResponse>())
+    handleApi(api.post(endpoint, { body: formData,timeout: false }).json<ApiResponse>())
   );
 }

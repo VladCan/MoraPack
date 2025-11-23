@@ -26,6 +26,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.LectorPedidoMultiArchivo;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.EstadoAnteriorExtractor;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosCancelados;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosMap;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.TEGEventBuilder;
@@ -53,6 +54,9 @@ public class RunManager {
     private static final String VUELOS_FILENAME = "vuelos.txt";
     private static final String PEDIDOS_FILENAME = "pedidos.txt";
     private static boolean firstExecution = false;
+
+    private static final String VUELOS_CANCELADOS_FILENAME = "vuelos_cancelados.txt";
+
 
     private final ExecutorService executor = Executors.newCachedThreadPool((r -> {
         Thread t = new Thread(r, "run-" + UUID.randomUUID());
@@ -177,7 +181,7 @@ public class RunManager {
     private volatile VuelosMap vuelosMap;
     private volatile CargarPedidos pedidosCargados;
     private volatile Set<String> sedes;
-    
+    private volatile VuelosCancelados cancelados;
     // Estado de planificación por run
     private final Map<String, SolucionProgramacion> solucionesAnteriores = new ConcurrentHashMap<>();
     private final Map<String, OcupacionPorAeropuerto> ocupacionesPorRun = new ConcurrentHashMap<>();
@@ -240,7 +244,20 @@ public class RunManager {
             
             // Definir sedes
             sedes = new HashSet<>(Arrays.asList("SPIM", "EBCI", "UBBB"));
-            
+
+            // Cargar vuelos cancelados de archivo
+            cancelados = new VuelosCancelados();
+            try (Scanner sc = archivoManager.getScannerForDataFile(VUELOS_CANCELADOS_FILENAME).orElse(null)) {
+                if (sc != null) {
+                    cancelados.leerDatos(sc);
+                    System.out.println("[RunManager] Vuelos cancelados cargados");
+                } else {
+                    System.err.println("[RunManager] Falló la carga del archivo de vuelos cancelados.");
+                }
+            } catch (Exception e) {
+                 System.err.println("[RunManager] Error procesando archivo de vuelos cancelados: " + e.getMessage());
+            }
+
             System.out.println("[RunManager] Catálogos inicializados correctamente");
         }
     }
@@ -599,9 +616,10 @@ public class RunManager {
                     reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior, wStart, Duration.ofHours(2));
                 }
 
-                // 2 Obtener y cargar pedidos de la ventana actual (ya actualizados)
+                // 2. Obtener pedidos de la ventana actual (ya actualizados)
                 cargarPedidosDesdeLector(id, pedidosCargados, wEnd);
-                VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wEnd);
+                //VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wEnd);
+                VentanaPedidos ventana = pedidosCargados.acumuladoEntre(wStart,wEnd);
                 List<Pedido> pedidosVentana = ventana.pedidos();
 
 
@@ -639,6 +657,13 @@ public class RunManager {
                         .build();
 
                 VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, vuelosMap).construir(params);
+                // 3.5 Cancelar vuelos de archivo
+
+                List<String> vuelosCancelados = cancelados.obtenerVuelosCancelados(wStart,wEnd);
+                if(!vuelosCancelados.isEmpty()){
+                    System.out.println("[RunManager] Vuelos cancelados en la ventana " + idx + ": " + vuelosCancelados);
+                    teg.cancelarVuelos(vuelosCancelados);
+                }
 
                 // 4. Generar solución inicial (seed)
                 OcupacionPorAeropuerto ocupacionPorAeropuerto = ocupacionesPorRun.computeIfAbsent(id, k -> new OcupacionPorAeropuerto(aeropuertosMap));
@@ -788,7 +813,6 @@ public class RunManager {
                     cargarPedidosDesdeQueue(id, pedidosCargados);
                     VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wEnd);
                     List<Pedido> pedidosVentana = ventana.pedidos();
-
 
                     /// Si no hay nada en la ventana, duerme
                     // sleepToEndWindow(id, wEnd);

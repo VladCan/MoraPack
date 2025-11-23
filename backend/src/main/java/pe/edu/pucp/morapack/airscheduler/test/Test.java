@@ -14,10 +14,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.VentanaPedidos;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.EstadoAnteriorExtractor;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.*;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.TEGEventBuilder;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.helpers.TEGParametros;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.ArriboExogeno;
@@ -46,7 +43,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
          */
         final Set<String> sedes = new HashSet<>(Arrays.asList("SPIM", "EBCI", "UBBB"));
         AeropuertosMap aeropuertosMap = new AeropuertosMap();// Aeropuertos (incluye husos horarios)
-        try (Scanner sc = ArchivoUtils.getScannerFromResource(
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(
                 "aereopuertos.txt")) {
             if (sc == null)
                 return;
@@ -54,12 +51,32 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
         }
         // Vuelos (catálogo maestro)
         VuelosMap mapa = new VuelosMap(aeropuertosMap);
-        try (Scanner sc = ArchivoUtils.getScannerFromResource(
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(
                 "vuelos.txt")) {
             if (sc == null)
                 return;
             mapa.leerDatos(sc);
         }
+
+        //VuelosCancelados cancelados = new VuelosCancelados();
+        //int year = 2025;
+        //int mes = 10; // octubre
+        // Nombre del archivo esperado: cancelaciones_2025-10.txt
+        //String nombre = String.format("cancelaciones_%04d-%02d.txt", year, mes);
+        //try (Scanner sc = ArchivoUtils.getScannerFromFilePath(nombre)) {
+        //    if (sc == null)
+        //        return;
+        //    cancelados.leerDatos(sc);
+        //}
+
+        /*List<Vuelo> hola = mapa.vuelosDesde("SUAA");
+
+        for (Vuelo v : hola) {
+            List<Integer> dias = cancelados.diasCancelado(v);
+            System.out.println("Vuelo: " + v + " -> Días cancelados: " + dias);
+        }*/
+
+
         // se va llenar de datos que no son necesarios
         // nos dificulta la replanificación
         /*
@@ -68,7 +85,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
          * =======================
          */
         CargarPedidos pedidos = new CargarPedidos();
-        try (Scanner sc = ArchivoUtils.getScannerFromResource("pedidos.txt")) {
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath("pedidos.txt")) {
             if (sc == null)
                 return;
             pedidos.leerDatosProfe(sc);
@@ -92,6 +109,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
         OcupacionPorAeropuerto ocupacionPorAeropuerto = new OcupacionPorAeropuerto(aeropuertosMap);
         
         while (!pedidos.isEmpty()) {
+            long startVentanaDeTiempo = System.nanoTime();
             // reloj avanza hacia el futuro el valro de HORAS_VENTANA
             reloj = reloj.plus(Duration.ofHours(HORAS_VENTANA));
             Instant presenteUTC = reloj;
@@ -106,8 +124,8 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                 pedidos.eliminarYActualizarCumplidosHasta(presenteUTC, solucionAnterior);
             //System.out.println("pedidos después de eliminar: " + pedidos.getLista().size());
             // imprimimos un reporte del estado de los pedididos en el tiempo presenteUTC
-            if (solucionAnterior != null)
-                solucionAnterior.imprimirEnArchivo(presenteUTC, "out/reporteSimulacion.txt");
+            //if (solucionAnterior != null)
+            //    solucionAnterior.imprimirEnArchivo(presenteUTC, "out/reporteSimulacion.txt");
             // solo copia los pedidos no desencola
             VentanaPedidos ventana = pedidos.acumuladoHasta(presenteUTC);// solo sacamos los pedidos de la ventana
             //System.out.println("cantidad de pedidos en la ventana: "+ventana.pedidos().size() + " pedidos para programar hasta "
@@ -131,11 +149,11 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             List<OcupacionAlmacen> reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior,
                     presenteUTC, Duration.ofHours(2));
             // imprimimos enVuelo y reservas para debug
-            DebugEstado.debugEstado(
-                    enVuelo,
-                    reservas,
-                    presenteUTC,
-                    Paths.get("out", "iteracionPrevia.txt"));
+            //DebugEstado.debugEstado(
+            //        enVuelo,
+            //        reservas,
+            //        presenteUTC,
+            //        Paths.get("out", "iteracionPrevia.txt"));
             // definimos los valores necesarios para el Time Elapse Event Graph TEEG
             TEGParametros params = TEGParametros.builder()
                     .inicioUtc(presenteUTC)
@@ -146,6 +164,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                     .reservasWaitIniciales(reservas) // <— ocupa bodega por pickup 2h
                     // .stockInicial(stockInicial) //en caso sea conveniente para el modelo (en
                     // evaluacion)
+                    //.vuelosCancelados(cancelados.getCanceladosMap())
                     .build();
 
             VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, mapa).construir(params);
@@ -170,8 +189,8 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             //24x410=9840
             // System.out.println("ALNS");
             // ImpresorSolucion.imprimirEnArchivo(solucionOptima);
-            ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
-            ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
+            //ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
+            //ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
             solucionAnterior = solucionOptima;
             // verificacionTotal(solucionAnterior)
             // System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
@@ -183,7 +202,10 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                     presenteUTC, finUTC,
                     "out/reporteCapacidadVuelos_" + presenteUTC.toString().replace(':', '-') + ".txt");
             */
-            VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46), mapa);
+            VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46),mapa);
+            long endVentanaDeTiempo = System.nanoTime();
+            double durationSeconds = (endVentanaDeTiempo - startVentanaDeTiempo) / 1_000_000_000.0;
+            System.out.println("⏱️ Tiempo total de ejecución: " + durationSeconds + " segundos");
         }
         System.out.println("─────────────────────────────────────────────");
         System.out.println("📄 Reporte de simulación guardado en: out/reporteSimulacion.txt");

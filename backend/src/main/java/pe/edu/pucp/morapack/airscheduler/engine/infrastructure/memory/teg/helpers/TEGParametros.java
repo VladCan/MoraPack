@@ -31,4 +31,7 @@ public class TEGParametros {
     /** Stock libre “en piso” disponible en el inicio (sí consumible). */
     @Builder.Default
     Map<String, Integer> stockInicial = Map.of();
+
+    @Builder.Default
+    Map<String,List<Integer>> vuelosCancelados = Map.of();
 }

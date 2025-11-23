@@ -119,4 +119,21 @@ public final class VuelosTEG {
 
         return map;
     }
+
+    public void cancelarVuelos(List<String> vuelosCancelados) {
+        if (vuelosCancelados == null || vuelosCancelados.isEmpty()) {
+            return;
+        }
+
+        System.out.println("[VuelosTEG] Cancelando vuelos: " + vuelosCancelados);
+
+        for (Map.Entry<AereopuertoNode, List<VuelosEdge>> entry : ady.entrySet()) {
+            List<VuelosEdge> edges = entry.getValue();
+
+            edges.removeIf(e -> e.isFlight()
+                    && vuelosCancelados.contains(e.idInstancia()));
+        }
+        ady.entrySet().removeIf(entry -> entry.getValue().isEmpty());
+
+    }
 }

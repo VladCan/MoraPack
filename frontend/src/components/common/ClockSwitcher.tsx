@@ -1,5 +1,5 @@
 // src/components/common/ClockSwitcher.tsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import NavClock from "./NavClock";
 
 type Props = {
