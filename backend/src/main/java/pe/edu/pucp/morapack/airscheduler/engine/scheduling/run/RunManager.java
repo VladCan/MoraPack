@@ -3,9 +3,13 @@ package pe.edu.pucp.morapack.airscheduler.engine.scheduling.run;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -19,6 +23,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoManager
 // Imports para la lógica de planificación
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.VentanaPedidos;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.LectorPedidoMultiArchivo;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.EstadoAnteriorExtractor;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosCancelados;
@@ -48,7 +53,6 @@ public class RunManager {
     private static final String AEROPUERTOS_FILENAME = "aereopuertos.txt";
     private static final String VUELOS_FILENAME = "vuelos.txt";
     private static final String PEDIDOS_FILENAME = "pedidos.txt";
-
     private static boolean firstExecution = false;
 
     private static final String VUELOS_CANCELADOS_FILENAME = "vuelos_cancelados.txt";
@@ -183,6 +187,7 @@ public class RunManager {
     private final Map<String, OcupacionPorAeropuerto> ocupacionesPorRun = new ConcurrentHashMap<>();
     private final Map<String, Set<String>> ventanasEnviadas = new ConcurrentHashMap<>();
     private final Map<String, Set<VueloProgramadoId>> vuelosCanceladosPorRun = new ConcurrentHashMap<>();
+    private final Map<String, LectorPedidoMultiArchivo> lectorArchivoPorRun = new ConcurrentHashMap<>();
     private static final Duration PICKUP_WAIT = Duration.ofHours(2);
 
     public void addContext(String idRun, RunContext context) {
@@ -231,21 +236,10 @@ public class RunManager {
             pedidosCargados = new CargarPedidos();
 
             if (scenario != RunConfig.Scenario.OPERACION){
-                // **USO DE ARCHIVOMANAGER:** Usar el manager para el archivo de pedidos
-                try (BufferedReader br = archivoManager.getBufferedReaderForDataFile(PEDIDOS_FILENAME).orElse(null)) {
-                    if (br != null) {
-                        //pedidosCargados.leerDatosProfe(sc);
-                        pedidosCargados.leerGigante(br);
-                        System.out.println("[RunManager] Lectura Gigante de pedidos completada");
-                        pedidosCargados.normalizarUtc(aeropuertosMap);
-                        pedidosCargados.ordenarPorUTC();
-                        System.out.println("[RunManager] Pedidos cargados: " + pedidosCargados.getLista().size());
-                    } else {
-                        System.err.println("[RunManager] Falló la carga del archivo de pedidos.");
-                    }
-                } catch (Exception e) {
-                    System.err.println("[RunManager] Error procesando archivo de pedidos: " + e.getMessage());
-                }
+                //Ya no cargamos un único archivo de pedidos aquí
+                //Solamente nos vamos a asegurar de tener pedidosCargados inicializados
+
+                if (pedidosCargados == null) pedidosCargados = new CargarPedidos();
             }
             
             // Definir sedes
@@ -263,7 +257,7 @@ public class RunManager {
             } catch (Exception e) {
                  System.err.println("[RunManager] Error procesando archivo de vuelos cancelados: " + e.getMessage());
             }
-            
+
             System.out.println("[RunManager] Catálogos inicializados correctamente");
         }
     }
@@ -271,6 +265,55 @@ public class RunManager {
     /**
      * Inicializa los catálogos compartidos PARA OPERACIÓN DIARIA si no están cargados
      */
+
+    private static final String[] CODIGOS = {
+            "EDDI", "EHAM", "EKCH", "LATI", "LBSF", "LDZA", "LKPR","LOWW", "OAKB", "OERK", "OJAI", "OMDB", "OOMS",
+            "OPKC", "OSDI", "OYSN", "SABE", "SBBR", "SCEL", "SEQM", "SGAS", "SKBO", "SLLP", "SUAA", "SVMI", "UMMS", "VIDP"
+    };
+
+
+    private List<Path> construirRutasArchivosPedidos() {
+        List<Path> paths = new ArrayList<>();
+        Path baseDir = Paths.get("src", "main", "resources", "archivosPedidos");
+        for (String codigo : CODIGOS) {
+            String fileName = "_pedidos_" + codigo + "_.txt";
+            paths.add(baseDir.resolve(fileName));
+        }
+        return paths;
+    }
+
+    private void inicializarLectorMultiArchivo(String id, Instant fechaInicio){
+        try {
+            // Si ya existe para este run, no hacemos nada
+            if (lectorArchivoPorRun.containsKey(id)) {
+                return;
+            }
+
+            List<Path> paths = construirRutasArchivosPedidos();
+            LectorPedidoMultiArchivo lectorPedidoMultiArchivo = new LectorPedidoMultiArchivo(paths);
+
+            /// Cuidado con el zoneOffset
+            LocalDateTime fechaInicioLT =
+                    LocalDateTime.ofInstant(fechaInicio, ZoneOffset.UTC);
+
+            long t0 = System.nanoTime();
+            lectorPedidoMultiArchivo.saltarHasta(fechaInicioLT);
+            long t1 = System.nanoTime();
+
+            System.out.printf(
+                    "[RunManager] LectorPedidosSimulacion saltarHasta(%s) = %.3f ms%n",
+                    fechaInicioLT, (t1 - t0) / 1_000_000.0
+            );
+
+            lectorArchivoPorRun.put(id, lectorPedidoMultiArchivo);
+        }
+        catch (Exception e){
+            System.err.println("[RunManager] Error inicializando lector de pedidos: " + e.getMessage());
+            e.printStackTrace();
+            return;
+        }
+    }
+
 
     //Registramos las cancelaciones de vuelos por runId
     public void registrarCancelacionVuelo(String runId, VueloProgramadoId vueloProgramadoId){
@@ -290,26 +333,26 @@ public class RunManager {
     /*Overload, ya que vamos a usar el string y no el RunId*/
     public Instant currentSimNow(String runId){
         RunContext ctx = requireContext(runId);
-
+        //Acá calculamos el tiempo real transcurrido desde que arrancó el run
         long deltaMs = Duration.between(ctx.wallAnchor(), Instant.now()).toMillis();
+        //Acá calculamos la velocidad en segundos simulados por segundo real
         long simDeltaMs = (long) Math.floor(deltaMs * ctx.speed());
 
+        // Retornamos el ahora simulado
         Instant simulatedNow = ctx.simStartUtc().plusMillis(simDeltaMs);
-
+        
+        // Limitar el simNow al final de la última llegada de vuelo
         SolucionProgramacion ultimaSolucion = solucionesAnteriores.get(runId);
         if (ultimaSolucion != null) {
             Instant ultimaLlegada = obtenerUltimaLlegada(ultimaSolucion);
-
             if (ultimaLlegada != null && simulatedNow.isAfter(ultimaLlegada)) {
-                System.out.println("[currentSimNow] reached end of flights → NOT clamping, letting clock move on");
-                return simulatedNow;
+                return ultimaLlegada;
             }
         }
-
+        
         return simulatedNow;
     }
-
-
+    
     private Instant obtenerUltimaLlegada(SolucionProgramacion solucion) {
         if (solucion == null || solucion.getCargaPorVuelo() == null) {
             return null;
@@ -443,6 +486,7 @@ public class RunManager {
         ventanasEnviadas.remove(id);
         solucionesAnteriores.remove(id);
         ocupacionesPorRun.remove(id);
+        lectorArchivoPorRun.remove(id);
         //queues.remove(id);          // si existe
     }
 
@@ -505,6 +549,8 @@ public class RunManager {
 
         System.out.println("Dentro de runSimulación firstExecution es:" + firstExecution);
 
+        inicializarLectorMultiArchivo(id, wStart);
+
         while (!isCancelled(id) && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
             /// Revisar esto:
             // Pausa cooperativa entre ventanas
@@ -536,8 +582,6 @@ public class RunManager {
             }
 
             System.out.println("[RunManager] Procesando ventana " + idx + ": " + wStart + " - " + wEnd);
-            //RunContext ctx = requireContext(id);
-            //ctx.reAnchorClock(wStart);
 
             try {
                 // 1. Preparar estado anterior si existe
@@ -573,8 +617,13 @@ public class RunManager {
                 }
 
                 // 2. Obtener pedidos de la ventana actual (ya actualizados)
+                cargarPedidosDesdeLector(id, pedidosCargados, wEnd);
+                //VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wEnd);
                 VentanaPedidos ventana = pedidosCargados.acumuladoEntre(wStart,wEnd);
                 List<Pedido> pedidosVentana = ventana.pedidos();
+
+
+                System.out.println("[RunManager] Los pedidos para esta ventana son: " + pedidosVentana.size());
 
                 if (pedidosVentana.isEmpty()) {
                     System.out.println("[RunManager] No hay pedidos en la ventana " + idx);
@@ -591,6 +640,7 @@ public class RunManager {
                     idx++;
                     wStart = wEnd;
                     wEnd = wEnd.plus(config.horasVentana());
+                    pedidosCargados.setUtcNormalizada(false);
                     continue;
                 }
 
@@ -671,6 +721,7 @@ public class RunManager {
             idx++;
             wStart = wEnd;
             wEnd   = wEnd.plus(config.horasVentana());
+            pedidosCargados.setUtcNormalizada(false);
         }
 
 
@@ -766,8 +817,7 @@ public class RunManager {
                     /// Si no hay nada en la ventana, duerme
                     // sleepToEndWindow(id, wEnd);
                     if (pedidosVentana.isEmpty()) {
-                        System.out.println("[RunManager] " +
-                                " " + idx);
+                        System.out.println("[RunManager] No hay pedidos en la ventana " + idx);
                         // Marcar ventana como enviada aunque esté vacía
                         ventanasEnviadasRun.add(windowIdISO);
                         broadcastWindow(new WindowPacket(id, idx, wStart, wEnd, List.of(),
@@ -879,6 +929,39 @@ public class RunManager {
         pedidosCargados.normalizarUtc(aeropuertosMap);
             pedidosCargados.ordenarPorUTC();
         System.out.println("[cargarPedidosDesdeQueue] Pedidos cargados: " + pedidosCargados.getLista().size());
+    }
+
+    private void cargarPedidosDesdeLector(String id, CargarPedidos pedidosCargados, Instant wEnd){
+        LectorPedidoMultiArchivo lectorArchivo = lectorArchivoPorRun.get(id);
+
+        if (lectorArchivo != null) {
+            // Convertimos wEnd (Instant) a LocalDateTime en UTC para el lector
+            try{
+                LocalDateTime finVentanaLT = LocalDateTime.ofInstant(wEnd, ZoneOffset.UTC);
+
+                List<Pedido> nuevosArchivo = lectorArchivo.leerHasta(finVentanaLT);
+
+                for (Pedido p : nuevosArchivo) {
+                    pedidosCargados.agregar(p);
+                }
+
+                if (!nuevosArchivo.isEmpty()) {
+                    System.out.println("[RunManager] Pedidos leídos desde archivos en esta ventana: "
+                            + nuevosArchivo.size());
+                }
+
+            } catch (IOException e) {
+                System.err.println("[RunManager] Error leyendo pedidos desde archivos para run " + id
+                        + " hasta ventana " + wEnd + ": " + e.getMessage());
+                e.printStackTrace();
+            }
+
+        }
+
+        //Realizamos el mismo proceso de normalizar y ordenar
+        pedidosCargados.normalizarUtc(aeropuertosMap);
+        pedidosCargados.ordenarPorUTC();
+        System.out.println("[cargarPedidosDesdeLector] Pedidos cargados: " + pedidosCargados.getLista().size());
 
     }
 
