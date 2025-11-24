@@ -240,7 +240,7 @@ export default function Operacion() {
   return (
     <div className="min-h-screen bg-neutral-50 relative">
       {/* Tooltip de aeropuerto */}
-      {selectedAirportId && (
+      {selectedAirportId && activeAirportData && (
         <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
           <div className="space-y-3">
             {/* Header */}
