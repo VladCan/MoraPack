@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files; // Necesario para abrir el stream del temp
 import java.nio.file.attribute.FileTime;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -264,6 +265,57 @@ public class PedidosController {
                     .build();
         }
     }
+
+    /// Endpoint para testing
+    @POST
+    @Path("/crear-test")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response crearPedidoTest() {
+        try {
+            // 1) Construimos el pedido DIRECTAMENTE con el constructor
+            //    Ajusta los valores en duro como quieras
+            int idPedido = 9999; // o cualquier id de prueba
+            int idCliente = 333;
+            String destino = "SKBO";
+            // "AAAA-MM-DDT:HH:MM:SS"
+            LocalDateTime fecha = LocalDateTime.parse("2025-12-12T00:00:35");
+            int cantidad = 1;
+
+            Pedido pedido = new Pedido(
+                    idPedido,
+                    idCliente,
+                    destino,
+                    fecha,
+                    cantidad
+            );
+
+            // 2) Obtenemos / creamos el run de Operación Diaria
+            String runId = runManager.ensureOperacionStarted();
+
+            System.out.println("El runId es " + runId);
+
+            // 3) Encolamos el pedido en la cola de dicho run
+            runManager.pushOrder(runId, pedido);
+
+            // 4) Armamos un mensaje similar al de crearPedido "normal"
+            String msg = "Pedido de prueba (cliente " + idCliente + ") con destino " +
+                    destino + " creado correctamente con id " + idPedido +
+                    " a las " + fecha + ".";
+
+            return Response.ok(
+                    new PedidoResponse("success", msg, runId)
+            ).build();
+
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(new JsonResponse("error",
+                            "Error al crear pedido de prueba: " + e.getMessage(), null))
+                    .build();
+        }
+    }
+
+
 
     private static boolean isBlank(String s) { return s == null || s.isEmpty(); }
     private static Response bad(String msg) {
