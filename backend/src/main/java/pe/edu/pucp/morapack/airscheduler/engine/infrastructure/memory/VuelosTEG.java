@@ -130,8 +130,15 @@ public final class VuelosTEG {
         for (Map.Entry<AereopuertoNode, List<VuelosEdge>> entry : ady.entrySet()) {
             List<VuelosEdge> edges = entry.getValue();
 
-            edges.removeIf(e -> e.isFlight()
-                    && vuelosCancelados.contains(e.idInstancia()));
+            edges.removeIf(e -> {
+                boolean match = e.isFlight() && vuelosCancelados.contains(e.idInstancia());
+                System.out.println("[Cancelar] Eliminando vuelo: " + e.idInstancia());
+                if (match) {
+                    System.out.println("[Cancelar] Eliminando vuelo: " + e.idInstancia());
+                }
+                return match;
+            });
+
         }
         ady.entrySet().removeIf(entry -> entry.getValue().isEmpty());
 
