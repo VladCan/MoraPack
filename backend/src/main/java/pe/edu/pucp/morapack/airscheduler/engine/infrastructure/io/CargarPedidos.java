@@ -437,4 +437,28 @@ public class CargarPedidos {
                 idClienteStr;
     }
 
+    public void reinsertarParcial(int idPedidoOriginal,
+            Instant creadoUtc,
+            String destino,
+            int cantidad) {
+
+        // Recuperar información original del pedido
+        //Pedido original = colaPedidos.get(idPedidoOriginal - 1);
+
+        Pedido nuevo = new Pedido();
+        nuevo.setIdPedido(idPedidoOriginal);  // Mantener el ID original
+        nuevo.setDestino(destino);
+        nuevo.setCantidad(cantidad);
+        nuevo.setCreatedAtUtc(creadoUtc);
+        colaPedidos.add(nuevo);
+        ordenarPorUTC();
+
+        System.out.println("↳ Pedido reintegrado por cancelación: id="
+                + idPedidoOriginal + " cant=" + cantidad
+                + " destino=" + destino
+                + " utc=" + creadoUtc);
+    }
+
+
+
 }

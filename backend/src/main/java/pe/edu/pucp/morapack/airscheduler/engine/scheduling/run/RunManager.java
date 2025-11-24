@@ -6,6 +6,8 @@ import jakarta.inject.Inject;
 import java.io.BufferedReader;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -497,7 +499,7 @@ public class RunManager {
         System.out.println("[RunManager] Ventana inicial: wStart=" + wStart + ", wEnd=" + wEnd);
 
         System.out.println("Dentro de runSimulación firstExecution es:" + firstExecution);
-
+        List<String> vuelosCanceladosTeg = new ArrayList<>();
         while (!isCancelled(id) && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
             /// Revisar esto:
             // Pausa cooperativa entre ventanas
@@ -551,7 +553,8 @@ public class RunManager {
                         System.out.println("[RunManager]: Procesando cancelaciones: " + vuelosCancelados.size());
 
                         //Considerar si hay que colocar los vuelos cancelados en algun otro lado para enchufar en el TEG
-
+                        List <String> vuelosCancelString = transformar(vuelosCancelados);
+                        vuelosCanceladosTeg.addAll(vuelosCancelString);
                         procesarCancelaciones(id, vuelosCancelados, solucionAnterior);
 
                         /// Dejamos el set vacío (por ahora):
@@ -602,10 +605,12 @@ public class RunManager {
                 VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, vuelosMap).construir(params);
                 // 3.5 Cancelar vuelos de archivo
 
-                List<String> vuelosCancelados = cancelados.obtenerVuelosCancelados(wStart,wEnd);
-                if(!vuelosCancelados.isEmpty()){
-                    System.out.println("[RunManager] Vuelos cancelados en la ventana " + idx + ": " + vuelosCancelados);
-                    teg.cancelarVuelos(vuelosCancelados);
+                List<String> vuelosCanceladosArch = cancelados.obtenerVuelosCancelados(wStart,wEnd);
+                vuelosCanceladosTeg.addAll(vuelosCanceladosArch);
+
+                if(!vuelosCanceladosTeg.isEmpty()){
+                    System.out.println("[RunManager] Vuelos cancelados en la ventana " + idx + ": " + vuelosCanceladosTeg);
+                    teg.cancelarVuelos(vuelosCanceladosTeg);
                 }
 
                 // 4. Generar solución inicial (seed)
@@ -952,6 +957,24 @@ public class RunManager {
 
                 System.out.println("[Cancel]   Pedido " + plan.getIdPedido()
                         + " → rutas después de cancelar: " + rutasFiltradas.size());
+
+                int cantidadPendiente = plan.getDemanda();
+
+                for (RutaAsignada r : rutasFiltradas) {
+                    cantidadPendiente -= r.getCantidad();  // restar rutas sobrevivientes
+                }
+                if (cantidadPendiente > 0) {
+                    System.out.println("[Cancel]   Pedido " + plan.getIdPedido()
+                            + " → vuelve a cola con cantidad=" + cantidadPendiente);
+
+                    pedidosCargados.reinsertarParcial(
+                            plan.getIdPedido(),
+                            plan.getCreadoUtc(),
+                            plan.getAeropuertoDestino(),
+                            cantidadPendiente
+                    );
+
+                }
             }
         }
 
@@ -1556,5 +1579,39 @@ public class RunManager {
         
         return vuelosPlanificados;
     }
+
+    public List<String> transformar(Set<VueloProgramadoId> vuelosCancelados) {
+        List<String> resultado = new ArrayList<>();
+
+        DateTimeFormatter fFecha = DateTimeFormatter.ofPattern("yyyyMMdd").withZone(ZoneOffset.UTC);
+        DateTimeFormatter fHora  = DateTimeFormatter.ofPattern("HHmm").withZone(ZoneOffset.UTC);
+
+        for (VueloProgramadoId v : vuelosCancelados) {
+
+            Instant salidaUtc = v.getSalidaUtc();
+            if (salidaUtc == null) continue;
+
+            String origen  = v.getOrigen();
+            String destino = v.getDestino();
+
+            // Formato YYYYMMDD y HHMM
+            String fecha = fFecha.format(salidaUtc);
+            String hora  = fHora.format(salidaUtc);
+
+            // Formato final
+            String id = String.format(
+                    "%s-%s-%s-%s",
+                    origen,
+                    destino,
+                    fecha,
+                    hora
+            );
+
+            resultado.add(id);
+        }
+
+        return resultado;
+    }
+
 
 }
