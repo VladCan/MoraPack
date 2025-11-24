@@ -216,8 +216,57 @@ export default function ToolsPanel({
     return resultado;
   }, [windows, simNowUtc, vuelosCancelados]);
 
-  // Obtener SOLO pedidos que están en vuelos activos
+  // Construir mapa de pedidos (último estado conocido por id) usando TODAS las ventanas
+  const pedidosPorIdOperacion = useMemo(() => {
+    if (variant !== "operacion") return null;
+    const map = new Map<number, PedidoDTO>();
+    windows.forEach(window => {
+      window.pedidos.forEach(p => {
+        map.set(p.id, p);
+      });
+    });
+    return map;
+  }, [windows, variant]);
+
+  // Obtener pedidos activos según escenario
   const pedidosActivos = useMemo<PedidoDTO[]>(() => {
+    if (variant === "operacion") {
+      const pedidosOperacion = pedidosPorIdOperacion ? Array.from(pedidosPorIdOperacion.values()) : [];
+      if (pedidosOperacion.length === 0) return [];
+
+      if (!simNowUtc) {
+        return pedidosOperacion;
+      }
+
+      const now = new Date(simNowUtc).getTime();
+      
+      // Filtrar pedidos completados (todos sus vuelos han llegado)
+      // Usar la misma lógica que calcularEstado para consistencia
+      return pedidosOperacion.filter(pedido => {
+        // Si no tiene rutas, mostrarlo (pendiente)
+        if (!pedido.rutas || pedido.rutas.length === 0) return true;
+        
+        // Verificar si TODOS los vuelos han llegado (igual que calcularEstado)
+        // Un pedido está completo solo cuando TODOS los vuelos de TODAS sus rutas han llegado
+        let todosVuelosLlegaron = true;
+        
+        pedido.rutas.forEach(ruta => {
+          ruta.vuelos.forEach(vuelo => {
+            const llegada = new Date(vuelo.llegadaUtc).getTime();
+            
+            // Si algún vuelo aún no ha llegado, el pedido no está completo
+            if (now <= llegada) {
+              todosVuelosLlegaron = false;
+            }
+          });
+        });
+        
+        // Mostrar si NO todos los vuelos han llegado (programado, en vuelo, o parcialmente entregado)
+        // Ocultar solo si todos los vuelos han llegado (COMPLETO)
+        return !todosVuelosLlegaron;
+      });
+    }
+
     if (windows.length === 0) return [];
 
     if (!simNowUtc) {
@@ -251,21 +300,25 @@ export default function ToolsPanel({
     }
 
     return resultado;
-  }, [windows, simNowUtc]);
+  }, [windows, simNowUtc, variant, pedidosPorIdOperacion]);
 
   // Calcular cantidad EN EL AIRE del pedido seleccionado
   const cantidadEnVuelo = useMemo(() => {
     if (!pedido || !pedido.rutas || !simNowUtc) return 0;
     
     const now = new Date(simNowUtc).getTime();
+    // Sumar la cantidad de cada vuelo que está actualmente en el aire
     return pedido.rutas.reduce((sum, ruta) => {
-      // Solo contar si la ruta tiene AL MENOS un vuelo en el aire
-      const tieneVueloEnAire = ruta.vuelos.some(vuelo => {
+      const cantidadRutaEnVuelo = ruta.vuelos.reduce((sumVuelos, vuelo) => {
         const salida = new Date(vuelo.salidaUtc).getTime();
         const llegada = new Date(vuelo.llegadaUtc).getTime();
-        return now >= salida && now <= llegada;
-      });
-      return tieneVueloEnAire ? sum + ruta.cantidad : sum;
+        // Si el vuelo está en el aire ahora, sumar su cantidad
+        if (now >= salida && now <= llegada) {
+          return sumVuelos + vuelo.cantidad;
+        }
+        return sumVuelos;
+      }, 0);
+      return sum + cantidadRutaEnVuelo;
     }, 0);
   }, [pedido, simNowUtc]);
 
@@ -445,17 +498,20 @@ export default function ToolsPanel({
                 <span className="text-muted-foreground">Estado</span>
                 <span className={`font-semibold ${
                   cantidadEnVuelo >= pedido.cantidad ? "text-emerald-600" :
-                  cantidadEnVuelo > 0 ? "text-amber-600" : "text-rose-600"
+                  cantidadEnVuelo > 0 ? (variant === "operacion" ? "text-purple-600" : "text-amber-600") :
+                  (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) ? "text-blue-600" : "text-rose-600"
                 }`}>
                   {cantidadEnVuelo >= pedido.cantidad ? "COMPLETO" :
-                   cantidadEnVuelo > 0 ? "PARCIAL" : "PENDIENTE"}
+                   cantidadEnVuelo > 0 ? (variant === "operacion" ? "EN_VUELO" : "PARCIAL") :
+                   (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) ? "PROGRAMADO" : "PENDIENTE"}
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div
                   className={`h-full transition-all ${
                     cantidadEnVuelo >= pedido.cantidad ? "bg-emerald-600" :
-                    cantidadEnVuelo > 0 ? "bg-amber-600" : "bg-rose-600"
+                    cantidadEnVuelo > 0 ? (variant === "operacion" ? "bg-purple-600" : "bg-amber-600") :
+                    (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) ? "bg-blue-600" : "bg-rose-600"
                   }`}
                   style={{ width: `${(cantidadEnVuelo / pedido.cantidad) * 100}%` }}
                 />
@@ -472,29 +528,42 @@ export default function ToolsPanel({
             )}
             {/* NUEVO: Desglose de rutas de entrega */}
             {pedido.rutas && pedido.rutas.length > 0 && (() => {
-              // Filtrar rutas que tienen vuelos EN EL AIRE AHORA
               const now = new Date(simNowUtc || Date.now()).getTime();
-              const rutasVisibles = pedido.rutas.filter(ruta => {
-                return ruta.vuelos.some(vuelo => {
-                  const salida = new Date(vuelo.salidaUtc).getTime();
-                  const llegada = new Date(vuelo.llegadaUtc).getTime();
-                  return now >= salida && now <= llegada;
-                });
-              });
+              const estadoPedido = cantidadEnVuelo >= pedido.cantidad ? "COMPLETO" :
+                                   cantidadEnVuelo > 0 ? (variant === "operacion" ? "EN_VUELO" : "PARCIAL") : 
+                                   (variant === "operacion" && pedido.rutas.length > 0 ? "PROGRAMADO" : "PENDIENTE");
+              
+              // En operación diaria, si es PROGRAMADO, mostrar todas las rutas
+              // Si es EN_VUELO, mostrar todas las rutas (algunas pueden estar en vuelo, otras programadas)
+              // Si es COMPLETO, no debería mostrarse (el pedido desaparece)
+              const rutasVisibles = (estadoPedido === "PROGRAMADO" || estadoPedido === "EN_VUELO") && variant === "operacion"
+                ? pedido.rutas // Mostrar todas las rutas si es PROGRAMADO o EN_VUELO
+                : pedido.rutas.filter(ruta => {
+                    return ruta.vuelos.some(vuelo => {
+                      const salida = new Date(vuelo.salidaUtc).getTime();
+                      const llegada = new Date(vuelo.llegadaUtc).getTime();
+                      return now >= salida && now <= llegada;
+                    });
+                  });
               
               return rutasVisibles.length > 0 && (
                 <div className="border-t border-border pt-2">
                   <p className="text-sm font-semibold mb-2">
-                    Rutas activas ({rutasVisibles.length} {rutasVisibles.length === 1 ? 'ruta' : 'rutas'})
+                    {estadoPedido === "PROGRAMADO" ? "Rutas programadas" : 
+                     estadoPedido === "EN_VUELO" ? "Rutas en vuelo" : 
+                     "Rutas activas"} ({rutasVisibles.length} {rutasVisibles.length === 1 ? 'ruta' : 'rutas'})
                   </p>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {rutasVisibles.map((ruta, idx) => {
-                      // Filtrar vuelos de esta ruta que están EN EL AIRE
-                      const vuelosActivos = ruta.vuelos.filter(vuelo => {
-                        const salida = new Date(vuelo.salidaUtc).getTime();
-                        const llegada = new Date(vuelo.llegadaUtc).getTime();
-                        return now >= salida && now <= llegada;
-                      });
+                      // Si es PROGRAMADO o EN_VUELO en operación diaria, mostrar todos los vuelos
+                      // Si no, solo los activos
+                      const vuelosActivos = (estadoPedido === "PROGRAMADO" || estadoPedido === "EN_VUELO") && variant === "operacion"
+                        ? ruta.vuelos // Mostrar todos los vuelos si es PROGRAMADO o EN_VUELO
+                        : ruta.vuelos.filter(vuelo => {
+                            const salida = new Date(vuelo.salidaUtc).getTime();
+                            const llegada = new Date(vuelo.llegadaUtc).getTime();
+                            return now >= salida && now <= llegada;
+                          });
                       
                       return (
                         <div key={idx} className="p-2 rounded-lg bg-muted/50 border border-border/50">
@@ -544,6 +613,8 @@ export default function ToolsPanel({
           scheduledFlights={variant === "simulacion" ? (vuelosProgramados || []) : undefined}
           showScheduledToggle={variant === "simulacion"}
           variant={variant}
+          simNowUtc={simNowUtc}
+          cancelarVuelo={cancelarVuelo}
         />
         <WarehouseSelectCard
           label="Almacén"
@@ -561,6 +632,7 @@ export default function ToolsPanel({
           items={pedidosActivos}
           onSelect={setPedido}
           simNowUtc={simNowUtc}
+          variant={variant}
         />
       </div>
 
@@ -877,6 +949,8 @@ function FlightSelectCard({
   scheduledFlights,
   showScheduledToggle,
   variant,
+  simNowUtc,
+  cancelarVuelo,
 }: {
   runId: string | null,
   label: string;
@@ -888,6 +962,8 @@ function FlightSelectCard({
   scheduledFlights?: VueloDTO[];
   showScheduledToggle?: boolean;
   variant?: Variant;
+  simNowUtc?: string | null;
+  cancelarVuelo?: (vueloId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -898,6 +974,15 @@ function FlightSelectCard({
   // Determinar qué lista de vuelos usar
   const hasScheduledFlights = showScheduledToggle || (scheduledFlights !== undefined);
   const currentItems = showScheduled && scheduledFlights ? scheduledFlights : items;
+
+  // Función para verificar si un vuelo está en el aire (no se puede cancelar)
+  const isVueloEnAire = useCallback((vuelo: VueloDTO): boolean => {
+    if (!simNowUtc) return false;
+    const now = new Date(simNowUtc).getTime();
+    const salida = new Date(vuelo.salidaUtc).getTime();
+    const llegada = new Date(vuelo.llegadaUtc).getTime();
+    return now >= salida && now <= llegada;
+  }, [simNowUtc]);
 
   const origins = useMemo(
     () => Array.from(new Set(currentItems.map((v) => v.origen))).sort(),
@@ -923,6 +1008,23 @@ function FlightSelectCard({
 
   const handleCancelar = async (vuelo: VueloDTO, e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Validar que el vuelo no esté en el aire (solo para operación diaria)
+    if (variant === "operacion" && simNowUtc) {
+      const now = new Date(simNowUtc).getTime();
+      const salida = new Date(vuelo.salidaUtc).getTime();
+      const llegada = new Date(vuelo.llegadaUtc).getTime();
+      if (now >= salida && now <= llegada) {
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={"No se puede cancelar: el vuelo está en el aire"+"❗"}
+            type="error"
+          />),
+        { duration: 5000});
+        return;
+      }
+    }
 
     try {
       const req : CancelarVueloRequest = {
@@ -955,7 +1057,9 @@ function FlightSelectCard({
 
       } else if (data) {
         // éxito - agregar vuelo a la lista de cancelados para ocultarlo inmediatamente
-        cancelarVuelo(vuelo.id);
+        if (cancelarVuelo) {
+          cancelarVuelo(vuelo.id);
+        }
         toast.custom((t) => (
           <ToastCustom
             t={t}
@@ -1144,31 +1248,41 @@ function FlightSelectCard({
                     // Vista normal de vuelos activos
                     variant === "operacion" ? (
                       // Vista con botón cancelar para operación diaria
-                      <div className="flex items-start justify-between gap-2">
-                        <button
-                          onClick={() => {
-                            onSelect(v);
-                            setOpen(false);
-                            setQ("");
-                          }}
-                          className="flex-1 text-left min-w-0"
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-mono text-xs">{v.id}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {v.origen} → {v.destino}
-                            </span>
+                      (() => {
+                        const enVuelo = isVueloEnAire(v);
+                        return (
+                          <div className="flex items-start justify-between gap-2">
+                            <button
+                              onClick={() => {
+                                onSelect(v);
+                                setOpen(false);
+                                setQ("");
+                              }}
+                              className="flex-1 text-left min-w-0"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-mono text-xs">{v.id}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {v.origen} → {v.destino}
+                                </span>
+                              </div>
+                            </button>
+                            <button
+                              onClick={(e) => handleCancelar(v, e)}
+                              disabled={enVuelo}
+                              className={`flex-shrink-0 px-2 py-1 text-xs font-medium rounded border transition-colors flex items-center gap-1 ${
+                                enVuelo
+                                  ? "text-muted-foreground bg-muted border-border cursor-not-allowed opacity-50"
+                                  : "text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-red-200 dark:border-red-900/50"
+                              }`}
+                              title={enVuelo ? `No se puede cancelar: vuelo en el aire` : `Cancelar vuelo ${v.id}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Cancelar
+                            </button>
                           </div>
-                        </button>
-                        <button
-                          onClick={(e) => handleCancelar(v, e)}
-                          className="flex-shrink-0 px-2 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 rounded border border-red-200 dark:border-red-900/50 transition-colors flex items-center gap-1"
-                          title={`Cancelar vuelo ${v.id}`}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          Cancelar
-                        </button>
-                      </div>
+                        );
+                      })()
                     ) : (
                       // Vista normal sin botón cancelar
                       <button
@@ -1206,6 +1320,7 @@ function OrderSelectCard({
   items,
   onSelect,
   simNowUtc,
+  variant,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -1214,6 +1329,7 @@ function OrderSelectCard({
   items: PedidoDTO[];
   onSelect: (val: PedidoDTO) => void;
   simNowUtc?: string | null;
+  variant?: Variant;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -1223,25 +1339,75 @@ function OrderSelectCard({
   // Función para calcular el estado basado en cantidadEnVuelo
   const calcularEstado = useCallback((pedido: PedidoDTO): string => {
     if (!pedido.rutas || !simNowUtc) {
+      // En operación diaria, si tiene rutas pero no hay simNowUtc, es PROGRAMADO
+      if (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) {
+        return "PROGRAMADO";
+      }
       return pedido.estadoAsignacion;
     }
 
     const now = new Date(simNowUtc).getTime();
+    
+    // En operación diaria: PROGRAMADO → EN_VUELO → COMPLETO
+    if (variant === "operacion") {
+      // Verificar si todos los vuelos han llegado (COMPLETO)
+      let todosVuelosLlegaron = true;
+      let tieneVuelosEnAire = false;
+      
+      pedido.rutas.forEach(ruta => {
+        ruta.vuelos.forEach(vuelo => {
+          const salida = new Date(vuelo.salidaUtc).getTime();
+          const llegada = new Date(vuelo.llegadaUtc).getTime();
+          
+          if (now <= llegada) {
+            // Aún no ha llegado este vuelo
+            todosVuelosLlegaron = false;
+            
+            // Verificar si está en el aire ahora
+            if (now >= salida && now <= llegada) {
+              tieneVuelosEnAire = true;
+            }
+          }
+        });
+      });
+      
+      if (todosVuelosLlegaron) {
+        return "COMPLETO";
+      }
+      if (tieneVuelosEnAire) {
+        return "EN_VUELO";
+      }
+      if (pedido.rutas && pedido.rutas.length > 0) {
+        return "PROGRAMADO";
+      }
+      return "PENDIENTE";
+    }
+    
+    // Para otros modos: calcular cantidadEnVuelo
     const cantidadEnVuelo = pedido.rutas.reduce((sum, ruta) => {
-      const tieneVueloEnAire = ruta.vuelos.some((vuelo) => {
+      // Sumar la cantidad de cada vuelo que está actualmente en el aire
+      const cantidadRutaEnVuelo = ruta.vuelos.reduce((sumVuelos, vuelo) => {
         const salida = new Date(vuelo.salidaUtc).getTime();
         const llegada = new Date(vuelo.llegadaUtc).getTime();
-        return now >= salida && now <= llegada;
-      });
-      return tieneVueloEnAire ? sum + ruta.cantidad : sum;
+        // Si el vuelo está en el aire ahora, sumar su cantidad
+        if (now >= salida && now <= llegada) {
+          return sumVuelos + vuelo.cantidad;
+        }
+        return sumVuelos;
+      }, 0);
+      return sum + cantidadRutaEnVuelo;
     }, 0);
 
-    return cantidadEnVuelo >= pedido.cantidad
-      ? "COMPLETO"
-      : cantidadEnVuelo > 0
-      ? "PARCIAL"
-      : "PENDIENTE";
-  }, [simNowUtc]);
+    // Para otros modos (simulación semanal, colapso): mantener lógica original
+    if (cantidadEnVuelo >= pedido.cantidad) {
+      return "COMPLETO";
+    }
+    if (cantidadEnVuelo > 0) {
+      return "PARCIAL";
+    }
+
+    return "PENDIENTE";
+  }, [simNowUtc, variant]);
 
   const estados = useMemo(
     () =>
@@ -1363,6 +1529,8 @@ function OrderSelectCard({
                         <span className={`text-xs px-1.5 py-0.5 rounded ${
                           estado === "COMPLETO" ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200" :
                           estado === "PARCIAL" ? "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200" :
+                          estado === "EN_VUELO" ? "bg-purple-100 text-purple-900 dark:bg-purple-900/30 dark:text-purple-200" :
+                          estado === "PROGRAMADO" ? "bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-200" :
                           "bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-200"
                         }`}>
                           {estado}
