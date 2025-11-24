@@ -344,7 +344,8 @@ const renderDropzoneFooterOP = (
         now: simNow ? new Date(simNow) : undefined,
       });
 
-      console.log("simNow es:", simNow)
+      console.log("[Registrar.tsx] simNow es:", simNow)
+      console.log("[Registrar.tsx] req es:", req)
 
       const [data, error] = await handleApi(
         postJson<PedidoResponse>("pedidos/crear", req)
