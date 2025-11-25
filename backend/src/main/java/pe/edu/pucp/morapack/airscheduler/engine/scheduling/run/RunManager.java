@@ -76,8 +76,19 @@ public class RunManager {
     //La cola de pedidos de dicho ÚNICO run de Operación
     private final ConcurrentHashMap<String, ConcurrentLinkedQueue<Pedido>> queues = new ConcurrentHashMap<>();
 
+    //Almacena el ID del run activo, para reconexiones
+    private final AtomicReference<String> activeRunId = new AtomicReference<>(null);
+
+    // Guarda la ÚLTIMA ventana emitida por cada run (para rehidratación)
+    private final Map<String, WindowPacket> lastWindows = new ConcurrentHashMap<>();
+
+    public WindowPacket getLastWindow(String runId) { return lastWindows.get(runId); }
+
     public String currentOperacionRunId(){ return operacionRunId.get(); }
     public boolean hasActiveOperacionRunId(){ return operacionRunId.get() != null; }
+
+    public String currentActiveRunId(){ return activeRunId.get(); }
+    public void setActiveRunIdRunId(String runId) { activeRunId.set(runId); }
     
     /**
      * Obtiene el último run activo (con estado RUNNING) de cualquier tipo.
@@ -517,6 +528,8 @@ public class RunManager {
         ocupacionesPorRun.remove(id);
         lectorArchivoPorRun.remove(id);
         //queues.remove(id);          // si existe
+
+        activeRunId.set(null);
     }
 
     private boolean isCancelled(String id){
@@ -1109,6 +1122,10 @@ public class RunManager {
 
 
     private void broadcastWindow(WindowPacket pkt) {
+
+        // 1) Guardamos la última ventana para este run
+        lastWindows.put(pkt.runId, pkt);
+
         var set = listeners.getOrDefault(pkt.runId, new java.util.concurrent.CopyOnWriteArraySet<>());
         set.forEach(l -> safe(() -> l.onWindow(pkt)));
     }

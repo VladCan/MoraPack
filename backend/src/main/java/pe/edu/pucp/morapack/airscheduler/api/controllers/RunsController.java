@@ -5,10 +5,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunConfig;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunContext;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunId;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.*;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -139,6 +136,9 @@ public class RunsController {
 
         System.out.println("Revisa: http://localhost:8080/runs/" + runId.value() + "/stream ");
 
+        //Indicamos que este es el runId activo
+        runManager.setActiveRunIdRunId(runId.value());
+
         //Delegamos al motor
         runManager.start(runId, config);
 
@@ -173,6 +173,38 @@ public class RunsController {
         return Response.status(Response.Status.CREATED)
                 .entity(new CancelRunResponse(runIdStr, true))
                 .build();
+    }
+
+    @GET
+    @Path("/active")
+    public Response active() {
+
+        System.out.println("[RunsController]: Vamos a ver si existe un run activo");
+
+        /// Obtenemos el runId activo para cualquiera de los 3 escenarios
+        String runId = runManager.currentActiveRunId();
+
+        /// Si no hay...
+        if (runId == null || runId.isBlank()) {
+            return Response.status(Response.Status.NO_CONTENT).build();
+        }
+
+        /// Si hay...
+        return Response.ok(java.util.Map.of(
+                "runId", runId
+        )).build();
+
+    }
+
+    @GET
+    @Path("/{id}/snapshot")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response snapshot(@PathParam("id") String runId) {
+        WindowPacket pkt = runManager.getLastWindow(runId);
+        if (pkt == null) return Response.status(Response.Status.NO_CONTENT).build();
+
+        return Response.ok(pkt).build();
+
     }
 
 }
