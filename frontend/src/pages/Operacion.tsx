@@ -80,8 +80,8 @@ export default function Operacion() {
   }, [airportsDtoRaw]);
 
   // Obtener vuelos de ambas fuentes
-  const { runId, vuelosCancelados, selectedAirportId, setSelectedAirport } = useRunSession();
-  const { simNowUtc, windows, airportOccupancy } = useRunSSE(runId || undefined);
+  const { runId, vuelosCancelados, selectedAirportId, setSelectedAirport, windows } = useRunSession();
+  const { simNowUtc, airportOccupancy } = useRunSSE(runId || undefined);
   const { data: liveFlights } = useFlightsSSE("vuelos/live?limit=200");
   
   // Crear mapa de aeropuertos para calcular posiciones

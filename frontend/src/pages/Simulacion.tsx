@@ -76,8 +76,8 @@ export default function Simulacion() {
   }, [airports]);
 
   // Conectar al SSE
-  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados } = useRunSession();
-const { simNowUtc, windows, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
+  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows } = useRunSession();
+const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
 
   // Procesar vuelos para renderizar
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());

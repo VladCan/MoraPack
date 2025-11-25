@@ -48,7 +48,7 @@ export default function TopNav() {
   //Esto es para la conexión SSE de la solución
 
   //Traemos el contexto
-  const { runId, status, end, setSimNow, setWindow, reset } = useRunSession();
+  const { runId, status, end, setSimNow, setWindow, reset, setAutoReconnect } = useRunSession();
 
   //Para el reloj
   const running = status === "running" && !!runId;
@@ -119,6 +119,9 @@ export default function TopNav() {
 
         //Cortamos el SSE
         disconnect();
+
+        //Para que no dispare el evento de reconexión
+        setAutoReconnect(false);
 
         //Limpiamos el contexto de la simulación
         reset();

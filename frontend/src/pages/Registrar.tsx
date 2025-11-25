@@ -206,10 +206,12 @@ const doDownload = async (kind: Kind, filename?: string) => {
   await downloadFile(`${kind}/download`, filename ?? `${kind}.txt`);
 }
 
+type AnyStatus = Status | PedidosStatusSummary;
+
 /**Esto usamos para mostrar el texto de los datos del archivo dentro del Dropzone**/
 const renderDropzoneFooter = (
   kind: Kind,
-  status?: Status,
+  status?: AnyStatus,
   isLoading?: boolean
 ) => 
 {
@@ -254,12 +256,14 @@ const renderDropzoneFooter = (
       );
     }
 
+  const s = status as Status | undefined;
+
   return(
     <>
       <div className="text-xs text-muted-foreground">
         {isLoading
           ? "Cargando estado..."
-          : status?.exists
+          : s?.exists
             ? <>
                 Archivo actual:{" "}
                 <button
@@ -267,9 +271,9 @@ const renderDropzoneFooter = (
                   onClick={() => doPreview(kind)}
                   title="Ver primeras líneas"
                 >
-                  {status.filename}
+                  {s.filename}
                 </button>
-                {" "}— {status.sizeBytes} bytes — {status.lastModified}
+                {" "}— {s.sizeBytes} bytes — {s.lastModified}
               </>
             : "No se pudo recuperar el estado."}
       </div>
@@ -278,14 +282,14 @@ const renderDropzoneFooter = (
         <button
           className="text-sm underline disabled:opacity-50 hover:cursor-pointer"
           onClick={() => doPreview(kind)}
-          disabled={!status?.exists}
+          disabled={!s?.exists}
         >
           Ver primeras líneas
         </button>
         <button
           className="text-sm underline disabled:opacity-50 hover:cursor-pointer"
-          onClick={() => doDownload(kind, status?.filename)}
-          disabled={!status?.exists}
+          onClick={() => doDownload(kind, s?.filename)}
+          disabled={!s?.exists}
         >
           Descargar
         </button>
@@ -359,7 +363,7 @@ const renderDropzoneFooterOP = (
           type="success"
         />),
       { duration: 5000});
-      form.reset({ clienteId: "", aeropuerto: "SPIM", cantidad: 1 });
+      form.reset({ clienteId: "", aeropuerto: "SKBO", cantidad: 1 });
 
       //Colocamos lo necesario en el hook
       begin(data.runId);
