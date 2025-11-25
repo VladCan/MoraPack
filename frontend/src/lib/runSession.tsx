@@ -84,7 +84,9 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
                     getJson<{ runId?: string }>(path)
                 );
 
-                //if (error)
+                if (error){
+                    console.log("Parece que hubo un error")
+                }
 
                 if (!cancelled && data?.runId) {
                     console.log("[RunSession] Run activo detectado:", data.runId);
