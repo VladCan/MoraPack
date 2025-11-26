@@ -7,10 +7,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.*;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -32,6 +30,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosMap;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.TEGEventBuilder;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.helpers.TEGParametros;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Aeropuerto;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.ArriboExogeno;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.OcupacionAlmacen;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
@@ -202,6 +201,9 @@ public class RunManager {
     private final Map<String, Set<VueloProgramadoId>> vuelosCanceladosPorRun = new ConcurrentHashMap<>();
     private final Map<String, LectorPedidoMultiArchivo> lectorArchivoPorRun = new ConcurrentHashMap<>();
     private static final Duration PICKUP_WAIT = Duration.ofHours(2);
+
+    //Para OD y poder forzar replanificación:
+    private final Map<String, AtomicBoolean> forcePlanPorRun  = new ConcurrentHashMap<>();
 
     public void addContext(String idRun, RunContext context) {
         contexts.put(idRun, context);
@@ -392,6 +394,33 @@ public class RunManager {
         
         return simulatedNow;
     }
+
+    ///Exclusivo para OD:
+    private LocalDateTime currentSimNowLocal(String runId){
+        Instant now = currentSimNow(runId);
+
+        /// Llevamos a la hora de Perú
+        ZoneId zonaPeru = ZoneId.of("America/Lima");
+
+        return LocalDateTime.ofInstant(now, zonaPeru);
+
+    }
+
+    ///Exclusivo para OD:
+    public void normalizarFechasOD(String runId, List<Pedido> pedidos){
+        LocalDateTime fechaOD = currentSimNowLocal(runId);
+
+        if (fechaOD == null || pedidos == null) return;
+
+        LocalDate actual = fechaOD.toLocalDate();
+
+        for (Pedido p : pedidos){
+            if (p == null) continue;
+            LocalTime horaOriginal = p.getFecha().toLocalTime();
+            p.setFecha(LocalDateTime.of(actual, horaOriginal));
+        }
+
+    }
     
     private Instant obtenerUltimaLlegada(SolucionProgramacion solucion) {
         if (solucion == null || solucion.getCargaPorVuelo() == null) {
@@ -470,6 +499,7 @@ public class RunManager {
         states.put(id, RunState.RUNNING);
         paused.put(id, new AtomicBoolean(false));
         cancelled.put(id, new AtomicBoolean(false));
+        forcePlanPorRun.put(id, new AtomicBoolean(false));
 
         executor.submit(() -> {
             try{
@@ -521,6 +551,7 @@ public class RunManager {
         states.remove(id);
         paused.remove(id);
         cancelled.remove(id);
+        forcePlanPorRun.remove(id);
 
         // estructuras por run:
         ventanasEnviadas.remove(id);
@@ -530,6 +561,9 @@ public class RunManager {
         //queues.remove(id);          // si existe
 
         activeRunId.set(null);
+
+        //Nuevo:
+        operacionRunId.set(null);
     }
 
     private boolean isCancelled(String id){
@@ -546,6 +580,52 @@ public class RunManager {
                 sleepQuietly(Duration.ofMillis(100)); // dormimos cortito mientras esté pausado
             }
             if (isCancelled(id)) return true;
+
+            Instant simNow = currentSimNow(id);
+
+            //Verificamos si ya cruzó el fin de ventana
+            if (!simNow.isBefore(wEnd)){
+                break;
+            }
+
+            //Lo que viene acá abajo es para evitar busy-wait, osea
+            //que el CPU no este ejecutando a cada rato lo de arriba
+
+            long remainingSimMs = Duration.between(simNow, wEnd).toMillis();
+            if (remainingSimMs <= 0) break;
+
+            //Acá calculamos lo que falta simular a "cuanto dormir"
+            RunContext ctx = requireContext(id);
+            double speed = ctx.speed();
+            long remainingRealMs = (long) Math.ceil(remainingSimMs / speed);
+
+            //Dormimos por tramos cortos para poder reaccionar a pausa o cancel
+            long napMs = Math.min(Math.max(remainingRealMs, 50L), 500L);
+            sleepQuietly(Duration.ofMillis(napMs));
+
+            if (isCancelled(id)) return true;
+        }
+        return false;
+    }
+
+    private boolean sleepToEndWindowOD(String id, Instant wEnd){
+        //Para revisar solicitud de planificación forzada
+        AtomicBoolean forced = forcePlanPorRun.get(id);
+
+        //Acá vamos a que el reloj simulado cruce el fin de ventana
+        while (true){
+            //En caso de existir pausa o cancelación (por ahora, esto no ocurrirá)
+            if (isCancelled(id)) return true;
+
+            while (paused.get(id).get() && !cancelled.get(id).get()) {
+                sleepQuietly(Duration.ofMillis(100)); // dormimos cortito mientras esté pausado
+            }
+            if (isCancelled(id)) return true;
+
+            /// Si se solicitó un replan:
+            if (forced != null && forced.get()) {
+                break;
+            }
 
             Instant simNow = currentSimNow(id);
 
@@ -868,7 +948,8 @@ public class RunManager {
                                 convertirPedidosADTO(List.of(), null)));
 
                         //Llamamos al sleep (para que el reloj simulado cruce fin de ventana):
-                        sleepToEndWindow(id, wEnd);
+                        sleepToEndWindowOD(id, wEnd);
+                        wEnd = updateWindowEnd(id, wEnd);
 
                         // Avanzar a la siguiente ventana antes de continuar
                         idx++;
@@ -947,7 +1028,8 @@ public class RunManager {
 
 
             //Llamamos al sleep (para que el reloj simulado cruce fin de ventana):
-            sleepToEndWindow(id, wEnd);
+            sleepToEndWindowOD(id, wEnd);
+            wEnd = updateWindowEnd(id, wEnd);
 
             // Siguiente ventana
             idx++;
@@ -957,7 +1039,51 @@ public class RunManager {
             pedidosCargados.setUtcNormalizada(false);
 
         }
+    }
 
+    public LocalDateTime ajustarFechaPedidoPorDestino(LocalDateTime fechaPeru, String codDes) {
+
+        Aeropuerto origen = aeropuertosMap.obtener("SPIM");
+        Aeropuerto destino = aeropuertosMap.obtener(codDes);
+
+        if (origen == null || destino == null) {
+            System.err.println("[RunManager]: No se encontró información de SPIM o" + codDes);
+            return fechaPeru;
+        }
+
+        /// Hacemos la conversión para tener la hora en la que fue creado el pedido, pero del destino
+        int gmtOrigen = origen.getGMT();
+        int gmtDestino = destino.getGMT();
+
+        /// Obtenemos diferencia horaria
+        int diff = gmtDestino - gmtOrigen;
+
+        LocalDateTime fechaDestino = fechaPeru.plus(diff, ChronoUnit.HOURS);
+
+        System.out.println("[RunManager] Ajustando fecha pedido: origen GMT " + gmtOrigen + ", destino GMT " +
+                gmtDestino + ", diff = " + diff +  "h => " + fechaPeru + " -> " + fechaDestino);
+
+        return fechaDestino;
+    }
+
+    public void setForcedReplan(String runId){
+        forcePlanPorRun
+                .computeIfAbsent(runId, k -> new AtomicBoolean(false))
+                .set(true);
+
+    }
+
+    public Instant updateWindowEnd(String id, Instant wEnd){
+        AtomicBoolean forced = forcePlanPorRun.get(id);
+        Instant newWEnd = wEnd;
+        boolean fueForzado = forced != null && forced.getAndSet(false);
+
+        /// Sí hubo cambio, se actualiza al tiempo actual. Si no, sigue siendo wEnd original
+        if (fueForzado){
+            newWEnd = currentSimNow(id);
+        }
+
+        return newWEnd;
     }
 
     private void cargarPedidosDesdeQueue(String id, CargarPedidos pedidosCargados){

@@ -239,19 +239,33 @@ public class PedidosController {
     @Produces(MediaType.APPLICATION_JSON)
     public Response crearPedido(PedidoRequest request) {
         try {
+
+            /// Primero, validamos si existe un run de OD activo
+            String runId = runManager.ensureOperacionStarted();
+            if (runId == null) {
+                return Response
+                        .status(Response.Status.INTERNAL_SERVER_ERROR)
+                        .entity(new JsonResponse("error", "Inicie una ejecución de Operación Diaria primero.", null))
+                        .build();
+            }
+
             if (request == null) return bad("Body requerido");
             if (isBlank(String.valueOf(request.idCliente))) return bad("El idCliente es requerido"); 
             if (isBlank(request.destino)) return bad("El destino es requerido");
             if (isBlank(request.fecha)) return bad("La fecha es requerida");
             if (isBlank(String.valueOf(request.cantidad))) return bad("La cantidad es requerida");
 
-            Pedido pedido = PedidoMapper.toPedido(request);
+            /// Obtenemos la fecha para transformarla a la del destino
+            LocalDateTime fechaPeru = LocalDateTime.parse(request.fecha);
+            String destino = request.destino;
+            LocalDateTime fecha = runManager.ajustarFechaPedidoPorDestino(fechaPeru, destino);
+
+            Pedido pedido = PedidoMapper.toPedido(request, fecha);
             int idGenerado = pedido.getIdPedido();
 
             String msg = "Pedido del cliente (" + request.idCliente + ") con destino " +
-                    "a " + request.destino + " creado correctamente con id " + idGenerado + " a las " + request.fecha;
+                    "a " + request.destino + " creado correctamente con id " + idGenerado + " a las " + fecha + " (" + destino + ")";
 
-            String runId = runManager.ensureOperacionStarted();
             runManager.pushOrder(runId, pedido);
 
             return Response
