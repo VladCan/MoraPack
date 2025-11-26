@@ -82,7 +82,11 @@ export default function Operacion() {
   // Obtener vuelos de ambas fuentes
   const { runId, vuelosCancelados, selectedAirportId, setSelectedAirport, windows } = useRunSession();
   const { simNowUtc, airportOccupancy } = useRunSSE(runId || undefined);
-  const { data: liveFlights } = useFlightsSSE("vuelos/live?limit=200");
+  // Usar tiempo simulado si hay runId, sino usar hora del sistema
+  const liveFlightsEndpoint = runId 
+    ? `vuelos/live?runId=${runId}&limit=200`
+    : "vuelos/live?limit=200";
+  const { data: liveFlights } = useFlightsSSE(liveFlightsEndpoint);
   
   // Crear mapa de aeropuertos para calcular posiciones
   const airportsMap = useMemo(() => {
