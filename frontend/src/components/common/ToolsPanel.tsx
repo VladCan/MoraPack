@@ -12,6 +12,7 @@ import {
   Search,
   Calendar,
   Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { DateTimePicker } from "@/components/ui/DatetimePicker";
 import { es } from "date-fns/locale";
@@ -68,7 +69,7 @@ export default function ToolsPanel({
   const [inicio, setInicio] = useState<Date | undefined>();
   const [fin, setFin] = useState<Date | undefined>();
   //const showStart = variant !== "operacion";
-  
+
   //Por los cambios del profesor, todos tienen fecha de inicio.
   const showStart = true;
   const showEnd = variant === "simulacion";
@@ -88,7 +89,7 @@ export default function ToolsPanel({
   const [almacen, setAlmacen] = useState<string | null>(null);
   const [pedido, setPedido] = useState<PedidoDTO | null>(null);
 
-  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId, vuelosCancelados, cancelarVuelo } = useRunSession();
+  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId, vuelosCancelados, cancelarVuelo, status } = useRunSession();
   const { data: airportsData } = useAirports();
 
   // Obtener vuelos planificados del día siguiente (solo en modo simulacion/operacion semanal)
@@ -374,7 +375,6 @@ export default function ToolsPanel({
     finally {
       setLoading(false);
     }
-
   }
 
   const handleClear = () => {
@@ -388,6 +388,61 @@ export default function ToolsPanel({
     setPedido(null);
     setSelectedAirport(null);
   };
+
+  const [forcing, setForcing] = useState(false);
+
+  const handleForceReplan = async () => {
+    if (variant != "operacion") return;
+
+    if (!currentRunId || status !== "running") {
+      toast.custom((t) => (
+        <ToastCustom
+          t={t}
+          message={"No hay una simulación de Operación Diaria en ejecución." + "❗"}
+          type="error"
+        />
+      ), { duration: 4000 });
+      return;
+    }
+
+    setForcing(true);
+
+    try {
+      const path = `operacionDiaria/${currentRunId}/force`;
+
+      const [data, error] = await handleApi(postJson<{}>(path));
+
+      if (error) {
+        console.error("[ToolsPanel] Error al forzar replan:", error);
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={"Error al forzar planificación." + "❗"}
+            type="error"
+          />
+        ), { duration: 4000 });
+      }
+      else {
+        toast.custom((t) => (
+            <ToastCustom
+              t={t}
+              message={"Replanificación forzada enviada." + "✅"}
+              type="success"
+            />
+          ), { duration: 4000 });
+      }
+
+
+    }
+    catch (err) {
+      console.error("[ToolsPanel] Error inesperado al forzar replan:", err);
+    }
+    finally {
+      setForcing(false);
+    }
+
+
+  }
 
   return (
     <section className="mx-auto max-w-6xl px-3 sm:px-4">
@@ -767,6 +822,33 @@ export default function ToolsPanel({
             >
               <X className="h-4 w-4" /> Limpiar
             </button>
+
+            { variant == "operacion" && currentRunId != null && <button
+              onClick={handleForceReplan}
+              disabled={
+                forcing ||
+                !currentRunId ||
+                status !== "running" ||
+                variant !== "operacion"
+              }
+              className={`px-3 py-2 text-sm rounded-full inline-flex items-center gap-1
+                ${
+                  forcing || !currentRunId || status !== "running" || variant !== "operacion"
+                    ? "bg-rose-300 text-white/70 cursor-not-allowed"
+                    : "bg-rose-600 text-white hover:bg-rose-700"
+                }`}
+              title={
+                !currentRunId || status !== "running"
+                  ? "Requiere una simulación de Operación Diaria en ejecución"
+                  : "Forzar una nueva planificación a partir del tiempo actual"
+              }
+            >
+              <RefreshCw className="w-4 h-4" />
+              {forcing ? "Forzando..." : "Forzar planificación"}
+            </button>
+            }
+
+
             <button
               onClick={handleRun}
               disabled={!canApply || loading}
