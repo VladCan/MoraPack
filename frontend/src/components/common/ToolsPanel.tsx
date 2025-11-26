@@ -422,11 +422,11 @@ export default function ToolsPanel({
           />
         ), { duration: 4000 });
       }
-      else {
+      else if (data){
         toast.custom((t) => (
             <ToastCustom
               t={t}
-              message={"Replanificación forzada enviada." + "✅"}
+              message={"Planificación forzada exitosamente!" + "✅"}
               type="success"
             />
           ), { duration: 4000 });
