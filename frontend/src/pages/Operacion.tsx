@@ -213,16 +213,21 @@ export default function Operacion() {
     return allFlights;
   }, [liveFlights, vuelosCancelados, windows, simNowUtc, airportsMap]);
 
-  // Sincronizar vuelo activo con datos actualizados
+  // Sincronizar vuelo activo con datos actualizados y limpiar si fue cancelado
   useEffect(() => {
     if (!activeFlight) return;
+    // Limpiar si el vuelo fue cancelado
+    if (vuelosCancelados.has(activeFlight.id)) {
+      setActiveFlight(null);
+      return;
+    }
     const refreshed = flightPaths.find((f) => f.id === activeFlight.id);
     if (!refreshed) {
       setActiveFlight(null);
     } else if (refreshed !== activeFlight) {
       setActiveFlight(refreshed);
     }
-  }, [flightPaths, activeFlight]);
+  }, [flightPaths, activeFlight, vuelosCancelados]);
 
   // Obtener datos del aeropuerto activo
   // Mostrar popup incluso si no hay datos todavía (mostrar valores por defecto)

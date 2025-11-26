@@ -119,7 +119,7 @@ export default function ToolsPanel({
       return [];
     }
     
-    // Convertir los datos del endpoint a VueloDTO
+    // Convertir los datos del endpoint a VueloDTO y filtrar vuelos cancelados
     const result = scheduledFlightsRaw.map((v: any) => ({
       id: v.id || "",
       origen: v.origen || "",
@@ -131,10 +131,12 @@ export default function ToolsPanel({
       residual: v.residual || 0,
       costo: v.costo || 0,
       carga: v.carga || [],
-    })).filter((v: VueloDTO) => v.id && v.origen && v.destino);
+    })).filter((v: VueloDTO) => 
+      v.id && v.origen && v.destino && !vuelosCancelados.has(v.id)
+    );
     
     return result;
-  }, [scheduledFlightsRaw, shouldFetchScheduled]);
+  }, [scheduledFlightsRaw, shouldFetchScheduled, vuelosCancelados]);
 
   const warehouseOptions = useMemo(() => {
     if (!airportsData) return [];
@@ -155,6 +157,13 @@ export default function ToolsPanel({
   useEffect(() => {
     setAlmacen(selectedAirportId ?? null);
   }, [selectedAirportId]);
+
+  // Limpiar vuelo seleccionado si fue cancelado
+  useEffect(() => {
+    if (vuelo && vuelosCancelados.has(vuelo.id)) {
+      setVuelo(null);
+    }
+  }, [vuelo, vuelosCancelados]);
 
   const handleSelectAlmacen = (codigo: string) => {
     setAlmacen(codigo);
