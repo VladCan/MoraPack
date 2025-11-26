@@ -1080,6 +1080,7 @@ public class RunManager {
 
         /// Sí hubo cambio, se actualiza al tiempo actual. Si no, sigue siendo wEnd original
         if (fueForzado){
+            System.out.println("[RunManager]: Fue forzado en el plan: " + id + ". Cambiando wEnd...");
             newWEnd = currentSimNow(id);
         }
 
@@ -1242,7 +1243,6 @@ public class RunManager {
         }
 
         int x = 0;
-
     }
 
 
@@ -1251,6 +1251,7 @@ public class RunManager {
 
         // 1) Guardamos la última ventana para este run
         lastWindows.put(pkt.runId, pkt);
+        System.out.println("[RunManager] pkt guardado para runId:" + pkt.runId);
 
         var set = listeners.getOrDefault(pkt.runId, new java.util.concurrent.CopyOnWriteArraySet<>());
         set.forEach(l -> safe(() -> l.onWindow(pkt)));

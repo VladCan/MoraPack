@@ -102,8 +102,6 @@ public class OperacionDiariaController {
     @POST
     @Path("/{id}/force")
     public Response forceReplan(@PathParam("id") String runId){
-        Instant now = runManager.currentSimNow(runId);
-
         System.out.println("[OperacionDiariaController]: Se recibió un forceReplan");
 
         runManager.setForcedReplan(runId);

@@ -178,7 +178,6 @@ public class RunsController {
     @GET
     @Path("/active")
     public Response active() {
-
         System.out.println("[RunsController]: Vamos a ver si existe un run activo");
 
         /// Obtenemos el runId activo para cualquiera de los 3 escenarios
@@ -200,9 +199,15 @@ public class RunsController {
     @Path("/{id}/snapshot")
     @Produces(MediaType.APPLICATION_JSON)
     public Response snapshot(@PathParam("id") String runId) {
+        System.out.println("[RunsController]: Vamos a ver si existe snapshot del runId: " + runId);
         WindowPacket pkt = runManager.getLastWindow(runId);
-        if (pkt == null) return Response.status(Response.Status.NO_CONTENT).build();
+        if (pkt == null) {
+            System.out.println("[RunsController]: El runId no existe en el sistema.");
+            return Response.status(Response.Status.NO_CONTENT).build();
+        }
 
+
+        System.out.println("[RunsController]: Enviando snapshot de runId " + runId);
         return Response.ok(pkt).build();
 
     }
