@@ -202,13 +202,15 @@ export default function ToolsPanel({
           
           if (variant === "operacion") {
             // En operación diaria: incluir vuelos EN_VUELO y PROGRAMADOS
-            // EN_VUELO: ya salió y aún no ha llegado
-            // PROGRAMADO: aún no ha salido pero está planificado (llegada > now)
-            if ((now >= salida && now <= llegada) || (now < salida && llegada > now)) {
+            // Excluir vuelos que ya llegaron (llegada <= now)
+            // EN_VUELO: ya salió y aún no ha llegado (now >= salida && now < llegada)
+            // PROGRAMADO: aún no ha salido pero está planificado (now < salida && llegada > now)
+            // La condición simplificada: llegada > now (el vuelo aún no ha llegado)
+            if (llegada > now) {
               vuelosActivosMap.set(v.id, v);
             }
           } else {
-            // En otros modos: solo vuelos EN EL AIRE
+            // En otros modos: solo vuelos EN EL AIRE (excluye programados y completados)
             if (now >= salida && now <= llegada) {
               vuelosActivosMap.set(v.id, v);
             }
