@@ -174,7 +174,9 @@ export default function ToolsPanel({
     }
   }
 
-  // Obtener SOLO vuelos que están EN EL AIRE en este momento (excluyendo cancelados)
+  // Obtener vuelos activos según el modo:
+  // - En "operacion": vuelos EN_VUELO (en el aire) y PROGRAMADOS (aún no han salido)
+  // - En otros modos: solo vuelos EN EL AIRE
   const vuelosActivos = useMemo<VueloDTO[]>(() => {
     if (windows.length === 0) return [];
     
@@ -187,26 +189,35 @@ export default function ToolsPanel({
     }
 
     const now = new Date(simNowUtc).getTime();
-    const vuelosEnAire = new Map<string, VueloDTO>();
+    const vuelosActivosMap = new Map<string, VueloDTO>();
     
     windows.forEach(window => {
       window.vuelos.forEach(v => {
         // Excluir vuelos cancelados
         if (vuelosCancelados.has(v.id)) return;
         
-        if (!vuelosEnAire.has(v.id)) {
+        if (!vuelosActivosMap.has(v.id)) {
           const salida = new Date(v.salidaUtc).getTime();
           const llegada = new Date(v.llegadaUtc).getTime();
           
-          // Solo incluir si está en el aire AHORA
-          if (now >= salida && now <= llegada) {
-            vuelosEnAire.set(v.id, v);
+          if (variant === "operacion") {
+            // En operación diaria: incluir vuelos EN_VUELO y PROGRAMADOS
+            // EN_VUELO: ya salió y aún no ha llegado
+            // PROGRAMADO: aún no ha salido pero está planificado (llegada > now)
+            if ((now >= salida && now <= llegada) || (now < salida && llegada > now)) {
+              vuelosActivosMap.set(v.id, v);
+            }
+          } else {
+            // En otros modos: solo vuelos EN EL AIRE
+            if (now >= salida && now <= llegada) {
+              vuelosActivosMap.set(v.id, v);
+            }
           }
         }
       });
     });
     
-    const resultado = Array.from(vuelosEnAire.values());
+    const resultado = Array.from(vuelosActivosMap.values());
     if (resultado.length === 0) {
       const lastWindow = windows[windows.length - 1];
       const vuelos = lastWindow?.vuelos ?? [];
@@ -215,7 +226,7 @@ export default function ToolsPanel({
     }
     
     return resultado;
-  }, [windows, simNowUtc, vuelosCancelados]);
+  }, [windows, simNowUtc, vuelosCancelados, variant]);
 
   // Construir mapa de pedidos (último estado conocido por id) usando TODAS las ventanas
   const pedidosPorIdOperacion = useMemo(() => {
