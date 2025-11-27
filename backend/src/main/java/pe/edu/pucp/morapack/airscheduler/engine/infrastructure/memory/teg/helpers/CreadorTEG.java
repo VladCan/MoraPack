@@ -4,15 +4,13 @@ import static pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg
 import static pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.helpers.FechasTEG.instantesDiariosEnVentana;
 
 import java.time.Instant;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosCancelados;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.*;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.AereopuertoNode;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.ArriboExogeno;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.OcupacionAlmacen;
@@ -101,33 +99,44 @@ public final class CreadorTEG {
 
     public static void crearFlights(VuelosTEG teg, VuelosMap vuelosMap, TEGParametros p,
             AeropuertosMap aeropuertosMap) {
-        VuelosCancelados cancelados = new VuelosCancelados();
-        cancelados.setCanceladosMap(p.getVuelosCancelados());
-
+        List<VueloCancelado> cancelados = p.getVuelosCancelados();
         for (String origen : vuelosMap.origenes()) {
             for (Vuelo v : vuelosMap.vuelosDesde(origen)) {
-                List<Integer> diasCancelados = cancelados.diasCancelado(v);
-                if(diasCancelados!=null && !diasCancelados.isEmpty()){
-                    System.out.printf("✈️  Vuelo cancelado: %s en días %s%n",
-                            v.getHoraOrigen(), diasCancelados);
-                }
                 for (Instant salida : instantesDiariosEnVentana(p.getInicioUtc(), p.getFinUtc(),
                         v.getHoraGMTOrigen())) {
                     Instant llegada = combinarFechaYHora(salida, v.getHoraGMTDestino()); 
                     if (!llegada.isAfter(salida))
                         llegada = llegada.plus(1, ChronoUnit.DAYS);
 
-                    AereopuertoNode nSalida = teg.agregarONodo(v.getOrigen(), salida,
-                            aeropuertosMap.getCapBodega(v.getOrigen()), false);
-                    AereopuertoNode nLlegada = teg.agregarONodo(v.getDestino(), llegada,
-                            aeropuertosMap.getCapBodega(v.getDestino()), false);
-                    
-                    String idInstancia = String.format("%s-%s-%s",
-                            v.getOrigen(),
-                            v.getDestino(),
-                            DateTimeFormatter.ofPattern("yyyyMMdd").withZone(ZoneOffset.UTC).format(salida),
-                            DateTimeFormatter.ofPattern("HHmm").withZone(ZoneOffset.UTC).format(salida));
-                    teg.agregarArco(new VuelosEdge(nSalida, nLlegada, VuelosEdge.Type.FLIGHT, v.getCapacidad(), v,idInstancia));
+                    boolean esCancelado = false;
+
+                    for (VueloCancelado vc : cancelados) {
+
+                        // 1. Mismo vuelo (código)
+                        if (!vc.getOrigen().equals(v.getOrigen())) continue;
+
+                        // 2. Misma fecha/hora de salida exacta
+                        //    vc.getFechaHoraUtc() es un Instant
+                        if (!vc.getInstante().equals(salida)) continue;
+
+                        // Si coincidió → es vuelo cancelado
+                        esCancelado = true;
+                        break;
+                    }
+
+                    if(!esCancelado) {
+                        AereopuertoNode nSalida = teg.agregarONodo(v.getOrigen(), salida,
+                                aeropuertosMap.getCapBodega(v.getOrigen()), false);
+                        AereopuertoNode nLlegada = teg.agregarONodo(v.getDestino(), llegada,
+                                aeropuertosMap.getCapBodega(v.getDestino()), false);
+
+
+                        teg.agregarArco(new VuelosEdge(nSalida, nLlegada, VuelosEdge.Type.FLIGHT, v.getCapacidad(), v));
+                    }else{
+
+                        System.out.println("[Flights] SALTANDO vuelo cancelado: "
+                                + v.getOrigen() + " salida=" + salida);
+                    }
                 }
             }
         }
