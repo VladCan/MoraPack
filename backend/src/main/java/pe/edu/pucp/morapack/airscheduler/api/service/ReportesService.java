@@ -15,13 +15,22 @@ public class ReportesService {
     ArchivoManager archivoManager; // Usamos el manager para la ruta
 
     private static final String FILENAME = "reporteSimulacion.txt";
+    private static final String LAST_PLAN = "ultimaPlanificacion.txt";
 
     public Path getReportesFilePath() {
         return Paths.get(archivoManager.getReportsDir(), FILENAME);
     }
 
-    public void limpiarReportesPrevios(){
-        Path p = getReportesFilePath();
+    public Path getLastPlanFilePath() {
+        return Paths.get(archivoManager.getReportsDir(), LAST_PLAN);
+    }
+
+    private Path getFilePath(String fileName) {
+        return Paths.get(archivoManager.getReportsDir(), fileName);
+    }
+
+    private void borrarSiExiste(String fileName) {
+        Path p = getFilePath(fileName);
         try {
             if (Files.exists(p)) {
                 Files.delete(p);
@@ -33,6 +42,11 @@ public class ReportesService {
         } catch (IOException e) {
             System.err.println("[ReportesService] (x) No se pudo borrar reporte: " + e.getMessage());
         }
+    }
+
+    public void limpiarReportesPrevios(){
+        borrarSiExiste(FILENAME);
+        borrarSiExiste(LAST_PLAN);
     }
 
 }
