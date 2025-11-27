@@ -1,6 +1,7 @@
 package pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory;
 
-import java.time.Instant;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
@@ -127,20 +128,49 @@ public final class VuelosTEG {
 
         System.out.println("[VuelosTEG] Cancelando vuelos: " + vuelosCancelados);
 
-        for (Map.Entry<AereopuertoNode, List<VuelosEdge>> entry : ady.entrySet()) {
-            List<VuelosEdge> edges = entry.getValue();
+        // --- Eliminación optimizada por key directa ---
+        for (String vc : vuelosCancelados) {
 
-            edges.removeIf(e -> {
-                boolean match = e.isFlight() && vuelosCancelados.contains(e.idInstancia());
-                System.out.println("[Cancelar] Eliminando vuelo: " + e.idInstancia());
-                if (match) {
-                    System.out.println("[Cancelar] Eliminando vuelo: " + e.idInstancia());
-                }
-                return match;
-            });
+            String key = parsearKey(vc);  // clave del nodo salida
+            AereopuertoNode node = nodos.get(key);
 
+            if (node == null) {
+                System.out.println("[WARN] Nodo no encontrado para vuelo " + vc + " (key=" + key + ")");
+                continue;
+            }
+
+            List<VuelosEdge> vuelos = ady.get(node);
+            if (vuelos == null) continue;
+
+            //vuelos.removeIf(e -> vc.equals(e.idInstancia()) && e.isFlight());
+
+            // Si el nodo quedó sin aristas → eliminar del mapa
+            if (vuelos.isEmpty()) {
+                ady.remove(node);
+            }
         }
-        ady.entrySet().removeIf(entry -> entry.getValue().isEmpty());
 
+        // --- Limpieza general (opcional si quieres mantener tu lógica original) ---
+        ady.entrySet().removeIf(entry -> entry.getValue().isEmpty());
     }
+    private String parsearKey(String idVuelo) {
+        // Ej: "EBCI-OYSN-20250107-0638"
+        String[] p = idVuelo.split("-");
+        String origen = p[0];
+        String fecha = p[2];
+        String hora = p[3];
+
+        // Convertir fecha y hora a Instant
+        LocalDate ld = LocalDate.parse(fecha, DateTimeFormatter.ofPattern("yyyyMMdd"));
+        LocalTime lt = LocalTime.parse(hora, DateTimeFormatter.ofPattern("HHmm"));
+
+        Instant instant = LocalDateTime.of(ld, lt)
+                .atZone(ZoneOffset.UTC)
+                .toInstant();
+
+        // La key debe coincidir con tu método key(codigoAP, Instant t)
+        return origen + "|" + instant.getEpochSecond();
+    }
+
+
 }

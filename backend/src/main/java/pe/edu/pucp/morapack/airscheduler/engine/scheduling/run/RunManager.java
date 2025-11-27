@@ -4,9 +4,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.io.BufferedReader;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.ZoneOffset;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,11 +19,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoManager
 // Imports para la lógica de planificación
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.VentanaPedidos;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.EstadoAnteriorExtractor;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosCancelados;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.*;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.TEGEventBuilder;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.helpers.TEGParametros;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.ArriboExogeno;
@@ -499,7 +493,7 @@ public class RunManager {
         System.out.println("[RunManager] Ventana inicial: wStart=" + wStart + ", wEnd=" + wEnd);
 
         System.out.println("Dentro de runSimulación firstExecution es:" + firstExecution);
-        List<String> vuelosCanceladosTeg = new ArrayList<>();
+        List<VueloCancelado> vuelosCanceladosTeg = new ArrayList<>();
         while (!isCancelled(id) && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
             /// Revisar esto:
             // Pausa cooperativa entre ventanas
@@ -553,7 +547,7 @@ public class RunManager {
                         System.out.println("[RunManager]: Procesando cancelaciones: " + vuelosCancelados.size());
 
                         //Considerar si hay que colocar los vuelos cancelados en algun otro lado para enchufar en el TEG
-                        List <String> vuelosCancelString = transformar(vuelosCancelados);
+                        List <VueloCancelado> vuelosCancelString = transformar(vuelosCancelados);
                         vuelosCanceladosTeg.addAll(vuelosCancelString);
                         procesarCancelaciones(id, vuelosCancelados, solucionAnterior);
 
@@ -592,6 +586,14 @@ public class RunManager {
 
                 if (isCancelled(id)) break;
 
+                List<VueloCancelado> vuelosCanceladosArch = cancelados.obtenerVuelosCancelados(wStart,wEnd);
+                vuelosCanceladosTeg.addAll(vuelosCanceladosArch);
+
+                if(!vuelosCanceladosTeg.isEmpty()){
+                    System.out.println("[RunManager] Vuelos cancelados en la ventana " + idx + ": " + vuelosCanceladosTeg);
+                    //teg.cancelarVuelos(vuelosCanceladosTeg);
+                }
+
                 // 3. Construir TEG para la ventana
                 Instant finTEG = wEnd.plus(config.horizon());
                 TEGParametros params = TEGParametros.builder()
@@ -600,18 +602,13 @@ public class RunManager {
                         .sedes(sedes)
                         .arribosLibres(enVuelo)
                         .reservasWaitIniciales(reservas)
+                        .vuelosCancelados(vuelosCanceladosTeg)
                         .build();
 
                 VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, vuelosMap).construir(params);
                 // 3.5 Cancelar vuelos de archivo
 
-                List<String> vuelosCanceladosArch = cancelados.obtenerVuelosCancelados(wStart,wEnd);
-                vuelosCanceladosTeg.addAll(vuelosCanceladosArch);
 
-                if(!vuelosCanceladosTeg.isEmpty()){
-                    System.out.println("[RunManager] Vuelos cancelados en la ventana " + idx + ": " + vuelosCanceladosTeg);
-                    teg.cancelarVuelos(vuelosCanceladosTeg);
-                }
 
                 // 4. Generar solución inicial (seed)
                 OcupacionPorAeropuerto ocupacionPorAeropuerto = ocupacionesPorRun.computeIfAbsent(id, k -> new OcupacionPorAeropuerto(aeropuertosMap));
@@ -757,13 +754,13 @@ public class RunManager {
                         // Avanzar a la siguiente ventana antes de continuar
                         idx++;
                         wStart = wEnd;
-                        wEnd = wEnd.plus(config.horasVentana());
+
+                        /// 3. Construimos TEG                wEnd = wEnd.plus(config.horasVentana());
                         //Como se ha diseñado para que lea todo0 de un archivo, tenemos que hacer esto para que funcione por ventana
                         pedidosCargados.setUtcNormalizada(false);
                         continue;
                     }
 
-                /// 3. Construimos TEG
 
                 Instant finTEG = wEnd.plus(config.horizon());
                 TEGParametros params = TEGParametros.builder()
@@ -775,7 +772,7 @@ public class RunManager {
                         .build();
 
                 VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, vuelosMap).construir(params);
-
+//Eliminar Vuelos
                 /// 4. Generamos la solución inicial (seed)
                 OcupacionPorAeropuerto ocupacionPorAeropuerto = ocupacionesPorRun.computeIfAbsent(id, k -> new OcupacionPorAeropuerto(aeropuertosMap));
                 SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of(), ocupacionPorAeropuerto);
@@ -1580,11 +1577,10 @@ public class RunManager {
         return vuelosPlanificados;
     }
 
-    public List<String> transformar(Set<VueloProgramadoId> vuelosCancelados) {
-        List<String> resultado = new ArrayList<>();
+    public List<VueloCancelado> transformar(Set<VueloProgramadoId> vuelosCancelados) {
+        List<VueloCancelado> resultado = new ArrayList<>();
 
-        DateTimeFormatter fFecha = DateTimeFormatter.ofPattern("yyyyMMdd").withZone(ZoneOffset.UTC);
-        DateTimeFormatter fHora  = DateTimeFormatter.ofPattern("HHmm").withZone(ZoneOffset.UTC);
+        ZoneId zone = ZoneOffset.UTC;
 
         for (VueloProgramadoId v : vuelosCancelados) {
 
@@ -1594,24 +1590,23 @@ public class RunManager {
             String origen  = v.getOrigen();
             String destino = v.getDestino();
 
-            // Formato YYYYMMDD y HHMM
-            String fecha = fFecha.format(salidaUtc);
-            String hora  = fHora.format(salidaUtc);
+            // Convertir Instant → LocalDate y LocalTime
+            LocalDate fecha = salidaUtc.atZone(zone).toLocalDate();
+            LocalTime hora  = salidaUtc.atZone(zone).toLocalTime();
 
-            // Formato final
-            String id = String.format(
-                    "%s-%s-%s-%s",
+            // Crear objeto VueloCancelado
+            resultado.add(new VueloCancelado(
                     origen,
                     destino,
                     fecha,
-                    hora
-            );
-
-            resultado.add(id);
+                    hora,
+                    salidaUtc
+            ));
         }
 
         return resultado;
     }
+
 
 
 }
