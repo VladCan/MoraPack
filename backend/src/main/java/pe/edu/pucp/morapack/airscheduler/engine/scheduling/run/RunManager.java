@@ -65,7 +65,7 @@ public class RunManager {
     private static final String PEDIDOS_FILENAME = "pedidos.txt";
     private static boolean firstExecution = false;
 
-    private static final String VUELOS_CANCELADOS_FILENAME = "vuelos_cancelados.txt";
+    private static final String VUELOS_CANCELADOS_FILENAME = "cancelaciones.txt";
 
     @Inject
     ReportesService reportesService;
