@@ -3,6 +3,7 @@ package pe.edu.pucp.morapack.airscheduler.test;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -58,11 +59,20 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             mapa.leerDatos(sc);
         }
 
-        //VuelosCancelados cancelados = new VuelosCancelados();
+        VuelosCancelados cancelados = new VuelosCancelados();
+        try (Scanner sc = ArchivoUtils.getScannerFromFilePath(
+                "vuelos_cancelados.txt")){
+            if (sc != null) {
+                cancelados.leerDatos(sc);
+                System.out.println("[RunManager] Vuelos cancelados cargados");
+            } else {
+                System.err.println("[RunManager] Falló la carga del archivo de vuelos cancelados.");
+            }
+        }
         //int year = 2025;
         //int mes = 10; // octubre
         // Nombre del archivo esperado: cancelaciones_2025-10.txt
-        //String nombre = String.format("cancelaciones_%04d-%02d.txt", year, mes);
+
         //try (Scanner sc = ArchivoUtils.getScannerFromFilePath(nombre)) {
         //    if (sc == null)
         //        return;
@@ -104,6 +114,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
         if (reloj == null)
             return; // no hay pedidos que simular
         limpiarArchivosPrevios();
+        List<VueloCancelado> vuelosCanceladosTeg = new ArrayList<>();
         // guardaremos la solución anterior para poder replanificar
         SolucionProgramacion solucionAnterior = null;
         OcupacionPorAeropuerto ocupacionPorAeropuerto = new OcupacionPorAeropuerto(aeropuertosMap);
@@ -155,6 +166,13 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             //        presenteUTC,
             //        Paths.get("out", "iteracionPrevia.txt"));
             // definimos los valores necesarios para el Time Elapse Event Graph TEEG
+
+            List<VueloCancelado> vuelosCanceladosArch = cancelados.obtenerVuelosCancelados(presenteUTC,finUTC);
+            vuelosCanceladosTeg.addAll(vuelosCanceladosArch);
+            if(!vuelosCanceladosTeg.isEmpty()){
+                System.out.println("Hay");
+            }
+
             TEGParametros params = TEGParametros.builder()
                     .inicioUtc(presenteUTC)
                     .finUtc(finUTC)
@@ -164,7 +182,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                     .reservasWaitIniciales(reservas) // <— ocupa bodega por pickup 2h
                     // .stockInicial(stockInicial) //en caso sea conveniente para el modelo (en
                     // evaluacion)
-                    //.vuelosCancelados(cancelados.getCanceladosMap())
+                    .vuelosCancelados(vuelosCanceladosTeg)
                     .build();
 
             VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, mapa).construir(params);
