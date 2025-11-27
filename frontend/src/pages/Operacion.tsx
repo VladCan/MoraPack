@@ -82,7 +82,11 @@ export default function Operacion() {
   // Obtener vuelos de ambas fuentes
   const { runId, vuelosCancelados, selectedAirportId, setSelectedAirport, windows } = useRunSession();
   const { simNowUtc, airportOccupancy } = useRunSSE(runId || undefined);
-  const { data: liveFlights } = useFlightsSSE("vuelos/live?limit=200");
+  // Usar tiempo simulado si hay runId, sino usar hora del sistema
+  const liveFlightsEndpoint = runId 
+    ? `vuelos/live?runId=${runId}&limit=200`
+    : "vuelos/live?limit=200";
+  const { data: liveFlights } = useFlightsSSE(liveFlightsEndpoint);
   
   // Crear mapa de aeropuertos para calcular posiciones
   const airportsMap = useMemo(() => {
@@ -213,16 +217,21 @@ export default function Operacion() {
     return allFlights;
   }, [liveFlights, vuelosCancelados, windows, simNowUtc, airportsMap]);
 
-  // Sincronizar vuelo activo con datos actualizados
+  // Sincronizar vuelo activo con datos actualizados y limpiar si fue cancelado
   useEffect(() => {
     if (!activeFlight) return;
+    // Limpiar si el vuelo fue cancelado
+    if (vuelosCancelados.has(activeFlight.id)) {
+      setActiveFlight(null);
+      return;
+    }
     const refreshed = flightPaths.find((f) => f.id === activeFlight.id);
     if (!refreshed) {
       setActiveFlight(null);
     } else if (refreshed !== activeFlight) {
       setActiveFlight(refreshed);
     }
-  }, [flightPaths, activeFlight]);
+  }, [flightPaths, activeFlight, vuelosCancelados]);
 
   // Obtener datos del aeropuerto activo
   // Mostrar popup incluso si no hay datos todavía (mostrar valores por defecto)

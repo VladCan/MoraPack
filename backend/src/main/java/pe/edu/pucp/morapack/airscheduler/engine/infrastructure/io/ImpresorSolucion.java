@@ -89,12 +89,14 @@ public final class ImpresorSolucion {
         }
 
         public static void imprimirEnArchivo(SolucionProgramacion sol, String nombreArchivo, Instant presenteUTC) {
-                String contenido = formatearReporte(sol, presenteUTC);
+                String contenido = formatearReporteSimple(sol, presenteUTC);
 
                 // 2) archivo (APPEND, sin truncar)
                 Path path = Paths.get(nombreArchivo == null || nombreArchivo.isBlank()
                                 ? "solucion.txt"
                                 : nombreArchivo);
+
+                System.out.println("[imprimirEnArchivo]: El path es: " + path);
 
                 try (var writer = Files.newBufferedWriter(
                                 path,
@@ -510,6 +512,75 @@ public final class ImpresorSolucion {
                                         String.format("%,d", asig),
                                         String.format("%,d", resid))).append('\n');
                 }
+
+                return sb.toString();
+        }
+
+        private static String formatearReporteSimple(SolucionProgramacion sol, Instant presenteUtc){
+                StringBuilder sb = new StringBuilder(2_000);
+
+                var planes = sol.getPlanPorPedido().values();
+
+                int totalPedidos = planes.size();
+                int completos    = (int) planes.stream().filter(PlanPedido::estaCompleto).count();
+                int incompletos  = totalPedidos - completos;
+
+                int demandaTotal  = planes.stream().mapToInt(PlanPedido::getDemanda).sum();
+                int asignadoTotal = planes.stream().mapToInt(PlanPedido::totalAsignado).sum();
+
+                double pctAsignado = (demandaTotal == 0 ? 100.0 : 100.0 * asignadoTotal / demandaTotal);
+
+                boolean capOK   = sol.respetaCapacidadesVuelos();
+                boolean sla46OK = sol.respetaSLAConPickupTodos(VENTANA_46H);
+                boolean sla48OK = sol.respetaSLA48hTodos();
+
+                // Resumen de uso de vuelos
+                var asignaciones = sol.getCargaPorVuelo().getAsignado();
+
+                int vuelosConCarga = (int) asignaciones.values().stream()
+                        .filter(v -> v != null && v > 0)
+                        .count();
+
+                int capacidadTotal = asignaciones.entrySet().stream()
+                        .mapToInt(e -> sol.getCargaPorVuelo().capacidad(e.getKey()))
+                        .sum();
+
+                int cargaTotal = asignaciones.values().stream()
+                        .filter(Objects::nonNull)
+                        .mapToInt(Integer::intValue)
+                        .sum();
+
+                double usoCapacidad = capacidadTotal == 0 ? 0.0 : 100.0 * cargaTotal / capacidadTotal;
+
+                // ─────────────────────────────────────────
+                // BLOQUE POR VENTANA
+                // ─────────────────────────────────────────
+                sb.append("──────────────────────────────────────────────\n");
+                sb.append(String.format("Snapshot en t = %s%n",
+                        DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss 'UTC'",
+                                        Locale.forLanguageTag("es-ES"))
+                                .withZone(ZoneOffset.UTC)
+                                .format(presenteUtc)));
+
+                sb.append('\n');
+                sb.append(String.format("Pedidos: %,d (Completos: %,d | Incompletos: %,d)%n",
+                        totalPedidos, completos, incompletos));
+                sb.append(String.format("Demanda total: %,d  |  Asignado: %,d (%.1f%%)%n",
+                        demandaTotal, asignadoTotal, pctAsignado));
+
+                sb.append('\n');
+                sb.append(String.format("Capacidades respetadas: %s%n", capOK   ? "OK" : "FALLA"));
+                sb.append(String.format("SLA ≤46h (todos):       %s%n", sla46OK ? "OK" : "FALLA"));
+                sb.append(String.format("SLA ≤48h (todos):       %s%n", sla48OK ? "OK" : "FALLA"));
+
+                sb.append('\n');
+                sb.append("== Vuelos ==\n");
+                sb.append(String.format("Vuelos con carga:       %,d%n", vuelosConCarga));
+                sb.append(String.format("Capacidad total:        %,d%n", capacidadTotal));
+                sb.append(String.format("Carga total asignada:   %,d%n", cargaTotal));
+                sb.append(String.format("Uso promedio capacidad: %.1f%%%n", usoCapacidad));
+
+                sb.append("──────────────────────────────────────────────\n\n");
 
                 return sb.toString();
         }

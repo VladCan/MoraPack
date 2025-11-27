@@ -176,16 +176,21 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
     return allFlights;
   }, [windows, simNowUtc, airportsMap, vuelosCancelados]);
 
-  // Sincronizar vuelo activo con datos actualizados
+  // Sincronizar vuelo activo con datos actualizados y limpiar si fue cancelado
   useEffect(() => {
     if (!activeFlight) return;
+    // Limpiar si el vuelo fue cancelado
+    if (vuelosCancelados.has(activeFlight.id)) {
+      setActiveFlight(null);
+      return;
+    }
     const refreshed = flightsToRender.find((f) => f.id === activeFlight.id);
     if (!refreshed) {
       setActiveFlight(null);
     } else if (refreshed !== activeFlight) {
       setActiveFlight(refreshed);
     }
-  }, [flightsToRender, activeFlight]);
+  }, [flightsToRender, activeFlight, vuelosCancelados]);
 
   // Obtener datos del aeropuerto activo
   const activeAirportData = selectedAirportId && airportOccupancy[selectedAirportId]

@@ -18,10 +18,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
+import pe.edu.pucp.morapack.airscheduler.api.service.ReportesService;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoManager;
 // Imports para la lógica de planificación
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.VentanaPedidos;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.LectorPedidoMultiArchivo;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.EstadoAnteriorExtractor;
@@ -58,6 +60,8 @@ public class RunManager {
 
     private static final String VUELOS_CANCELADOS_FILENAME = "vuelos_cancelados.txt";
 
+    @Inject
+    ReportesService reportesService;
 
     private final ExecutorService executor = Executors.newCachedThreadPool((r -> {
         Thread t = new Thread(r, "run-" + UUID.randomUUID());
@@ -252,7 +256,8 @@ public class RunManager {
 
             if (scenario != RunConfig.Scenario.OPERACION){
                 //Ya no cargamos un único archivo de pedidos aquí
-                //Solamente nos vamos a asegurar de tener pedidosCargados inicializados
+                //Limpiamos los reportes previos
+                reportesService.limpiarReportesPrevios();
 
                 if (pedidosCargados == null) pedidosCargados = new CargarPedidos();
             }
@@ -830,6 +835,11 @@ public class RunManager {
                 ventanasEnviadasRun.add(windowIdISO);
                 broadcastWindow(new WindowPacket(id, idx, wStart, wEnd, vuelosVentana, pedidosVentanaDTO));
 
+                //9. Imprimimos en archivo
+                Path reportePath = reportesService.getReportesFilePath();
+
+                ImpresorSolucion.imprimirEnArchivo(solucionOptima, reportePath.toString(), wStart);
+
                 System.out.println("[RunManager] Ventana " + idx + " procesada exitosamente. Vuelos: " + vuelosVentana.size() + ", Pedidos: " + pedidosVentanaDTO.size());
 
             } catch (Exception e) {
@@ -848,6 +858,7 @@ public class RunManager {
             pedidosCargados.setUtcNormalizada(false);
         }
 
+        /// Acá debería de ir imprimirUltimaPlanificacion
 
     }
 
