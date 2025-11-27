@@ -13,7 +13,9 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 import org.jboss.resteasy.reactive.RestStreamElementType;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +31,7 @@ public class VuelosSseController {
         /**
          * SSE: cada ~1s emite un array JSON con los vuelos EN EL AIRE.
          * Query opcional: ?time=HH:mm  (usa esa hora UTC simulada por conexión).
+         * Query opcional: ?runId=xxx  (usa el tiempo simulado del run activo).
          */
         // src/main/java/.../controllers/VuelosSseController.java
     @GET
@@ -38,15 +41,35 @@ public class VuelosSseController {
     @RestStreamElementType(MediaType.APPLICATION_JSON)
     public Multi<List<FlightLiveDTO>> live(
             @QueryParam("time") String time,
-            @QueryParam("limit") @DefaultValue("50") int limit // 👈 NUEVO
+            @QueryParam("runId") String runId,
+            @QueryParam("limit") @DefaultValue("50") int limit
     ) {
         VuelosLiveService.NowSupplier nowSupplier;
         try {
+            // Prioridad 1: Si hay runId, usar el tiempo simulado del run
+            if (runId != null && !runId.isBlank()) {
+                final int effectiveLimit = (limit <= 0) ? Integer.MAX_VALUE : Math.min(limit, 500);
+                return Multi.createFrom().ticks().every(Duration.ofSeconds(1))
+                        .onItem().transform(t -> {
+                            try {
+                                Instant simNow = runManager.currentSimNow(runId);
+                                // Convertir Instant a segundos del día UTC
+                                LocalTime utcTime = simNow.atZone(ZoneOffset.UTC).toLocalTime();
+                                int nowUtcSeconds = utcTime.toSecondOfDay();
+                                return service.snapshot(nowUtcSeconds, effectiveLimit);
+                            } catch (Exception e) {
+                                System.err.println("[VuelosSseController] Error obteniendo tiempo simulado para runId " + runId + ": " + e.getMessage());
+                                return service.snapshot(service.systemNowUtcSeconds(), effectiveLimit);
+                            }
+                        });
+            }
+            // Prioridad 2: Si hay time, usar esa hora
             if (time != null && !time.isBlank()) {
                 var t = LocalTime.parse(time, DateTimeFormatter.ofPattern("HH:mm"));
                 final int fixed = t.toSecondOfDay();
                 nowSupplier = () -> fixed;
             } else {
+                // Prioridad 3: Usar hora del sistema
                 nowSupplier = service::systemNowUtcSeconds;
             }
         } catch (Exception e) {

@@ -9,6 +9,7 @@ import { useRunSession } from "@/lib/runSession";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import SimulationFinishedOverlay from "@/components/common/SimulationFinishedOverlay";
+import { downloadFile } from "@/services/api";
 
 const COLOR_SEDE   = "#005097";
 const COLOR_NORMAL = "#38bdf8";
@@ -75,8 +76,8 @@ export default function Simulacion() {
   }, [airports]);
 
   // Conectar al SSE
-  const { runId, selectedAirportId, setSelectedAirport, reset } = useRunSession();
-  const { simNowUtc, windows, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
+  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows } = useRunSession();
+const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
 
   // Procesar vuelos para renderizar
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
@@ -103,8 +104,11 @@ export default function Simulacion() {
       });
     });
 
-    // Ahora procesamos todos los vuelos únicos
+    // Ahora procesamos todos los vuelos únicos (excluyendo cancelados)
     vuelosUnicos.forEach(vuelo => {
+        // Excluir vuelos cancelados
+        if (vuelosCancelados.has(vuelo.id)) return;
+        
         const origen = airportsMap.get(vuelo.origen);
         const destino = airportsMap.get(vuelo.destino);
 
@@ -170,18 +174,23 @@ export default function Simulacion() {
     });
 
     return allFlights;
-  }, [windows, simNowUtc, airportsMap]);
+  }, [windows, simNowUtc, airportsMap, vuelosCancelados]);
 
-  // Sincronizar vuelo activo con datos actualizados
+  // Sincronizar vuelo activo con datos actualizados y limpiar si fue cancelado
   useEffect(() => {
     if (!activeFlight) return;
+    // Limpiar si el vuelo fue cancelado
+    if (vuelosCancelados.has(activeFlight.id)) {
+      setActiveFlight(null);
+      return;
+    }
     const refreshed = flightsToRender.find((f) => f.id === activeFlight.id);
     if (!refreshed) {
       setActiveFlight(null);
     } else if (refreshed !== activeFlight) {
       setActiveFlight(refreshed);
     }
-  }, [flightsToRender, activeFlight]);
+  }, [flightsToRender, activeFlight, vuelosCancelados]);
 
   // Obtener datos del aeropuerto activo
   const activeAirportData = selectedAirportId && airportOccupancy[selectedAirportId]
@@ -210,8 +219,11 @@ export default function Simulacion() {
     setFinishedAt(null);
   }, [runId]);
 
-  const handleDownloadReports = () => {
+  const handleDownloadReports = async () => {
     if (!runId) return;
+
+    await downloadFile(`reportes/download`, "reporteSimulacion.txt");
+
     // Endpoint a crear, por ejemplo:
     // GET /runs/{id}/report  -> devuelve ZIP
     // downloadFile(`runs/${runId}/report`, `reporte-simulacion-${runId}.zip`);

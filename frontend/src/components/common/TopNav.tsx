@@ -48,7 +48,7 @@ export default function TopNav() {
   //Esto es para la conexión SSE de la solución
 
   //Traemos el contexto
-  const { runId, status, end, setSimNow, setWindow, reset } = useRunSession();
+  const { runId, status, end, setSimNow, setWindow, reset, setAutoReconnect } = useRunSession();
 
   //Para el reloj
   const running = status === "running" && !!runId;
@@ -96,7 +96,7 @@ export default function TopNav() {
 
     if (error) {
         // aquí tu toast o UI de error
-        console.error("❌ [ToolsPanel] Error al finalizar la simulación:", error);
+        console.error("❌ [TopNav] Error al finalizar la simulación:", error);
         //alert(`Error al iniciar simulación: ${error.message}`);
         toast.custom((t) => (
           <ToastCustom
@@ -108,7 +108,7 @@ export default function TopNav() {
     }
     else if (data) {
       if (data.cancelled){
-        console.log("✅ [ToolsPanel] Simulación finalizada exitosamente:", data);
+        console.log("✅ [TopNav] Simulación finalizada exitosamente:", data);
         toast.custom((t) => (
           <ToastCustom
             t={t}
@@ -119,6 +119,9 @@ export default function TopNav() {
 
         //Cortamos el SSE
         disconnect();
+
+        //Para que no dispare el evento de reconexión
+        setAutoReconnect(false);
 
         //Limpiamos el contexto de la simulación
         reset();

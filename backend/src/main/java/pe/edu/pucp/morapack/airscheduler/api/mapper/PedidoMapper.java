@@ -23,4 +23,15 @@ public final class PedidoMapper {
         );
     }
 
+    public static Pedido toPedido(PedidosController.PedidoRequest pedidoRequest, LocalDateTime fecha) {
+        if (pedidoRequest == null) return null;
+        return new Pedido(
+                nextId++,
+                pedidoRequest.idCliente,
+                pedidoRequest.destino,
+                fecha,
+                pedidoRequest.cantidad
+        );
+    }
+
 }

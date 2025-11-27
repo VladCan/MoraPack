@@ -61,14 +61,14 @@ public class RunConfig {
     /** Acá implementamos 3 factories, donde cada uno representa los parámetros de cada operación **/
 
     /// Estamos usando horas, deberían ser minutos.
-    public static RunConfig operacion(Set<String> sedes) {
-        return operacion(sedes, Duration.ofHours(1));
+    public static RunConfig operacion(Instant inicio, Set<String> sedes) {
+        return operacion(inicio, sedes, Duration.ofHours(1));
     }
     
-    public static RunConfig operacion(Set<String> sedes, Duration windowSize) {
+    public static RunConfig operacion(Instant inicio, Set<String> sedes, Duration windowSize) {
         return new RunConfig(
                 Scenario.OPERACION,
-                Instant.now(),
+                inicio,
                 null,
                 windowSize,
                 Duration.ofHours(24),

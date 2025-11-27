@@ -12,6 +12,7 @@ import {
   Search,
   Calendar,
   Trash2,
+  RefreshCw,
 } from "lucide-react";
 import { DateTimePicker } from "@/components/ui/DatetimePicker";
 import { es } from "date-fns/locale";
@@ -67,7 +68,10 @@ export default function ToolsPanel({
   // Estado principal
   const [inicio, setInicio] = useState<Date | undefined>();
   const [fin, setFin] = useState<Date | undefined>();
-  const showStart = variant !== "operacion";
+  //const showStart = variant !== "operacion";
+
+  //Por los cambios del profesor, todos tienen fecha de inicio.
+  const showStart = true;
   const showEnd = variant === "simulacion";
 
   const [niveles, setNiveles] = useState<Record<NivelCarga, boolean>>({
@@ -85,7 +89,7 @@ export default function ToolsPanel({
   const [almacen, setAlmacen] = useState<string | null>(null);
   const [pedido, setPedido] = useState<PedidoDTO | null>(null);
 
-  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId } = useRunSession();
+  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId, vuelosCancelados, cancelarVuelo, status } = useRunSession();
   const { data: airportsData } = useAirports();
 
   // Obtener vuelos planificados del día siguiente (solo en modo simulacion/operacion semanal)
@@ -115,7 +119,7 @@ export default function ToolsPanel({
       return [];
     }
     
-    // Convertir los datos del endpoint a VueloDTO
+    // Convertir los datos del endpoint a VueloDTO y filtrar vuelos cancelados
     const result = scheduledFlightsRaw.map((v: any) => ({
       id: v.id || "",
       origen: v.origen || "",
@@ -127,10 +131,12 @@ export default function ToolsPanel({
       residual: v.residual || 0,
       costo: v.costo || 0,
       carga: v.carga || [],
-    })).filter((v: VueloDTO) => v.id && v.origen && v.destino);
+    })).filter((v: VueloDTO) => 
+      v.id && v.origen && v.destino && !vuelosCancelados.has(v.id)
+    );
     
     return result;
-  }, [scheduledFlightsRaw, shouldFetchScheduled]);
+  }, [scheduledFlightsRaw, shouldFetchScheduled, vuelosCancelados]);
 
   const warehouseOptions = useMemo(() => {
     if (!airportsData) return [];
@@ -152,6 +158,13 @@ export default function ToolsPanel({
     setAlmacen(selectedAirportId ?? null);
   }, [selectedAirportId]);
 
+  // Limpiar vuelo seleccionado si fue cancelado
+  useEffect(() => {
+    if (vuelo && vuelosCancelados.has(vuelo.id)) {
+      setVuelo(null);
+    }
+  }, [vuelo, vuelosCancelados]);
+
   const handleSelectAlmacen = (codigo: string) => {
     setAlmacen(codigo);
     setSelectedAirport(codigo);
@@ -170,44 +183,113 @@ export default function ToolsPanel({
     }
   }
 
-  // Obtener SOLO vuelos que están EN EL AIRE en este momento
+  // Obtener vuelos activos según el modo:
+  // - En "operacion": vuelos EN_VUELO (en el aire) y PROGRAMADOS (aún no han salido)
+  // - En otros modos: solo vuelos EN EL AIRE
   const vuelosActivos = useMemo<VueloDTO[]>(() => {
     if (windows.length === 0) return [];
     
     // Si aún no tenemos TICK (simNowUtc), mostramos los vuelos de la última ventana.
     if (!simNowUtc) {
       const lastWindow = windows[windows.length - 1];
-      return lastWindow?.vuelos ?? [];
+      const vuelos = lastWindow?.vuelos ?? [];
+      // Filtrar vuelos cancelados
+      return vuelos.filter(v => !vuelosCancelados.has(v.id));
     }
 
     const now = new Date(simNowUtc).getTime();
-    const vuelosEnAire = new Map<string, VueloDTO>();
+    const vuelosActivosMap = new Map<string, VueloDTO>();
     
     windows.forEach(window => {
       window.vuelos.forEach(v => {
-        if (!vuelosEnAire.has(v.id)) {
+        // Excluir vuelos cancelados
+        if (vuelosCancelados.has(v.id)) return;
+        
+        if (!vuelosActivosMap.has(v.id)) {
           const salida = new Date(v.salidaUtc).getTime();
           const llegada = new Date(v.llegadaUtc).getTime();
           
-          // Solo incluir si está en el aire AHORA
-          if (now >= salida && now <= llegada) {
-            vuelosEnAire.set(v.id, v);
+          if (variant === "operacion") {
+            // En operación diaria: incluir vuelos EN_VUELO y PROGRAMADOS
+            // Excluir vuelos que ya llegaron (llegada <= now)
+            // EN_VUELO: ya salió y aún no ha llegado (now >= salida && now < llegada)
+            // PROGRAMADO: aún no ha salido pero está planificado (now < salida && llegada > now)
+            // La condición simplificada: llegada > now (el vuelo aún no ha llegado)
+            if (llegada > now) {
+              vuelosActivosMap.set(v.id, v);
+            }
+          } else {
+            // En otros modos: solo vuelos EN EL AIRE (excluye programados y completados)
+            if (now >= salida && now <= llegada) {
+              vuelosActivosMap.set(v.id, v);
+            }
           }
         }
       });
     });
     
-    const resultado = Array.from(vuelosEnAire.values());
+    const resultado = Array.from(vuelosActivosMap.values());
     if (resultado.length === 0) {
       const lastWindow = windows[windows.length - 1];
-      return lastWindow?.vuelos ?? [];
+      const vuelos = lastWindow?.vuelos ?? [];
+      // Filtrar vuelos cancelados
+      return vuelos.filter(v => !vuelosCancelados.has(v.id));
     }
     
     return resultado;
-  }, [windows, simNowUtc]);
+  }, [windows, simNowUtc, vuelosCancelados, variant]);
 
-  // Obtener SOLO pedidos que están en vuelos activos
+  // Construir mapa de pedidos (último estado conocido por id) usando TODAS las ventanas
+  const pedidosPorIdOperacion = useMemo(() => {
+    if (variant !== "operacion") return null;
+    const map = new Map<number, PedidoDTO>();
+    windows.forEach(window => {
+      window.pedidos.forEach(p => {
+        map.set(p.id, p);
+      });
+    });
+    return map;
+  }, [windows, variant]);
+
+  // Obtener pedidos activos según escenario
   const pedidosActivos = useMemo<PedidoDTO[]>(() => {
+    if (variant === "operacion") {
+      const pedidosOperacion = pedidosPorIdOperacion ? Array.from(pedidosPorIdOperacion.values()) : [];
+      if (pedidosOperacion.length === 0) return [];
+
+      if (!simNowUtc) {
+        return pedidosOperacion;
+      }
+
+      const now = new Date(simNowUtc).getTime();
+      
+      // Filtrar pedidos completados (todos sus vuelos han llegado)
+      // Usar la misma lógica que calcularEstado para consistencia
+      return pedidosOperacion.filter(pedido => {
+        // Si no tiene rutas, mostrarlo (pendiente)
+        if (!pedido.rutas || pedido.rutas.length === 0) return true;
+        
+        // Verificar si TODOS los vuelos han llegado (igual que calcularEstado)
+        // Un pedido está completo solo cuando TODOS los vuelos de TODAS sus rutas han llegado
+        let todosVuelosLlegaron = true;
+        
+        pedido.rutas.forEach(ruta => {
+          ruta.vuelos.forEach(vuelo => {
+            const llegada = new Date(vuelo.llegadaUtc).getTime();
+            
+            // Si algún vuelo aún no ha llegado, el pedido no está completo
+            if (now <= llegada) {
+              todosVuelosLlegaron = false;
+            }
+          });
+        });
+        
+        // Mostrar si NO todos los vuelos han llegado (programado, en vuelo, o parcialmente entregado)
+        // Ocultar solo si todos los vuelos han llegado (COMPLETO)
+        return !todosVuelosLlegaron;
+      });
+    }
+
     if (windows.length === 0) return [];
 
     if (!simNowUtc) {
@@ -241,21 +323,25 @@ export default function ToolsPanel({
     }
 
     return resultado;
-  }, [windows, simNowUtc]);
+  }, [windows, simNowUtc, variant, pedidosPorIdOperacion]);
 
   // Calcular cantidad EN EL AIRE del pedido seleccionado
   const cantidadEnVuelo = useMemo(() => {
     if (!pedido || !pedido.rutas || !simNowUtc) return 0;
     
     const now = new Date(simNowUtc).getTime();
+    // Sumar la cantidad de cada vuelo que está actualmente en el aire
     return pedido.rutas.reduce((sum, ruta) => {
-      // Solo contar si la ruta tiene AL MENOS un vuelo en el aire
-      const tieneVueloEnAire = ruta.vuelos.some(vuelo => {
+      const cantidadRutaEnVuelo = ruta.vuelos.reduce((sumVuelos, vuelo) => {
         const salida = new Date(vuelo.salidaUtc).getTime();
         const llegada = new Date(vuelo.llegadaUtc).getTime();
-        return now >= salida && now <= llegada;
-      });
-      return tieneVueloEnAire ? sum + ruta.cantidad : sum;
+        // Si el vuelo está en el aire ahora, sumar su cantidad
+        if (now >= salida && now <= llegada) {
+          return sumVuelos + vuelo.cantidad;
+        }
+        return sumVuelos;
+      }, 0);
+      return sum + cantidadRutaEnVuelo;
     }, 0);
   }, [pedido, simNowUtc]);
 
@@ -311,7 +397,6 @@ export default function ToolsPanel({
     finally {
       setLoading(false);
     }
-
   }
 
   const handleClear = () => {
@@ -325,6 +410,61 @@ export default function ToolsPanel({
     setPedido(null);
     setSelectedAirport(null);
   };
+
+  const [forcing, setForcing] = useState(false);
+
+  const handleForceReplan = async () => {
+    if (variant != "operacion") return;
+
+    if (!currentRunId || status !== "running") {
+      toast.custom((t) => (
+        <ToastCustom
+          t={t}
+          message={"No hay una simulación de Operación Diaria en ejecución." + "❗"}
+          type="error"
+        />
+      ), { duration: 4000 });
+      return;
+    }
+
+    setForcing(true);
+
+    try {
+      const path = `operacionDiaria/${currentRunId}/force`;
+
+      const [data, error] = await handleApi(postJson<{}>(path));
+
+      if (error) {
+        console.error("[ToolsPanel] Error al forzar replan:", error);
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={"Error al forzar planificación." + "❗"}
+            type="error"
+          />
+        ), { duration: 4000 });
+      }
+      else if (data){
+        toast.custom((t) => (
+            <ToastCustom
+              t={t}
+              message={"Planificación forzada exitosamente!" + "✅"}
+              type="success"
+            />
+          ), { duration: 4000 });
+      }
+
+
+    }
+    catch (err) {
+      console.error("[ToolsPanel] Error inesperado al forzar replan:", err);
+    }
+    finally {
+      setForcing(false);
+    }
+
+
+  }
 
   return (
     <section className="mx-auto max-w-6xl px-3 sm:px-4">
@@ -435,17 +575,20 @@ export default function ToolsPanel({
                 <span className="text-muted-foreground">Estado</span>
                 <span className={`font-semibold ${
                   cantidadEnVuelo >= pedido.cantidad ? "text-emerald-600" :
-                  cantidadEnVuelo > 0 ? "text-amber-600" : "text-rose-600"
+                  cantidadEnVuelo > 0 ? (variant === "operacion" ? "text-purple-600" : "text-amber-600") :
+                  (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) ? "text-blue-600" : "text-rose-600"
                 }`}>
                   {cantidadEnVuelo >= pedido.cantidad ? "COMPLETO" :
-                   cantidadEnVuelo > 0 ? "PARCIAL" : "PENDIENTE"}
+                   cantidadEnVuelo > 0 ? (variant === "operacion" ? "EN_VUELO" : "PARCIAL") :
+                   (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) ? "PROGRAMADO" : "PENDIENTE"}
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div
                   className={`h-full transition-all ${
                     cantidadEnVuelo >= pedido.cantidad ? "bg-emerald-600" :
-                    cantidadEnVuelo > 0 ? "bg-amber-600" : "bg-rose-600"
+                    cantidadEnVuelo > 0 ? (variant === "operacion" ? "bg-purple-600" : "bg-amber-600") :
+                    (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) ? "bg-blue-600" : "bg-rose-600"
                   }`}
                   style={{ width: `${(cantidadEnVuelo / pedido.cantidad) * 100}%` }}
                 />
@@ -462,29 +605,42 @@ export default function ToolsPanel({
             )}
             {/* NUEVO: Desglose de rutas de entrega */}
             {pedido.rutas && pedido.rutas.length > 0 && (() => {
-              // Filtrar rutas que tienen vuelos EN EL AIRE AHORA
               const now = new Date(simNowUtc || Date.now()).getTime();
-              const rutasVisibles = pedido.rutas.filter(ruta => {
-                return ruta.vuelos.some(vuelo => {
-                  const salida = new Date(vuelo.salidaUtc).getTime();
-                  const llegada = new Date(vuelo.llegadaUtc).getTime();
-                  return now >= salida && now <= llegada;
-                });
-              });
+              const estadoPedido = cantidadEnVuelo >= pedido.cantidad ? "COMPLETO" :
+                                   cantidadEnVuelo > 0 ? (variant === "operacion" ? "EN_VUELO" : "PARCIAL") : 
+                                   (variant === "operacion" && pedido.rutas.length > 0 ? "PROGRAMADO" : "PENDIENTE");
+              
+              // En operación diaria, si es PROGRAMADO, mostrar todas las rutas
+              // Si es EN_VUELO, mostrar todas las rutas (algunas pueden estar en vuelo, otras programadas)
+              // Si es COMPLETO, no debería mostrarse (el pedido desaparece)
+              const rutasVisibles = (estadoPedido === "PROGRAMADO" || estadoPedido === "EN_VUELO") && variant === "operacion"
+                ? pedido.rutas // Mostrar todas las rutas si es PROGRAMADO o EN_VUELO
+                : pedido.rutas.filter(ruta => {
+                    return ruta.vuelos.some(vuelo => {
+                      const salida = new Date(vuelo.salidaUtc).getTime();
+                      const llegada = new Date(vuelo.llegadaUtc).getTime();
+                      return now >= salida && now <= llegada;
+                    });
+                  });
               
               return rutasVisibles.length > 0 && (
                 <div className="border-t border-border pt-2">
                   <p className="text-sm font-semibold mb-2">
-                    Rutas activas ({rutasVisibles.length} {rutasVisibles.length === 1 ? 'ruta' : 'rutas'})
+                    {estadoPedido === "PROGRAMADO" ? "Rutas programadas" : 
+                     estadoPedido === "EN_VUELO" ? "Rutas en vuelo" : 
+                     "Rutas activas"} ({rutasVisibles.length} {rutasVisibles.length === 1 ? 'ruta' : 'rutas'})
                   </p>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {rutasVisibles.map((ruta, idx) => {
-                      // Filtrar vuelos de esta ruta que están EN EL AIRE
-                      const vuelosActivos = ruta.vuelos.filter(vuelo => {
-                        const salida = new Date(vuelo.salidaUtc).getTime();
-                        const llegada = new Date(vuelo.llegadaUtc).getTime();
-                        return now >= salida && now <= llegada;
-                      });
+                      // Si es PROGRAMADO o EN_VUELO en operación diaria, mostrar todos los vuelos
+                      // Si no, solo los activos
+                      const vuelosActivos = (estadoPedido === "PROGRAMADO" || estadoPedido === "EN_VUELO") && variant === "operacion"
+                        ? ruta.vuelos // Mostrar todos los vuelos si es PROGRAMADO o EN_VUELO
+                        : ruta.vuelos.filter(vuelo => {
+                            const salida = new Date(vuelo.salidaUtc).getTime();
+                            const llegada = new Date(vuelo.llegadaUtc).getTime();
+                            return now >= salida && now <= llegada;
+                          });
                       
                       return (
                         <div key={idx} className="p-2 rounded-lg bg-muted/50 border border-border/50">
@@ -533,6 +689,9 @@ export default function ToolsPanel({
           onSelect={setVuelo}
           scheduledFlights={variant === "simulacion" ? (vuelosProgramados || []) : undefined}
           showScheduledToggle={variant === "simulacion"}
+          variant={variant}
+          simNowUtc={simNowUtc}
+          cancelarVuelo={cancelarVuelo}
         />
         <WarehouseSelectCard
           label="Almacén"
@@ -550,6 +709,7 @@ export default function ToolsPanel({
           items={pedidosActivos}
           onSelect={setPedido}
           simNowUtc={simNowUtc}
+          variant={variant}
         />
       </div>
 
@@ -684,6 +844,33 @@ export default function ToolsPanel({
             >
               <X className="h-4 w-4" /> Limpiar
             </button>
+
+            { variant == "operacion" && currentRunId != null && <button
+              onClick={handleForceReplan}
+              disabled={
+                forcing ||
+                !currentRunId ||
+                status !== "running" ||
+                variant !== "operacion"
+              }
+              className={`px-3 py-2 text-sm rounded-full inline-flex items-center gap-1
+                ${
+                  forcing || !currentRunId || status !== "running" || variant !== "operacion"
+                    ? "bg-rose-300 text-white/70 cursor-not-allowed"
+                    : "bg-rose-600 text-white hover:bg-rose-700"
+                }`}
+              title={
+                !currentRunId || status !== "running"
+                  ? "Requiere una simulación de Operación Diaria en ejecución"
+                  : "Forzar una nueva planificación a partir del tiempo actual"
+              }
+            >
+              <RefreshCw className="w-4 h-4" />
+              {forcing ? "Forzando..." : "Forzar planificación"}
+            </button>
+            }
+
+
             <button
               onClick={handleRun}
               disabled={!canApply || loading}
@@ -865,6 +1052,9 @@ function FlightSelectCard({
   onSelect,
   scheduledFlights,
   showScheduledToggle,
+  variant,
+  simNowUtc,
+  cancelarVuelo,
 }: {
   runId: string | null,
   label: string;
@@ -875,6 +1065,9 @@ function FlightSelectCard({
   onSelect: (val: VueloDTO) => void;
   scheduledFlights?: VueloDTO[];
   showScheduledToggle?: boolean;
+  variant?: Variant;
+  simNowUtc?: string | null;
+  cancelarVuelo?: (vueloId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -885,6 +1078,15 @@ function FlightSelectCard({
   // Determinar qué lista de vuelos usar
   const hasScheduledFlights = showScheduledToggle || (scheduledFlights !== undefined);
   const currentItems = showScheduled && scheduledFlights ? scheduledFlights : items;
+
+  // Función para verificar si un vuelo está en el aire (no se puede cancelar)
+  const isVueloEnAire = useCallback((vuelo: VueloDTO): boolean => {
+    if (!simNowUtc) return false;
+    const now = new Date(simNowUtc).getTime();
+    const salida = new Date(vuelo.salidaUtc).getTime();
+    const llegada = new Date(vuelo.llegadaUtc).getTime();
+    return now >= salida && now <= llegada;
+  }, [simNowUtc]);
 
   const origins = useMemo(
     () => Array.from(new Set(currentItems.map((v) => v.origen))).sort(),
@@ -910,6 +1112,23 @@ function FlightSelectCard({
 
   const handleCancelar = async (vuelo: VueloDTO, e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Validar que el vuelo no esté en el aire (solo para operación diaria)
+    if (variant === "operacion" && simNowUtc) {
+      const now = new Date(simNowUtc).getTime();
+      const salida = new Date(vuelo.salidaUtc).getTime();
+      const llegada = new Date(vuelo.llegadaUtc).getTime();
+      if (now >= salida && now <= llegada) {
+        toast.custom((t) => (
+          <ToastCustom
+            t={t}
+            message={"No se puede cancelar: el vuelo está en el aire"+"❗"}
+            type="error"
+          />),
+        { duration: 5000});
+        return;
+      }
+    }
 
     try {
       const req : CancelarVueloRequest = {
@@ -941,7 +1160,10 @@ function FlightSelectCard({
         { duration: 5000});
 
       } else if (data) {
-        // éxito
+        // éxito - agregar vuelo a la lista de cancelados para ocultarlo inmediatamente
+        if (cancelarVuelo) {
+          cancelarVuelo(vuelo.id);
+        }
         toast.custom((t) => (
           <ToastCustom
             t={t}
@@ -1128,21 +1350,61 @@ function FlightSelectCard({
                     </div>
                   ) : (
                     // Vista normal de vuelos activos
-                    <button
-                      onClick={() => {
-                        onSelect(v);
-                        setOpen(false);
-                        setQ("");
-                      }}
-                      className="w-full text-left"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono">{v.id}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {v.origen} → {v.destino}
-                        </span>
-                      </div>
-                    </button>
+                    variant === "operacion" ? (
+                      // Vista con botón cancelar para operación diaria
+                      (() => {
+                        const enVuelo = isVueloEnAire(v);
+                        return (
+                          <div className="flex items-start justify-between gap-2">
+                            <button
+                              onClick={() => {
+                                onSelect(v);
+                                setOpen(false);
+                                setQ("");
+                              }}
+                              className="flex-1 text-left min-w-0"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-mono text-xs">{v.id}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {v.origen} → {v.destino}
+                                </span>
+                              </div>
+                            </button>
+                            <button
+                              onClick={(e) => handleCancelar(v, e)}
+                              disabled={enVuelo}
+                              className={`flex-shrink-0 px-2 py-1 text-xs font-medium rounded border transition-colors flex items-center gap-1 ${
+                                enVuelo
+                                  ? "text-muted-foreground bg-muted border-border cursor-not-allowed opacity-50"
+                                  : "text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 border-red-200 dark:border-red-900/50"
+                              }`}
+                              title={enVuelo ? `No se puede cancelar: vuelo en el aire` : `Cancelar vuelo ${v.id}`}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              Cancelar
+                            </button>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      // Vista normal sin botón cancelar
+                      <button
+                        onClick={() => {
+                          onSelect(v);
+                          setOpen(false);
+                          setQ("");
+                        }}
+                        className="w-full text-left"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono">{v.id}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {v.origen} → {v.destino}
+                          </span>
+                        </div>
+                      </button>
+                    )
                   )}
                 </div>
               </li>
@@ -1162,6 +1424,7 @@ function OrderSelectCard({
   items,
   onSelect,
   simNowUtc,
+  variant,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -1170,6 +1433,7 @@ function OrderSelectCard({
   items: PedidoDTO[];
   onSelect: (val: PedidoDTO) => void;
   simNowUtc?: string | null;
+  variant?: Variant;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -1179,25 +1443,75 @@ function OrderSelectCard({
   // Función para calcular el estado basado en cantidadEnVuelo
   const calcularEstado = useCallback((pedido: PedidoDTO): string => {
     if (!pedido.rutas || !simNowUtc) {
+      // En operación diaria, si tiene rutas pero no hay simNowUtc, es PROGRAMADO
+      if (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) {
+        return "PROGRAMADO";
+      }
       return pedido.estadoAsignacion;
     }
 
     const now = new Date(simNowUtc).getTime();
+    
+    // En operación diaria: PROGRAMADO → EN_VUELO → COMPLETO
+    if (variant === "operacion") {
+      // Verificar si todos los vuelos han llegado (COMPLETO)
+      let todosVuelosLlegaron = true;
+      let tieneVuelosEnAire = false;
+      
+      pedido.rutas.forEach(ruta => {
+        ruta.vuelos.forEach(vuelo => {
+          const salida = new Date(vuelo.salidaUtc).getTime();
+          const llegada = new Date(vuelo.llegadaUtc).getTime();
+          
+          if (now <= llegada) {
+            // Aún no ha llegado este vuelo
+            todosVuelosLlegaron = false;
+            
+            // Verificar si está en el aire ahora
+            if (now >= salida && now <= llegada) {
+              tieneVuelosEnAire = true;
+            }
+          }
+        });
+      });
+      
+      if (todosVuelosLlegaron) {
+        return "COMPLETO";
+      }
+      if (tieneVuelosEnAire) {
+        return "EN_VUELO";
+      }
+      if (pedido.rutas && pedido.rutas.length > 0) {
+        return "PROGRAMADO";
+      }
+      return "PENDIENTE";
+    }
+    
+    // Para otros modos: calcular cantidadEnVuelo
     const cantidadEnVuelo = pedido.rutas.reduce((sum, ruta) => {
-      const tieneVueloEnAire = ruta.vuelos.some((vuelo) => {
+      // Sumar la cantidad de cada vuelo que está actualmente en el aire
+      const cantidadRutaEnVuelo = ruta.vuelos.reduce((sumVuelos, vuelo) => {
         const salida = new Date(vuelo.salidaUtc).getTime();
         const llegada = new Date(vuelo.llegadaUtc).getTime();
-        return now >= salida && now <= llegada;
-      });
-      return tieneVueloEnAire ? sum + ruta.cantidad : sum;
+        // Si el vuelo está en el aire ahora, sumar su cantidad
+        if (now >= salida && now <= llegada) {
+          return sumVuelos + vuelo.cantidad;
+        }
+        return sumVuelos;
+      }, 0);
+      return sum + cantidadRutaEnVuelo;
     }, 0);
 
-    return cantidadEnVuelo >= pedido.cantidad
-      ? "COMPLETO"
-      : cantidadEnVuelo > 0
-      ? "PARCIAL"
-      : "PENDIENTE";
-  }, [simNowUtc]);
+    // Para otros modos (simulación semanal, colapso): mantener lógica original
+    if (cantidadEnVuelo >= pedido.cantidad) {
+      return "COMPLETO";
+    }
+    if (cantidadEnVuelo > 0) {
+      return "PARCIAL";
+    }
+
+    return "PENDIENTE";
+  }, [simNowUtc, variant]);
 
   const estados = useMemo(
     () =>
@@ -1319,6 +1633,8 @@ function OrderSelectCard({
                         <span className={`text-xs px-1.5 py-0.5 rounded ${
                           estado === "COMPLETO" ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200" :
                           estado === "PARCIAL" ? "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200" :
+                          estado === "EN_VUELO" ? "bg-purple-100 text-purple-900 dark:bg-purple-900/30 dark:text-purple-200" :
+                          estado === "PROGRAMADO" ? "bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-200" :
                           "bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-200"
                         }`}>
                           {estado}

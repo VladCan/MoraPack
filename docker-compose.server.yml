@@ -1,0 +1,54 @@
+services:
+  # --- 1. Servicio de Backend (API) ---
+  backend:
+    # Nombre local. Coincidirá con el tag del docker build en el script
+    image: morapack-backend:local-build 
+    container_name: morapack-backend
+    restart: unless-stopped
+    networks:
+      - morapack-net
+    expose:
+      - 8080
+    environment:
+      - MORAPACK_DATA_SOURCE_MODE=filesystem
+      - MORAPACK_UPLOAD_DIR=/uploads
+    volumes:
+      - morapack-data:/uploads
+
+  # --- 2. Servicio de Frontend (App Web) ---
+  frontend:
+    # Nombre local
+    image: morapack-frontend:local-build
+    container_name: morapack-frontend
+    restart: unless-stopped
+    networks:
+      - morapack-net
+    expose:
+      - 80
+
+  # --- 3. Reverse Proxy (Caddy) ---
+  caddy-proxy:
+    image: caddy:2-alpine
+    container_name: morapack-caddy-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - morapack-net
+    depends_on:
+      - backend
+      - frontend
+
+networks:
+  morapack-net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  morapack-data:

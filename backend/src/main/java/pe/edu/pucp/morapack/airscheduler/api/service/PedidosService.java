@@ -22,33 +22,45 @@ public class PedidosService {
     @Inject
     RunManager runManager; // Mantenemos RunManager aquí si lo requiere la lógica de negocio
 
-    private static final String FILENAME = "pedidos.txt";
+    /// Ahora que vamos a cargar varios archivos, tenemos que refactorizar la lógica
+
+    /// Con esto, ya no almacena en /uploads o en /src/main/resources, sino en /uploads/archivosPedidos; análogo para local
+    private static final String PEDIDOS_SUBDIR  = "archivosPedidos";
 
     /**
-     * Obtiene el Path del archivo de pedidos subido.
-     * @return El Path del archivo en el sistema.
+     * Construye el Path del archivo de pedidos para un código dado.
+     *  * Ej: codigo = "SKBO" -> .../archivosPedidos/_pedidos_SKBO_.txt
      */
-    public Path getPedidosFilePath() {
-        // Obtenemos la ruta base de uploads del manager, pero forzamos el nombre del archivo de pedidos.
-        // Esto asume que ArchivoManager.uploadDir está inyectado correctamente.
-        return Paths.get(archivoManager.getUploadDir(), FILENAME);
+    public Path getPedidosFilePath(String codigo) {
+        String cleanCode = codigo.trim().toUpperCase();
+
+        // Directorio base: MORAPACK_UPLOAD_DIR
+        Path baseDir = Paths.get(archivoManager.getUploadDir()); // local: src/main/resources, prod: /uploads
+
+        //Agregamos la subcarpeta específica de pedidos
+        Path pedidosDir = baseDir.resolve(PEDIDOS_SUBDIR); // .../archivosPedidos
+
+        //Nombre del archivo
+        String fileName = "_pedidos_" + cleanCode + "_.txt";
+
+        return pedidosDir.resolve(fileName);
     }
     
     /**
-     * Guarda el archivo de pedidos subido.
-     * @param fileInputStream El stream de datos del archivo.
-     * @return El Path donde se guardó el archivo.
-     * @throws IOException Si falla la escritura.
+     * Guarda el archivo de pedidos para un código (uno de los 27).
      */
-    public Path guardarArchivoPedidos(InputStream fileInputStream) throws IOException {
-        Path targetPath = getPedidosFilePath();
+    public Path guardarArchivoPedidos(InputStream fileInputStream, String codigo) throws IOException {
+        Path targetPath = getPedidosFilePath(codigo);
 
         // Asegurar que el directorio exista (e.g., /uploads)
         Files.createDirectories(targetPath.getParent());
 
         // Copiar el stream al archivo
         Files.copy(fileInputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
-        
+
+        //Para asegurarnos
+        System.out.println("[PedidosService] Archivo de pedidos guardado en: " + targetPath);
+
         return targetPath;
     }
 

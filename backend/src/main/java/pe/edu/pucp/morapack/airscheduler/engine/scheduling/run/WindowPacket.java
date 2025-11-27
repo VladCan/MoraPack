@@ -1,9 +1,12 @@
 package pe.edu.pucp.morapack.airscheduler.engine.scheduling.run;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+@RegisterForReflection
 public final class WindowPacket {
     public final String runId;
     public final int windowId;
@@ -31,6 +34,7 @@ public final class WindowPacket {
         this.windowEndUTC = end;
         this.vuelos = vuelos != null ? vuelos : List.of();
         this.pedidos = pedidos != null ? pedidos : List.of();
+       
         this.windowIdISO = start.toString();
     }
 }

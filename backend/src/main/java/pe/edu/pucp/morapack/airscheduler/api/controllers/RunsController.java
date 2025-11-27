@@ -5,10 +5,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunConfig;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunContext;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunId;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.*;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -111,7 +108,7 @@ public class RunsController {
                     config = RunConfig.colapso(start, sedes, windowSize);
                     break;
                 case OPERACION:
-                    config = RunConfig.operacion(sedes, windowSize);
+                    config = RunConfig.operacion(start, sedes, windowSize);
                     break;
                 default:
                     throw new BadRequestException("Scenario no soportado.");
@@ -125,6 +122,12 @@ public class RunsController {
         RunContext runContext = new RunContext(runId, config);
         runManager.addContext(runId.value(), runContext);
 
+        switch (scenario) {
+            case OPERACION:
+                runManager.setOperacionRunId(runId.value());
+                break;
+        }
+
         /*
         System.out.println("Estamos en RunsController y vamos a dar 30 sec para que coloques el link del SSE y " +
                 "veas los datos enviados. El url es: http://localhost:8080/runs/" + runId.value() + "/stream");
@@ -132,6 +135,9 @@ public class RunsController {
          */
 
         System.out.println("Revisa: http://localhost:8080/runs/" + runId.value() + "/stream ");
+
+        //Indicamos que este es el runId activo
+        runManager.setActiveRunIdRunId(runId.value());
 
         //Delegamos al motor
         runManager.start(runId, config);
@@ -167,6 +173,43 @@ public class RunsController {
         return Response.status(Response.Status.CREATED)
                 .entity(new CancelRunResponse(runIdStr, true))
                 .build();
+    }
+
+    @GET
+    @Path("/active")
+    public Response active() {
+        System.out.println("[RunsController]: Vamos a ver si existe un run activo");
+
+        /// Obtenemos el runId activo para cualquiera de los 3 escenarios
+        String runId = runManager.currentActiveRunId();
+
+        /// Si no hay...
+        if (runId == null || runId.isBlank()) {
+            return Response.status(Response.Status.NO_CONTENT).build();
+        }
+
+        /// Si hay...
+        return Response.ok(java.util.Map.of(
+                "runId", runId
+        )).build();
+
+    }
+
+    @GET
+    @Path("/{id}/snapshot")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response snapshot(@PathParam("id") String runId) {
+        System.out.println("[RunsController]: Vamos a ver si existe snapshot del runId: " + runId);
+        WindowPacket pkt = runManager.getLastWindow(runId);
+        if (pkt == null) {
+            System.out.println("[RunsController]: El runId no existe en el sistema.");
+            return Response.status(Response.Status.NO_CONTENT).build();
+        }
+
+
+        System.out.println("[RunsController]: Enviando snapshot de runId " + runId);
+        return Response.ok(pkt).build();
+
     }
 
 }

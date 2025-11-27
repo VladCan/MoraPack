@@ -26,22 +26,25 @@ type Status = {
   lastModified?: string;
 }
 
-const handleFileUpload = async (file: File, endpoint: string) => {
-  const [data, error] = await uploadFile(endpoint, file);
-  //termina el toast de carga
-  if (data) {
-    toast.custom((t) => (
-      <ToastCustom t={t} message={data.message} type="success" />),
-      { duration: Infinity }
-    );
-  } else if (error) {
-    toast.custom((t) => (
-      <ToastCustom t={t} message={error.message} type="error" />),
-      { duration: Infinity }
-    );
-    console.error("Detalles del error:", error); // útil para debug
-  }
+/*Esto es para algo similar a lo de arriba, solo que para pedidos (recordar que son varios archivos)*/
+type PedidoFileStatus = {
+  codigo: string;
+  exists: boolean;
+  filename?: string;
+  sizeBytes?: number;
+  lastModified?: string;
+  error?: string;
+}
+
+type PedidosStatusSummary = {
+  totalCodigos: number;
+  archivosPresentes: number;
+  totalSizeBytes: number;
+  archivos: PedidoFileStatus[];
 };
+
+type Kind = "vuelos" | "aereopuertos" | "cancelaciones" | "pedidos" | "operacionDiaria";
+
 const schema = z.object({
   clienteId: z.string().min(1, "Requerido"),
   aeropuerto: z.string().min(1, "Requerido"),
@@ -55,6 +58,31 @@ export default function Registrar() {
   //console.log("🧠 Componente Registrar montado");
 
   const qc = useQueryClient();
+
+  const handleFileUpload = async (file: File, endpoint: string, kind?: Kind) => {
+    const [data, error] = await uploadFile(endpoint, file);
+    //termina el toast de carga
+    if (data) {
+      toast.custom((t) => (
+        <ToastCustom t={t} message={data.message +" ✅"} type="success" />),
+        { duration: 8000 }
+      );
+
+      if (kind) {
+        //Para que al subir un archivo, se actualice el número de archivos
+        await qc.invalidateQueries({ queryKey: ["status", kind] });
+        await qc.refetchQueries({ queryKey: ["status", kind] });
+      }
+
+
+    } else if (error) {
+      toast.custom((t) => (
+        <ToastCustom t={t} message={error.message +" ❗"} type="error" />),
+        { duration: 8000 }
+      );
+      console.error("Detalles del error:", error); // útil para debug
+    }
+  };
 
   const vuelosStatus = useQuery({
   queryKey: ["status", "vuelos"],
@@ -79,15 +107,15 @@ const husosStatus  = useQuery({
 
 //todavía no tenemos para cancelaciones, pero cuando tengamos:
 const cancelacionesStatus = useQuery({
-  queryKey: ["status", "aereopuertos"],
-  queryFn: () => getJson<Status>("aereopuertos/status"),
+  queryKey: ["status", "cancelaciones"],
+  queryFn: () => getJson<Status>("cancelaciones/status"),
   refetchOnWindowFocus: false,
 });
 
 //husos = aeropuertos
 const pedidosStatus  = useQuery({
   queryKey: ["status", "pedidos"],
-  queryFn: () => getJson<Status>("pedidos/status"),
+  queryFn: () => getJson<PedidosStatusSummary>("pedidos/status"),
   refetchOnWindowFocus: false,
 })
 
@@ -97,8 +125,6 @@ const operacionDiariaStatus = useQuery({
   refetchOnWindowFocus: false,
 })
 
-type Kind = "vuelos" | "aereopuertos" | "cancelaciones" | "pedidos" | "operacionDiaria";
-
 //Esto es porque operaciónDiaria, en principio, no necesita un status (ahora sí le puse xd) "ej: Archivo actual: vuelos.txt — 80248 bytes — 2025-11-10T19:50:31.7425859Z"
 const statuses: Partial<Record<Kind, { exists?: boolean; filename?: string } | undefined>> = {
   vuelos: vuelosStatus.data,
@@ -107,7 +133,7 @@ const statuses: Partial<Record<Kind, { exists?: boolean; filename?: string } | u
   operacionDiaria: undefined,               // explícitamente sin status
 }
 
-const withoutStatusCheck = new Set<Kind>(["operacionDiaria"]);
+const withoutStatusCheck = new Set<Kind>(["operacionDiaria", "pedidos"]);
 
 //pero antes: handler de subida con confirmación + refresh (TODO falta agregar cancelaciones)
 const onUpload = async (file: File, kind: Kind) => {
@@ -158,6 +184,12 @@ const onUpload = async (file: File, kind: Kind) => {
 
 //1. handler para ver primeras 50 lineas
 const doPreview  = async (kind: Kind) => {
+
+  if (kind === "pedidos") {
+    alert("Preview no disponible para pedidos multi-archivo.");
+    return;
+  }
+
   const text = await getText(`${kind}/preview`, {lines: 50});
   //Por ahora va como un alert
   alert(text || "(archivo vacío)");
@@ -165,52 +197,106 @@ const doPreview  = async (kind: Kind) => {
 
 //2. handler de descarga
 const doDownload = async (kind: Kind, filename?: string) => {
+
+  if (kind === "pedidos") {
+    alert("Descarga no disponible para pedidos multi-archivo.");
+    return;
+  }
+
   await downloadFile(`${kind}/download`, filename ?? `${kind}.txt`);
 }
+
+type AnyStatus = Status | PedidosStatusSummary;
 
 /**Esto usamos para mostrar el texto de los datos del archivo dentro del Dropzone**/
 const renderDropzoneFooter = (
   kind: Kind,
-  status?: Status,
+  status?: AnyStatus,
   isLoading?: boolean
-) => (
-  <>
-    <div className="text-xs text-muted-foreground">
-      {isLoading
-        ? "Cargando estado..."
-        : status?.exists
-          ? <>
-              Archivo actual:{" "}
-              <button
-                className="underline"
-                onClick={() => doPreview(kind)}
-                title="Ver primeras líneas"
-              >
-                {status.filename}
-              </button>
-              {" "}— {status.sizeBytes} bytes — {status.lastModified}
-            </>
-          : "No se pudo recuperar el estado."}
-    </div>
+) => 
+{
 
-    <div className="flex gap-3 mt-2">
-      <button
-        className="text-sm underline disabled:opacity-50 hover:cursor-pointer"
-        onClick={() => doPreview(kind)}
-        disabled={!status?.exists}
-      >
-        Ver primeras líneas
-      </button>
-      <button
-        className="text-sm underline disabled:opacity-50 hover:cursor-pointer"
-        onClick={() => doDownload(kind, status?.filename)}
-        disabled={!status?.exists}
-      >
-        Descargar
-      </button>
-    </div>
-  </>
-);
+  // Por cambios del profesor agregamos un caso especial: pedidos multi-archivo
+    if (kind === "pedidos") {
+      const summary = status as PedidosStatusSummary | undefined;
+
+      if (isLoading) {
+        return <div className="text-xs text-muted-foreground">Cargando estado de pedidos...</div>;
+      }
+
+      if (!summary) {
+        return <div className="text-xs text-muted-foreground">No se pudo recuperar el estado.</div>;
+      }
+
+      // Códigos que faltan
+      const missing = summary.archivos
+        .filter((a) => !a.exists)
+        .map((a) => a.codigo);
+
+      const { totalCodigos, archivosPresentes, totalSizeBytes } = summary;
+
+      return (
+        <div className="text-xs text-muted-foreground">
+          <p>
+            Archivos de pedidos cargados:{" "}
+            <b>{archivosPresentes}</b> / {totalCodigos}
+          </p>
+          <p>
+            Espacio total ocupado:{" "}
+            <b>{(totalSizeBytes / (1024 * 1024)).toFixed(2)} MB</b>
+          </p>
+
+          {missing.length > 0 && (
+            <p className="mt-1">
+              Falta(n) archivo(s) para:{" "}
+              <b>{missing.join(", ")}</b>
+            </p>
+          )}
+        </div>
+      );
+    }
+
+  const s = status as Status | undefined;
+
+  return(
+    <>
+      <div className="text-xs text-muted-foreground">
+        {isLoading
+          ? "Cargando estado..."
+          : s?.exists
+            ? <>
+                Archivo actual:{" "}
+                <button
+                  className="underline"
+                  onClick={() => doPreview(kind)}
+                  title="Ver primeras líneas"
+                >
+                  {s.filename}
+                </button>
+                {" "}— {s.sizeBytes} bytes — {s.lastModified}
+              </>
+            : "No se pudo recuperar el estado."}
+      </div>
+
+      <div className="flex gap-3 mt-2">
+        <button
+          className="text-sm underline disabled:opacity-50 hover:cursor-pointer"
+          onClick={() => doPreview(kind)}
+          disabled={!s?.exists}
+        >
+          Ver primeras líneas
+        </button>
+        <button
+          className="text-sm underline disabled:opacity-50 hover:cursor-pointer"
+          onClick={() => doDownload(kind, s?.filename)}
+          disabled={!s?.exists}
+        >
+          Descargar
+        </button>
+      </div>
+    </>
+  );
+}
 
 const renderDropzoneFooterOP = (
   kind: Kind,
@@ -233,11 +319,12 @@ const renderDropzoneFooterOP = (
 
   const form = useForm<FormValues>({
     resolver,
-    defaultValues: { clienteId: "", aeropuerto: "SPIM", cantidad: 1 },
+    defaultValues: { clienteId: "", aeropuerto: "SKBO", cantidad: 1 },
     mode: "onTouched",
   });
 
-  const {begin} = useRunSession();
+  const {begin, simNow} = useRunSession();
+
 
   const createPedido = useMutation({
     mutationFn: async (v: FormValues) => {
@@ -245,7 +332,11 @@ const renderDropzoneFooterOP = (
         clienteId: v.clienteId,
         aeropuerto: v.aeropuerto,
         cantidad: v.cantidad,
+        now: simNow ? new Date(simNow) : undefined,
       });
+
+      console.log("[Registrar.tsx] simNow es:", simNow)
+      console.log("[Registrar.tsx] req es:", req)
 
       const [data, error] = await handleApi(
         postJson<PedidoResponse>("pedidos/crear", req)
@@ -272,7 +363,7 @@ const renderDropzoneFooterOP = (
           type="success"
         />),
       { duration: 5000});
-      form.reset({ clienteId: "", aeropuerto: "SPIM", cantidad: 1 });
+      form.reset({ clienteId: "", aeropuerto: "SKBO", cantidad: 1 });
 
       //Colocamos lo necesario en el hook
       begin(data.runId);
@@ -313,14 +404,18 @@ const renderDropzoneFooterOP = (
             footer = {renderDropzoneFooter("vuelos", vuelosStatus.data, vuelosStatus.isLoading)}/>
           <Dropzone label="Carga masiva de husos horarios" onFiles={(fs) => onUpload(fs[0], "aereopuertos")} 
             footer={renderDropzoneFooter("aereopuertos", husosStatus.data, husosStatus.isLoading)}/>
-          <Dropzone label="Carga masiva de errores" 
+          <Dropzone label="Carga masiva de cancelaciones" 
           onFiles={
             (fs) =>toast.custom((t) => (
               <ToastCustom t={t} message={"No implementado archivo: "+fs[0]?.name +" no subido"} type="error" />),
               { duration: 5000 }
             )
-            } />
-          <Dropzone label="Carga masiva de pedidos" onFiles={(fs) => handleFileUpload(fs[0], "pedidos/upload")}
+            }
+            footer={renderDropzoneFooter("cancelaciones", cancelacionesStatus.data, cancelacionesStatus.isLoading)}
+            />
+
+            
+          <Dropzone label="Carga masiva de pedidos" onFiles={(fs) => handleFileUpload(fs[0], "pedidos/upload", "pedidos")}
             footer={renderDropzoneFooter("pedidos", pedidosStatus.data, pedidosStatus.isLoading)} />
         </CardContent>
       </Card>

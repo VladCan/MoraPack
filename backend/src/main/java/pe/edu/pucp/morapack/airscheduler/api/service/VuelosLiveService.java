@@ -77,10 +77,24 @@ public class VuelosLiveService {
     }
 
     private List<FlightLiveDTO> snapshot(int nowUtcSec) {
-        return vuelos.stream()
+        return snapshot(nowUtcSec, Integer.MAX_VALUE);
+    }
+    
+    /**
+     * Obtiene un snapshot de vuelos en el aire para un tiempo UTC dado.
+     * Método público para uso desde controladores.
+     */
+    public List<FlightLiveDTO> snapshot(int nowUtcSec, int limit) {
+        var stream = vuelos.stream()
                 .map(v -> toLive(nowUtcSec, v))
-                .filter(Objects::nonNull) // 👈 solo “en el aire”
-                .collect(Collectors.toList());
+                .filter(Objects::nonNull) // 👈 solo "en el aire"
+                .sorted(Comparator.comparing(FlightLiveDTO::id));
+        
+        if (limit > 0 && limit < Integer.MAX_VALUE) {
+            stream = stream.limit(limit);
+        }
+        
+        return stream.collect(Collectors.toList());
     }
 
     /**
@@ -144,18 +158,5 @@ public class VuelosLiveService {
     public Multi<List<FlightLiveDTO>> streamLiveFlights(NowSupplier nowSupplier, int limit) {
         return Multi.createFrom().ticks().every(Duration.ofSeconds(1))
                 .onItem().transform(t -> snapshot(nowSupplier.nowUtcSeconds(), limit));
-    }
-
-    private List<FlightLiveDTO> snapshot(int nowUtcSec, int limit) {
-        var stream = vuelos.stream()
-                .map(v -> toLive(nowUtcSec, v))
-                .filter(Objects::nonNull)
-                // orden estable para que no “parpadeen” los N primeros
-                .sorted(Comparator.comparing(FlightLiveDTO::id));
-
-        if (limit != Integer.MAX_VALUE)
-            stream = stream.limit(limit);
-
-        return stream.collect(Collectors.toList());
     }
 }

@@ -37,7 +37,10 @@ public final class VerificadorSLA {
     /** NUEVO: valida rutas reales contra el archivo original de vuelos (VuelosMap). */
     public static void assertBasicos(SolucionProgramacion sol, Duration ventana46h, VuelosMap vuelosMap) {
         SLAReport r = diagnosticar(sol, ventana46h, null, vuelosMap);
-        if (r.ok()) return;
+        if (r.ok()) {
+            System.out.println("[VerificadorSLA] ✅ No se violó ninguna restricción. Continuando...");
+            return;
+        }
         throw new IllegalStateException(renderError(sol, ventana46h, r));
     }
 

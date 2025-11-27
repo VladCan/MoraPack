@@ -1,6 +1,9 @@
 //src/lib/runSession.tsx
-import { createContext, useContext, useMemo, useState, useCallback } from "react";
+import { createContext, useContext, useMemo, useState, useCallback, useEffect } from "react";
 import type { VueloDTO, PedidoDTO } from "@/hooks/useRunSSE";
+import { getJson, handleApi } from "@/services/api";
+import toast from "react-hot-toast";
+import ToastCustom from "@/components/common/ToastCustom";
 
 export type RunStatus = "idle" | "running" | "finished" | "failed";
 
@@ -19,6 +22,7 @@ interface RunSessionState {
     lastWindow: RunWindow | null;   // última ventana recibida por SSE (con vuelos y pedidos)
     windows: RunWindow[];           // historial completo de ventanas recibidas
     selectedAirportId: string | null;
+    vuelosCancelados: Set<string>;  // IDs de vuelos cancelados localmente
 
     //Esto va a usar TopNav:
     begin: (runId: string) => void;
@@ -27,8 +31,13 @@ interface RunSessionState {
     setSimNow: (iso: string) => void;
     setWindow: (w: RunWindow) => void;
     setSelectedAirport: (id: string | null) => void;
+    cancelarVuelo: (vueloId: string) => void;  // Agregar vuelo a la lista de cancelados
 
     reset: () => void;
+
+    autoReconnect: boolean;
+    setAutoReconnect: (state: boolean) => void;
+
 }
 
 const RunSessionContext = createContext<RunSessionState | null>(null);
@@ -40,6 +49,9 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
     const [lastWindow, setLastWindow] = useState<RunWindow | null>(null);
     const [windows, setWindows] = useState<RunWindow[]>([]);
     const [selectedAirportId, setSelectedAirportId] = useState<string | null>(null);
+    const [vuelosCancelados, setVuelosCancelados] = useState<Set<string>>(new Set());
+
+    const [autoReconnect, setAutoReconnect] = useState<boolean>(true);
 
     const begin = useCallback((id: string) => {
         setRunId(id);
@@ -48,7 +60,74 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setLastWindow(null);
         setWindows([]);
         setSelectedAirportId(null);
+        setVuelosCancelados(new Set());
     }, []);
+
+    //Esto es para reconectar, o conectar por primera vez desde otro pc
+    useEffect(() => {
+        // No reconectar si esta pestaña canceló manualmente la simulación
+        if (!autoReconnect) return;
+
+        if (runId !== null) return;
+        
+        //if (runId !== null || status !== "idle") return;
+
+        let cancelled = false;
+        
+        const path = "runs/active"
+        
+        let msg = " ";
+
+        const checkActiveRun = async () => {
+            try {
+                const [data, error] = await handleApi(
+                    getJson<{ runId?: string }>(path)
+                );
+
+                if (error){
+                    console.log("Parece que hubo un error")
+                }
+
+                if (!cancelled && data?.runId) {
+                    console.log("[RunSession] Run activo detectado:", data.runId);
+                    begin(data.runId);
+
+                    ///Pedimos el snapshot/última ventana
+                    try {
+                        const [snap, snapErr] = await handleApi(
+                            getJson<RunWindow>(`runs/${data.runId}/snapshot`)
+                        );
+
+                        if (snap && !snapErr) {
+                            console.log("[RunSession] Snapshot recibido:", snap);
+                            msg = " con snapshot "
+                            setWindow(snap);
+                        }
+                    }
+                    catch (e){
+                        console.warn("[RunSession] No se pudo obtener snapshot:", e);
+                    }
+
+
+                    toast.custom((t) => (
+                        <ToastCustom
+                            t={t}
+                            message={"Conexión establecida"+ msg + "! ✅"}
+                            type="success"
+                        />),
+                    { duration: 5000})
+                }
+
+            }
+            catch (err){
+                console.error("[RunSession] Error detectando run activo:", err);
+            }
+        }
+
+        checkActiveRun();
+
+        return () => { cancelled = true; };
+    }, [runId, status, begin, autoReconnect]);
 
     const end = useCallback((st: Extract<RunStatus, "finished" | "failed"> = "finished") => {
         setStatus(st);
@@ -61,6 +140,11 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setLastWindow(null);
         setWindows([]);
         setSelectedAirportId(null);
+        setVuelosCancelados(new Set());
+    }, []);
+
+    const cancelarVuelo = useCallback((vueloId: string) => {
+        setVuelosCancelados(prev => new Set([...prev, vueloId]));
     }, []);
 
     const setSimNow = useCallback((iso: string) => {
@@ -91,13 +175,17 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         lastWindow,
         windows,
         selectedAirportId,
+        vuelosCancelados,
         begin,
         end,
         setSimNow,
         setWindow,
         setSelectedAirport,
+        cancelarVuelo,
         reset,
-    }), [runId, status, simNow, lastWindow, windows, selectedAirportId, begin, end, setSimNow, setWindow, setSelectedAirport, reset]);
+        autoReconnect,
+        setAutoReconnect
+    }), [runId, status, simNow, lastWindow, windows, selectedAirportId, vuelosCancelados, begin, end, setSimNow, setWindow, setSelectedAirport, cancelarVuelo, reset, autoReconnect]);
 
     return (
         <RunSessionContext.Provider value={value}>

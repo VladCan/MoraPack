@@ -12,6 +12,8 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
@@ -29,10 +31,26 @@ public class OperacionDiariaController {
     @Consumes(MediaType.MULTIPART_FORM_DATA)
     public Response uploadPedidosOD(@FormParam("file") InputStream fileInputStream){
         try {
+            /// 1) Verificamos si existe run activo. Caso contrario, se retorna mensaje de error.
+            /// pd: es un consenso tomado. Se puede cambiar, en el código comentando se explica como
+            String runId = runManager.currentOperacionRunId();
+            if (runId == null){
+                System.out.println("No hay Operación Diaria activa. Iníciala antes de subir pedidos.");
+                return Response
+                        .status(Response.Status.INTERNAL_SERVER_ERROR)
+                        .entity(new JsonResponse("error",
+                                "No hay Operación Diaria activa. Iníciala antes de subir pedidos.",
+                                null))
+                        .build();
+            }
+            //Si vamos a generar un run a partir del archivo:
+            //runId = runManager.ensureOperacionStarted();
+
+            /// 2.1) Leemos el contenido del archivo (NO normalizamos UTC, eso es dentro del RunManager)
+
             //Dado que este archivo no se "guarda", sino que se utiliza para procesar pedidos, no necesitamos rutas ni nada por el estilo
             CargarPedidos pedidos = new CargarPedidos();
 
-            /// 1) Leemos el contenido del archivo (NO normalizamos UTC, eso es dentro del RunManager)
             try (Scanner sc = ArchivoUtils.getScanner(fileInputStream)) {
                 if (sc == null){
                     return Response
@@ -48,21 +66,8 @@ public class OperacionDiariaController {
                 System.err.println("[OperacionDiariaController] Error procesando archivo de pedidos: " + e.getMessage());
             }
 
-            /// 2) Verificamos si existe run activo. Caso contrario, se retorna mensaje de error.
-            /// pd: es un consenso tomado. Se puede cambiar, en el código comentando se explica como
-
-            String runId = runManager.currentOperacionRunId();
-            if (runId == null){
-                System.out.println("No hay Operación Diaria activa. Iníciala antes de subir pedidos.");
-                return Response
-                        .status(Response.Status.INTERNAL_SERVER_ERROR)
-                        .entity(new JsonResponse("error",
-                                "No hay Operación Diaria activa. Iníciala antes de subir pedidos.",
-                                null))
-                        .build();
-            }
-            //Si vamos a generar un run a partir del archivo:
-            //runId = runManager.ensureOperacionStarted();
+            /// 2.2) Anclamos la fecha actual (por ahora, solo dd/mm/aaaa, no las horas)
+            runManager.normalizarFechasOD(runId, pedidos.getLista());
 
             /// 3) Encolamos en la cola existente en RunManager
             runManager.pushOrders(runId, pedidos.getLista());
@@ -92,6 +97,16 @@ public class OperacionDiariaController {
         body.put("exists", archivoCargado);
 
         return Response.ok(body).build();
+    }
+
+    @POST
+    @Path("/{id}/force")
+    public Response forceReplan(@PathParam("id") String runId){
+        System.out.println("[OperacionDiariaController]: Se recibió un forceReplan");
+
+        runManager.setForcedReplan(runId);
+
+        return Response.ok().build();
     }
 
 }
