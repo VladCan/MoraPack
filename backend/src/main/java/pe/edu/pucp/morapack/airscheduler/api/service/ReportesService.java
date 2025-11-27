@@ -4,6 +4,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoManager;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -16,6 +18,21 @@ public class ReportesService {
 
     public Path getReportesFilePath() {
         return Paths.get(archivoManager.getReportsDir(), FILENAME);
+    }
+
+    public void limpiarReportesPrevios(){
+        Path p = getReportesFilePath();
+        try {
+            if (Files.exists(p)) {
+                Files.delete(p);
+                System.out.println("[ReportesService] Eliminado: " + p);
+            }
+            else{
+                System.out.println("[ReportesService] El archivo no existe, no se puede eliminar.");
+            }
+        } catch (IOException e) {
+            System.err.println("[ReportesService] (x) No se pudo borrar reporte: " + e.getMessage());
+        }
     }
 
 }
