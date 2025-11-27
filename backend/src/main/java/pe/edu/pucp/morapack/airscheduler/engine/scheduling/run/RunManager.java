@@ -900,6 +900,7 @@ public class RunManager {
 
         System.out.println("En esta iteración, wStart es: " + wStart + ", wEnd es: " + wEnd);
         System.out.println("Voy a entrar al bucle, mi id es:" + id);
+        List<VueloCancelado> vuelosCanceladosTeg = new ArrayList<>();
 
         while (!cancelled.get(id).get() && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))){
             while (paused.get(id).get() && !cancelled.get(id).get()) {
@@ -945,7 +946,8 @@ public class RunManager {
                         System.out.println("[RunManager]: Procesando cancelaciones: " + vuelosCancelados.size());
 
                         //Considerar si hay que colocar los vuelos cancelados en algun otro lado para enchufar en el TEG
-
+                        List <VueloCancelado> vuelosCancelString = transformar(vuelosCancelados);
+                        vuelosCanceladosTeg.addAll(vuelosCancelString);
                         procesarCancelaciones(id, vuelosCancelados, solucionAnterior);
 
                         /// Dejamos el set vacío (por ahora):
@@ -994,6 +996,15 @@ public class RunManager {
                     }
 
 
+                List<VueloCancelado> vuelosCanceladosArch = cancelados.obtenerVuelosCancelados(wStart,wEnd);
+                vuelosCanceladosTeg.addAll(vuelosCanceladosArch);
+
+                if(!vuelosCanceladosTeg.isEmpty()){
+                    System.out.println("[RunManager] Vuelos cancelados en la ventana " + idx + ": " + vuelosCanceladosTeg);
+                    //teg.cancelarVuelos(vuelosCanceladosTeg);
+                }
+
+
                 Instant finTEG = wEnd.plus(config.horizon());
                 TEGParametros params = TEGParametros.builder()
                         .inicioUtc(wStart)
@@ -1001,6 +1012,7 @@ public class RunManager {
                         .sedes(sedes)
                         .arribosLibres(enVuelo)
                         .reservasWaitIniciales(reservas)
+                        .vuelosCancelados(vuelosCanceladosTeg)
                         .build();
 
                 VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, vuelosMap).construir(params);
