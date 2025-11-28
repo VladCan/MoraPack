@@ -26,6 +26,16 @@ public class OperacionDiariaController {
     @Inject
     RunManager runManager;
 
+    public static final class ForceReplanResponse {
+        public boolean forced;
+        public String message;
+
+        public ForceReplanResponse(boolean forced, String message) {
+            this.forced = forced;
+            this.message = message;
+        }
+    }
+
     @POST
     @Path("/upload")
     @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -102,11 +112,34 @@ public class OperacionDiariaController {
     @POST
     @Path("/{id}/force")
     public Response forceReplan(@PathParam("id") String runId){
-        System.out.println("[OperacionDiariaController]: Se recibió un forceReplan");
+        System.out.println("[OperacionDiariaController]: Se recibió un forceReplan para runId=" + runId);
 
-        runManager.setForcedReplan(runId);
+        if (runId == null || runId.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ForceReplanResponse(false, "runId es requerido"))
+                    .build();
+        }
 
-        return Response.ok().build();
+
+        try {
+            runManager.setForcedReplan(runId);
+            return Response.ok(
+                    new ForceReplanResponse(true, "Planificación forzada registrada correctamente")
+            ).build();
+
+        } catch (IllegalStateException e) {
+            // por ejemplo: no hay run activo con ese id
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(new ForceReplanResponse(false, "No se pudo forzar la planificación: " + e.getMessage()))
+                    .build();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Response.serverError()
+                    .entity(new ForceReplanResponse(false, "Error interno al forzar la planificación"))
+                    .build();
+        }
+
     }
 
 }
