@@ -226,6 +226,10 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
     ? airportOccupancy[selectedAirportId]
     : null;
 
+  // Verificar si el aeropuerto seleccionado es una sede (SPIM, EBCI, UBBB)
+  const SEDES = ["SPIM", "EBCI", "UBBB"];
+  const esSede = selectedAirportId ? SEDES.includes(selectedAirportId) : false;
+
 
   //Para la pantalla de fin:
 
@@ -283,15 +287,19 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeAirportData.porcentaje > 0.8 ? "#f97316" : activeAirportData.porcentaje > 0.5 ? "#facc15" : "#38bdf8" }}></div>
+                {!esSede && (
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeAirportData.porcentaje > 0.8 ? "#f97316" : activeAirportData.porcentaje > 0.5 ? "#facc15" : "#38bdf8" }}></div>
+                )}
                 <h3 className="font-semibold text-lg">
                   {selectedAirportId}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {Math.round(activeAirportData.porcentaje * 100)}%
-                </span>
+                {!esSede && (
+                  <span className="text-xs text-muted-foreground">
+                    {Math.round(activeAirportData.porcentaje * 100)}%
+                  </span>
+                )}
                 <button
                   onClick={() => setSelectedAirport(null)}
                   className="text-muted-foreground hover:text-foreground transition-colors"
@@ -304,30 +312,34 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
               </div>
             </div>
 
-            {/* Capacidad */}
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-muted-foreground">Ocupación</span>
-                <span className="font-semibold">
-                  {activeAirportData.ocupacionActual} / {activeAirportData.capacidadTotal}
-                </span>
+            {/* Capacidad - Solo mostrar si NO es sede */}
+            {!esSede && (
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span className="text-muted-foreground">Ocupación</span>
+                  <span className="font-semibold">
+                    {activeAirportData.ocupacionActual} / {activeAirportData.capacidadTotal}
+                  </span>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                  <div
+                    className="h-full transition-all"
+                    style={{
+                      width: `${activeAirportData.porcentaje * 100}%`,
+                      backgroundColor: activeAirportData.porcentaje > 0.8 ? "#f97316" : activeAirportData.porcentaje > 0.5 ? "#facc15" : "#38bdf8",
+                    }}
+                  />
+                </div>
               </div>
-              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                <div
-                  className="h-full transition-all"
-                  style={{
-                    width: `${activeAirportData.porcentaje * 100}%`,
-                    backgroundColor: activeAirportData.porcentaje > 0.8 ? "#f97316" : activeAirportData.porcentaje > 0.5 ? "#facc15" : "#38bdf8",
-                  }}
-                />
-              </div>
-            </div>
+            )}
 
-            {/* Disponible */}
-            <div>
-              <p className="text-muted-foreground text-xs">Disponible</p>
-              <p className="font-semibold text-lg">{activeAirportData.disponible} uds</p>
-            </div>
+            {/* Disponible - Solo mostrar si NO es sede */}
+            {!esSede && (
+              <div>
+                <p className="text-muted-foreground text-xs">Disponible</p>
+                <p className="font-semibold text-lg">{activeAirportData.disponible} uds</p>
+              </div>
+            )}
 
             {/* Eventos en tiempo real */}
             {(activeAirportData.cargaLlegando !== undefined && activeAirportData.cargaLlegando > 0) ||
