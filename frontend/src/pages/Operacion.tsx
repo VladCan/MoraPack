@@ -222,6 +222,11 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
     const MAX_VUELOS_TXT = 20; // Límite de vuelos de vuelos.txt a mostrar
     
     arr.forEach(f => {
+      // Si hay un pedido seleccionado, ocultar vuelos SSE (solo mostrar vuelos de la solución)
+      if (tienePedidoSeleccionado) {
+        return; // Ocultar todos los vuelos SSE cuando hay un pedido seleccionado
+      }
+      
       // Solo incluir si no está cancelado, no está ya en la lista (planificado), y no excedemos el límite
       if (!vuelosCancelados.has(f.id) && !seenIds.has(f.id) && vuelosTxtCount < MAX_VUELOS_TXT) {
         allFlights.push({
