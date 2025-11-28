@@ -222,7 +222,8 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
   const handleDownloadReports = async () => {
     if (!runId) return;
 
-    await downloadFile(`reportes/download`, "reporteSimulacion.txt");
+    await downloadFile(`reportes/downloadReporteSimulacion`, "reporteSimulacion.txt");
+    await downloadFile(`reportes/downloadUltimaPlan`, "ultimaPlanificacion.txt")
 
     // Endpoint a crear, por ejemplo:
     // GET /runs/{id}/report  -> devuelve ZIP

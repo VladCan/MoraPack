@@ -6,8 +6,10 @@ import FlightPath from "@/components/common/FlightPath";
 import { useAirports } from "@/hooks/useAirports";
 import { useRunSSE } from "@/hooks/useRunSSE";
 import { useRunSession } from "@/lib/runSession";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import SimulationFinishedOverlay from "@/components/common/SimulationFinishedOverlay";
+import { downloadFile } from "@/services/api";
 
 const COLOR_SEDE   = "#005097";
 const COLOR_NORMAL = "#38bdf8";
@@ -75,8 +77,8 @@ export default function Colapso() {
     }, [airports]);
   
     // Conectar al SSE
-    const { runId, vuelosCancelados } = useRunSession();
-    const { simNowUtc, windows, airportOccupancy } = useRunSSE(runId || undefined);
+    const { runId, vuelosCancelados, reset, windows } = useRunSession();
+    const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
   
     // Procesar vuelos para renderizar
     const flightsToRender = useMemo<FlightForRender[]>(() => {
@@ -163,6 +165,52 @@ export default function Colapso() {
     const activeAirportData = activeAirportId && airportOccupancy[activeAirportId]
       ? airportOccupancy[activeAirportId]
       : null;
+
+    //Para la pantalla de fin:
+    
+      const [finishedAt, setFinishedAt] = useState<number | null>(null);
+    
+      useEffect(() => {
+        if (!finished) return;
+        console.log ("🔚 [Simulación] Terminó:", finished.reason);
+    
+        setOverlayVisible(true);
+      }, [finished, disconnect, reset]);
+    
+      useEffect(() => {
+        if (finished && !finishedAt) {
+          setFinishedAt(Date.now());
+        }
+      }, [finished, finishedAt]);
+    
+      useEffect(() => {
+        setFinishedAt(null);
+      }, [runId]);
+    
+      const handleDownloadReports = async () => {
+        if (!runId) return;
+    
+        await downloadFile(`reportes/downloadReporteSimulacion`, "reporteSimulacion.txt");
+        await downloadFile(`reportes/downloadUltimaPlan`, "ultimaPlanificacion.txt")
+    
+        // Endpoint a crear, por ejemplo:
+        // GET /runs/{id}/report  -> devuelve ZIP
+        // downloadFile(`runs/${runId}/report`, `reporte-simulacion-${runId}.zip`);
+      };
+    
+      const handleCloseOverlay = () => {
+        setOverlayVisible(false);
+    
+        //Cortamos el SSE
+        disconnect();
+    
+        //Limpiamos el contexto de la simulación
+        reset();
+      };
+    
+      const [overlayVisible, setOverlayVisible] = useState(true);
+    
+      const showFinishedOverlay = !!finished && !!runId && overlayVisible;
   
     return (
       <div className="min-h-screen bg-neutral-50 relative">
@@ -388,6 +436,20 @@ export default function Colapso() {
             iconSize={16}
           />
         </MainMap>
+
+        {finished && runId && (
+          <SimulationFinishedOverlay
+            open={showFinishedOverlay}
+            reason={finished.reason}
+            simStartUtc={simStartUtc ?? null}
+            simEndUtc={simNowUtc ?? null}
+            wallAnchor={wallStartUtc}
+            finishedAt={finishedAt}
+            onClose={handleCloseOverlay}
+            onDownloadReports={handleDownloadReports}
+          />
+        )}
+
       </div>
   );
 }

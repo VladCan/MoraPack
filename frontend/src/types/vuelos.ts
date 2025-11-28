@@ -6,5 +6,6 @@ export type CancelarVueloRequest = {
 }
 
 export type CancelarVueloResponse = {
-    
-}
+  cancelled: boolean;
+  message: string;
+};

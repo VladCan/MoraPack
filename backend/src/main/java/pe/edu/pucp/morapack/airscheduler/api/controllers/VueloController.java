@@ -45,6 +45,17 @@ public class VueloController {
         public String llegadaUtc;
     }
 
+    public static final class CancelarVueloResponse {
+        public boolean cancelled;
+        public String message;
+
+        public CancelarVueloResponse(boolean cancelled, String message) {
+            this.cancelled = cancelled;
+            this.message = message;
+        }
+    }
+
+
     // Endpoint para recibir el archivo y guardarlo (DELEGACIÓN AL SERVICE)
     @POST
     @jakarta.ws.rs.Path("/upload")
@@ -183,19 +194,21 @@ public class VueloController {
             runManager.registrarCancelacionVuelo(runId, vueloProgramadoId);
 
             return Response.status(Response.Status.CREATED)
-                    .entity("Cancelado")
+                    .entity(new CancelarVueloResponse(true, "Cancelado"))
                     .build();
 
         }
         catch (DateTimeParseException e){
             return Response.status(Response.Status.BAD_REQUEST)
-                    .entity("Formato de fecha inválido. Usa ISO-8601, ej: 2025-01-02T06:32:00Z")
+                    .entity(new CancelarVueloResponse(false,
+                            "Formato de fecha inválido. Usa ISO-8601, ej: 2025-01-02T06:32:00Z"))
                     .build();
         }
         catch (Exception e) {
             e.printStackTrace();
             return Response.serverError()
-                    .entity("Error al registrar cancelación de vuelo: " + e.getMessage())
+                    .entity(new CancelarVueloResponse(false,
+                            "Error al registrar cancelación de vuelo: " + e.getMessage()))
                     .build();
         }
 

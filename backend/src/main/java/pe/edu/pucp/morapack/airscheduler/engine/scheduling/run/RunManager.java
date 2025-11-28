@@ -92,6 +92,9 @@ public class RunManager {
     // Guarda la ÚLTIMA ventana emitida por cada run (para rehidratación)
     private final Map<String, WindowPacket> lastWindows = new ConcurrentHashMap<>();
 
+    // Para validar si se violó un SLA o no
+    private final ConcurrentHashMap<String, AtomicBoolean> slaBroken = new ConcurrentHashMap<>();
+
     public WindowPacket getLastWindow(String runId) { return lastWindows.get(runId); }
 
     public String currentOperacionRunId(){ return operacionRunId.get(); }
@@ -513,6 +516,9 @@ public class RunManager {
         cancelled.put(id, new AtomicBoolean(false));
         forcePlanPorRun.put(id, new AtomicBoolean(false));
 
+        final AtomicBoolean slaFlag = slaBroken.computeIfAbsent(id, k -> new AtomicBoolean(false));
+        slaFlag.set(false);
+
         executor.submit(() -> {
             try{
                 switch (config.scenario()){
@@ -534,9 +540,25 @@ public class RunManager {
                     System.out.println("Ahora firstExecution es:" + firstExecution);
                 }
 
-                // Fin normal
-                states.put(id, RunState.COMPLETED);
-                broadcastFinished(id, StopReason.FIN_DE_RANGO);
+
+                if (slaFlag.get()) {
+                    // Fin por colapso
+                    states.put(id, RunState.COMPLETED);
+                    broadcastFinished(id, StopReason.COLAPSO);
+                }
+                else if (cancelled.get(id).get()) {
+                    // Fin por cancelación manual
+                    states.put(id, RunState.COMPLETED);
+                    System.out.println("Emitiendo StopReason.MANUAL" + id);
+                    broadcastFinished(id, StopReason.MANUAL);
+                }
+                else {
+                    // Fin normal
+                    states.put(id, RunState.COMPLETED);
+                    broadcastFinished(id, StopReason.FIN_DE_RANGO);
+                }
+
+
 
                 // Limpiamos
                 // Solución rápida:
@@ -576,6 +598,8 @@ public class RunManager {
 
         //Nuevo:
         operacionRunId.set(null);
+
+        slaBroken.remove(id);
     }
 
     private boolean isCancelled(String id){
@@ -674,9 +698,14 @@ public class RunManager {
 
         final String id = runId.value();
 
+        final AtomicBoolean slaFlag = slaBroken.computeIfAbsent(id, k -> new AtomicBoolean(false));
+        slaFlag.set(false);
+
         Instant wStart = config.fechaInicio();
         Instant wEnd = wStart.plus(config.horasVentana());
         int idx = 0;
+
+        Instant lastWStart = wStart;
 
         System.out.println("[RunManager] Config: fechaInicio=" + config.fechaInicio() + ", fechaFin=" + config.fechaFin());
         System.out.println("[RunManager] Ventana inicial: wStart=" + wStart + ", wEnd=" + wEnd);
@@ -832,7 +861,12 @@ public class RunManager {
                 actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
                 solucionesAnteriores.put(id, solucionOptima);
 
-                VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46), vuelosMap);
+                boolean SlaOk = VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46), vuelosMap);
+                if (!SlaOk){
+                    slaFlag.set(true);
+                    break;
+                }
+
 
                 // 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
                 final Instant wStartFinal = wStart;
@@ -854,8 +888,9 @@ public class RunManager {
 
                 //9. Imprimimos en archivo
                 Path reportePath = reportesService.getReportesFilePath();
-
                 ImpresorSolucion.imprimirEnArchivo(solucionOptima, reportePath.toString(), wStart);
+
+                lastWStart = wStart;
 
                 System.out.println("[RunManager] Ventana " + idx + " procesada exitosamente. Vuelos: " + vuelosVentana.size() + ", Pedidos: " + pedidosVentanaDTO.size());
 
@@ -876,6 +911,13 @@ public class RunManager {
         }
 
         /// Acá debería de ir imprimirUltimaPlanificacion
+        SolucionProgramacion ultimaPlan = solucionesAnteriores.get(id);
+
+        if (ultimaPlan != null) {
+            System.out.println("[RunManaqer]: Vamos a imprimir la última planificación.");
+            Path reportePath = reportesService.getLastPlanFilePath();
+            ImpresorSolucion.imprimirUltimaPlanificacion(ultimaPlan, reportePath.toString(), lastWStart);
+        }
 
     }
 
