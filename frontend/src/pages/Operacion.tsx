@@ -82,7 +82,7 @@ export default function Operacion() {
   }, [airportsDtoRaw]);
 
   // Obtener vuelos de ambas fuentes
-  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows } = useRunSession();
+  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows, selectedPedido } = useRunSession();
 const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
   // Usar tiempo simulado si hay runId, sino usar hora del sistema
   const liveFlightsEndpoint = runId 
@@ -112,10 +112,34 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
 
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
 
+  // Extraer IDs de vuelos relacionados al pedido seleccionado
+  const vuelosRelacionadosAlPedido = useMemo<Set<string>>(() => {
+    if (!selectedPedido || !selectedPedido.rutas) {
+      return new Set(); // Si no hay pedido seleccionado, no filtrar
+    }
+    
+    const vuelosIds = new Set<string>();
+    selectedPedido.rutas.forEach(ruta => {
+      ruta.vuelos.forEach(vuelo => {
+        // El ID del vuelo se construye como: origen-destino-salidaUtc (sin :)
+        // El backend usa: vueloId.getOrigen() + "-" + vueloId.getDestino() + "-" + vueloId.getSalidaUtc().toString().replace(":", "")
+        // salidaUtc viene como ISO string, necesitamos quitar los :
+        const salidaUtcSinColon = vuelo.salidaUtc.replace(/:/g, '');
+        const vueloId = `${vuelo.origen}-${vuelo.destino}-${salidaUtcSinColon}`;
+        vuelosIds.add(vueloId);
+      });
+    });
+    
+    return vuelosIds;
+  }, [selectedPedido]);
+
   const flightPaths = useMemo<FlightForRender[]>(() => {
     const now = simNowUtc ? new Date(simNowUtc).getTime() : Date.now();
     const allFlights: FlightForRender[] = [];
     const seenIds = new Set<string>();
+
+    // Si hay un pedido seleccionado, solo mostrar vuelos relacionados
+    const tienePedidoSeleccionado = selectedPedido !== null && vuelosRelacionadosAlPedido.size > 0;
 
     // 1. PRIMERO: Vuelos planificados por el algoritmo ALNS (prioridad)
     if (windows.length > 0 && simNowUtc) {
@@ -132,6 +156,11 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
 
       // Procesar vuelos planificados que están en el aire
       vuelosUnicos.forEach(vuelo => {
+        // Si hay un pedido seleccionado, solo mostrar vuelos relacionados
+        if (tienePedidoSeleccionado && !vuelosRelacionadosAlPedido.has(vuelo.id)) {
+          return; // Ocultar vuelos no relacionados
+        }
+        
         const origen = airportsMap.get(vuelo.origen);
         const destino = airportsMap.get(vuelo.destino);
         
@@ -217,7 +246,7 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
     });
 
     return allFlights;
-  }, [liveFlights, vuelosCancelados, windows, simNowUtc, airportsMap]);
+  }, [liveFlights, vuelosCancelados, windows, simNowUtc, airportsMap, selectedPedido, vuelosRelacionadosAlPedido]);
 
   // Sincronizar vuelo activo con datos actualizados y limpiar si fue cancelado
   useEffect(() => {

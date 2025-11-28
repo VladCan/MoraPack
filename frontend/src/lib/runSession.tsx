@@ -22,6 +22,7 @@ interface RunSessionState {
     lastWindow: RunWindow | null;   // última ventana recibida por SSE (con vuelos y pedidos)
     windows: RunWindow[];           // historial completo de ventanas recibidas
     selectedAirportId: string | null;
+    selectedPedido: PedidoDTO | null;  // Pedido seleccionado para filtrar vuelos
     vuelosCancelados: Set<string>;  // IDs de vuelos cancelados localmente
 
     //Esto va a usar TopNav:
@@ -31,6 +32,7 @@ interface RunSessionState {
     setSimNow: (iso: string) => void;
     setWindow: (w: RunWindow) => void;
     setSelectedAirport: (id: string | null) => void;
+    setSelectedPedido: (pedido: PedidoDTO | null) => void;  // Actualizar pedido seleccionado
     cancelarVuelo: (vueloId: string) => void;  // Agregar vuelo a la lista de cancelados
 
     reset: () => void;
@@ -49,6 +51,7 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
     const [lastWindow, setLastWindow] = useState<RunWindow | null>(null);
     const [windows, setWindows] = useState<RunWindow[]>([]);
     const [selectedAirportId, setSelectedAirportId] = useState<string | null>(null);
+    const [selectedPedido, setSelectedPedidoState] = useState<PedidoDTO | null>(null);
     const [vuelosCancelados, setVuelosCancelados] = useState<Set<string>>(new Set());
 
     const [autoReconnect, setAutoReconnect] = useState<boolean>(true);
@@ -60,6 +63,7 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setLastWindow(null);
         setWindows([]);
         setSelectedAirportId(null);
+        setSelectedPedidoState(null);
         setVuelosCancelados(new Set());
     }, []);
 
@@ -140,6 +144,7 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setLastWindow(null);
         setWindows([]);
         setSelectedAirportId(null);
+        setSelectedPedidoState(null);
         setVuelosCancelados(new Set());
     }, []);
 
@@ -168,6 +173,10 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setSelectedAirportId(id);
     }, []);
 
+    const setSelectedPedido = useCallback((pedido: PedidoDTO | null) => {
+        setSelectedPedidoState(pedido);
+    }, []);
+
     const value = useMemo<RunSessionState>(() => ({
         runId,
         status,
@@ -175,17 +184,19 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         lastWindow,
         windows,
         selectedAirportId,
+        selectedPedido,
         vuelosCancelados,
         begin,
         end,
         setSimNow,
         setWindow,
         setSelectedAirport,
+        setSelectedPedido,
         cancelarVuelo,
         reset,
         autoReconnect,
         setAutoReconnect
-    }), [runId, status, simNow, lastWindow, windows, selectedAirportId, vuelosCancelados, begin, end, setSimNow, setWindow, setSelectedAirport, cancelarVuelo, reset, autoReconnect]);
+    }), [runId, status, simNow, lastWindow, windows, selectedAirportId, selectedPedido, vuelosCancelados, begin, end, setSimNow, setWindow, setSelectedAirport, setSelectedPedido, cancelarVuelo, reset, autoReconnect]);
 
     return (
         <RunSessionContext.Provider value={value}>

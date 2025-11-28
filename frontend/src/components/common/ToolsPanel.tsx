@@ -88,9 +88,11 @@ export default function ToolsPanel({
 
   const [vuelo, setVuelo] = useState<VueloDTO | null>(null);
   const [almacen, setAlmacen] = useState<string | null>(null);
-  const [pedido, setPedido] = useState<PedidoDTO | null>(null);
+  // Usar el pedido del contexto en lugar de estado local
+  const pedido = selectedPedido;
+  const setPedido = setSelectedPedido;
 
-  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId, vuelosCancelados, cancelarVuelo, status } = useRunSession();
+  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId, vuelosCancelados, cancelarVuelo, status, selectedPedido, setSelectedPedido } = useRunSession();
   const { data: airportsData } = useAirports();
 
   // Obtener vuelos planificados del día siguiente (solo en modo simulacion/operacion semanal)
@@ -559,7 +561,9 @@ export default function ToolsPanel({
                 <Package className="w-4 h-4 text-primary" />
                 <h3 className="font-semibold text-lg">PED-{pedido.id}</h3>
               </div>
-              <button onClick={() => setPedido(null)} className="text-muted-foreground hover:text-foreground">
+              <button onClick={() => {
+                setPedido(null);
+              }} className="text-muted-foreground hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
             </div>

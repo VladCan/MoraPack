@@ -76,11 +76,32 @@ export default function Simulacion() {
   }, [airports]);
 
   // Conectar al SSE
-  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows } = useRunSession();
+  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows, selectedPedido } = useRunSession();
 const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
 
   // Procesar vuelos para renderizar
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
+
+  // Extraer IDs de vuelos relacionados al pedido seleccionado
+  const vuelosRelacionadosAlPedido = useMemo<Set<string>>(() => {
+    if (!selectedPedido || !selectedPedido.rutas) {
+      return new Set(); // Si no hay pedido seleccionado, no filtrar
+    }
+    
+    const vuelosIds = new Set<string>();
+    selectedPedido.rutas.forEach(ruta => {
+      ruta.vuelos.forEach(vuelo => {
+        // El ID del vuelo se construye como: origen-destino-salidaUtc (sin :)
+        // El backend usa: vueloId.getOrigen() + "-" + vueloId.getDestino() + "-" + vueloId.getSalidaUtc().toString().replace(":", "")
+        // salidaUtc viene como ISO string, necesitamos quitar los :
+        const salidaUtcSinColon = vuelo.salidaUtc.replace(/:/g, '');
+        const vueloId = `${vuelo.origen}-${vuelo.destino}-${salidaUtcSinColon}`;
+        vuelosIds.add(vueloId);
+      });
+    });
+    
+    return vuelosIds;
+  }, [selectedPedido]);
 
   const flightsToRender = useMemo<FlightForRender[]>(() => {
     if (!simNowUtc || windows.length === 0) {
@@ -104,10 +125,18 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
       });
     });
 
+    // Si hay un pedido seleccionado, solo mostrar vuelos relacionados
+    const tienePedidoSeleccionado = selectedPedido !== null && vuelosRelacionadosAlPedido.size > 0;
+
     // Ahora procesamos todos los vuelos únicos (excluyendo cancelados)
     vuelosUnicos.forEach(vuelo => {
         // Excluir vuelos cancelados
         if (vuelosCancelados.has(vuelo.id)) return;
+        
+        // Si hay un pedido seleccionado, solo mostrar vuelos relacionados
+        if (tienePedidoSeleccionado && !vuelosRelacionadosAlPedido.has(vuelo.id)) {
+          return; // Ocultar vuelos no relacionados
+        }
         
         const origen = airportsMap.get(vuelo.origen);
         const destino = airportsMap.get(vuelo.destino);
@@ -174,7 +203,7 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
     });
 
     return allFlights;
-  }, [windows, simNowUtc, airportsMap, vuelosCancelados]);
+  }, [windows, simNowUtc, airportsMap, vuelosCancelados, selectedPedido, vuelosRelacionadosAlPedido]);
 
   // Sincronizar vuelo activo con datos actualizados y limpiar si fue cancelado
   useEffect(() => {
