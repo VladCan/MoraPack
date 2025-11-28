@@ -425,14 +425,25 @@ public class RunManager {
     public void normalizarFechasOD(String runId, List<Pedido> pedidos){
         LocalDateTime fechaOD = currentSimNowLocal(runId);
 
+        System.out.println("[RunManager] Fecha de OD: " + fechaOD);
+
         if (fechaOD == null || pedidos == null) return;
 
+        /// Lo que está comentado solo anclaba el dd/mm/aaaa
+        /*
         LocalDate actual = fechaOD.toLocalDate();
-
         for (Pedido p : pedidos){
             if (p == null) continue;
             LocalTime horaOriginal = p.getFecha().toLocalTime();
             p.setFecha(LocalDateTime.of(actual, horaOriginal));
+        }
+        */
+
+        /// Esto ancla TODA la fecha (como en crearPedido de PedidosController)
+        for (Pedido p : pedidos){
+            if (p == null) continue;
+            LocalDateTime fecha = ajustarFechaPedidoPorDestino(fechaOD, p.getDestino());
+            p.setFecha(fecha);
         }
 
     }

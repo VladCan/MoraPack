@@ -1,5 +1,6 @@
 package pe.edu.pucp.morapack.airscheduler.api.controllers;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -26,6 +27,7 @@ public class OperacionDiariaController {
     @Inject
     RunManager runManager;
 
+    @RegisterForReflection
     public static final class ForceReplanResponse {
         public boolean forced;
         public String message;
