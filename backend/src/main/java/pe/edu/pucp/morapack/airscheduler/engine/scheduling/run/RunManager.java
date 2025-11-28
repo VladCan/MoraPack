@@ -539,6 +539,12 @@ public class RunManager {
                     states.put(id, RunState.COMPLETED);
                     broadcastFinished(id, StopReason.COLAPSO);
                 }
+                else if (cancelled.get(id).get()) {
+                    // Fin por cancelación manual
+                    states.put(id, RunState.COMPLETED);
+                    System.out.println("Emitiendo StopReason.MANUAL" + id);
+                    broadcastFinished(id, StopReason.MANUAL);
+                }
                 else {
                     // Fin normal
                     states.put(id, RunState.COMPLETED);
