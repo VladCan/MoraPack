@@ -117,15 +117,18 @@ export default function TopNav() {
           />),
         { duration: 5000});
 
+        /*
         //Cortamos el SSE
         disconnect();
+          */
 
         //Para que no dispare el evento de reconexión
         setAutoReconnect(false);
 
+        /*
         //Limpiamos el contexto de la simulación
         reset();
-
+          */
       }
       else{
         console.error("❌ [ToolsPanel] Error al finalizar la simulación:", error);

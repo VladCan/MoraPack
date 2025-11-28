@@ -9,6 +9,8 @@ import { useFlightsSSE } from "@/hooks/useFlightsSSE";
 import { useRunSession } from "@/lib/runSession";
 import { useRunSSE } from "@/hooks/useRunSSE";
 import type { AeropuertoDTO } from "@/types/api";
+import { downloadFile } from "@/services/api";
+import SimulationFinishedOverlay from "@/components/common/SimulationFinishedOverlay";
 
 const COLOR_SEDE   = "#005097";
 const COLOR_NORMAL = "#38bdf8"; // 👈 más suave que #0ea5e9
@@ -80,8 +82,8 @@ export default function Operacion() {
   }, [airportsDtoRaw]);
 
   // Obtener vuelos de ambas fuentes
-  const { runId, vuelosCancelados, selectedAirportId, setSelectedAirport, windows } = useRunSession();
-  const { simNowUtc, airportOccupancy } = useRunSSE(runId || undefined);
+  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows } = useRunSession();
+const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
   // Usar tiempo simulado si hay runId, sino usar hora del sistema
   const liveFlightsEndpoint = runId 
     ? `vuelos/live?runId=${runId}&limit=200`
@@ -245,6 +247,53 @@ export default function Operacion() {
         cargaSaliendo: 0,
       })
     : null;
+
+  //Para la pantalla de fin:
+      
+        const [finishedAt, setFinishedAt] = useState<number | null>(null);
+      
+        useEffect(() => {
+          if (!finished) return;
+          console.log ("🔚 [Simulación] Terminó:", finished.reason);
+      
+          setOverlayVisible(true);
+        }, [finished, disconnect, reset]);
+      
+        useEffect(() => {
+          if (finished && !finishedAt) {
+            setFinishedAt(Date.now());
+          }
+        }, [finished, finishedAt]);
+      
+        useEffect(() => {
+          setFinishedAt(null);
+        }, [runId]);
+      
+        const handleDownloadReports = async () => {
+          if (!runId) return;
+      
+          await downloadFile(`reportes/downloadReporteSimulacion`, "reporteSimulacion.txt");
+          await downloadFile(`reportes/downloadUltimaPlan`, "ultimaPlanificacion.txt")
+      
+          // Endpoint a crear, por ejemplo:
+          // GET /runs/{id}/report  -> devuelve ZIP
+          // downloadFile(`runs/${runId}/report`, `reporte-simulacion-${runId}.zip`);
+        };
+      
+        const handleCloseOverlay = () => {
+          setOverlayVisible(false);
+      
+          //Cortamos el SSE
+          disconnect();
+      
+          //Limpiamos el contexto de la simulación
+          reset();
+        };
+      
+        const [overlayVisible, setOverlayVisible] = useState(true);
+      
+        const showFinishedOverlay = !!finished && !!runId && overlayVisible;
+
 
   return (
     <div className="min-h-screen bg-neutral-50 relative">
@@ -504,6 +553,21 @@ export default function Operacion() {
           iconSize={16}
         />
       </MainMap>
+
+      {finished && runId && (
+                <SimulationFinishedOverlay
+                  open={showFinishedOverlay}
+                  reason={finished.reason}
+                  simStartUtc={simStartUtc ?? null}
+                  simEndUtc={simNowUtc ?? null}
+                  wallAnchor={wallStartUtc}
+                  finishedAt={finishedAt}
+                  onClose={handleCloseOverlay}
+                  onDownloadReports={handleDownloadReports}
+                />
+              )}
+
+
     </div>
   );
 }
