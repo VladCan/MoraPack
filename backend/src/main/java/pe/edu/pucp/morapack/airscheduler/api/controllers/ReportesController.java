@@ -15,16 +15,15 @@ import java.nio.file.Files;
 @Path("/reportes")
 @RequestScoped
 public class ReportesController {
-    private static final String FILENAME = "reporteSimulacion.txt";
 
     @Inject
     ReportesService reportesService;
 
     @GET
-    @jakarta.ws.rs.Path("/download")
+    @jakarta.ws.rs.Path("/downloadReporteSimulacion")
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
-    public Response download(){
-        java.nio.file.Path p = filePath();
+    public Response downloadReporteSimulacion(){
+        java.nio.file.Path p = filePathReportes();
         String filename = p.getFileName().toString();
 
         if (!Files.exists(p)){
@@ -43,8 +42,35 @@ public class ReportesController {
         }
     }
 
-    private java.nio.file.Path filePath(){
+    @GET
+    @jakarta.ws.rs.Path("/downloadUltimaPlan")
+    @Produces(MediaType.APPLICATION_OCTET_STREAM)
+    public Response downloadUltimaPlanificacion(){
+        java.nio.file.Path p = filePathUltimaPlan();
+        String filename = p.getFileName().toString();
+
+        if (!Files.exists(p)){
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity("No existe el archivo " + filename).build();
+        }
+
+        try{
+            File f = p.toFile();
+            return Response.ok(f)
+                    .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+                    .build();
+        }
+        catch (Exception e){
+            return Response.serverError().entity("Error al leer el archivo: " + e.getMessage()).build();
+        }
+    }
+
+    private java.nio.file.Path filePathReportes(){
         return reportesService.getReportesFilePath();
+    }
+
+    private java.nio.file.Path filePathUltimaPlan(){
+        return reportesService.getLastPlanFilePath();
     }
 
 

@@ -49,3 +49,6 @@ src/main/resources/pedidos.txt
 src/main/resources/pedidosbackup.txt
 /uploads/*
 src/main/resources/archivosPedidos/
+# Ignorar archivo ultimaPLanificacion
+src/main/resources/ultimaPlanificacion.txt
+

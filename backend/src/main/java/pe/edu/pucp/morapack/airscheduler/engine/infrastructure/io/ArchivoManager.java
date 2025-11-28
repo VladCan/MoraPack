@@ -33,7 +33,9 @@ public class ArchivoManager {
     }
 
     public String getReportsDir(){
-        return reportsDir;
+        /// Para estar 100% blindados, toda escritura es en uploadDir
+        //return reportsDir;
+        return uploadDir;
     }
 
     // ELIMINAR el método getUploadFilePath() si solo se usaba para "aereopuertos.txt"
