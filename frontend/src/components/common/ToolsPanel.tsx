@@ -1147,6 +1147,9 @@ function FlightSelectCard({
         postJson<CancelarVueloResponse>(path, req)
       )
 
+      console.log("[cancelarVuelo] El data es:", data);
+      console.log("[cancelarVuelo] El error es:", error);
+
       if (error) {
         // aquí tu toast o UI de error
         console.error("❌ [ToolsPanel] Error al cancelar el vuelo:", error);
