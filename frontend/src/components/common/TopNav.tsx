@@ -48,13 +48,13 @@ export default function TopNav() {
   //Esto es para la conexión SSE de la solución
 
   //Traemos el contexto
-  const { runId, status, end, setSimNow, setWindow, reset, setAutoReconnect } = useRunSession();
+  const { runId, status, end, setSimNow, setWindow, setAutoReconnect } = useRunSession();
 
   //Para el reloj
   const running = status === "running" && !!runId;
   
   //Acá expone connect(url, handlers) -> () => void
-  const { simNowUtc, windows, finished, wallStartUtc, disconnect } = useRunSSE(
+  const { simNowUtc, windows, finished, wallStartUtc } = useRunSSE(
     status === "running" && runId ? runId : undefined
   );
 
