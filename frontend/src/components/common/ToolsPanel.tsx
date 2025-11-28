@@ -88,11 +88,12 @@ export default function ToolsPanel({
 
   const [vuelo, setVuelo] = useState<VueloDTO | null>(null);
   const [almacen, setAlmacen] = useState<string | null>(null);
+
+  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId, vuelosCancelados, cancelarVuelo, status, selectedPedido, setSelectedPedido } = useRunSession();
+  
   // Usar el pedido del contexto en lugar de estado local
   const pedido = selectedPedido;
   const setPedido = setSelectedPedido;
-
-  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId, vuelosCancelados, cancelarVuelo, status, selectedPedido, setSelectedPedido } = useRunSession();
   const { data: airportsData } = useAirports();
 
   // Obtener vuelos planificados del día siguiente (solo en modo simulacion/operacion semanal)
