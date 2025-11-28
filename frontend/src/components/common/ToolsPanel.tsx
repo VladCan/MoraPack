@@ -35,6 +35,7 @@ import ToastCustom from "@/components/common/ToastCustom";
 import type { VueloDTO, PedidoDTO } from "@/hooks/useRunSSE";
 import { useFlightsSSE } from "@/hooks/useFlightsSSE";
 import type { CancelarVueloRequest, CancelarVueloResponse } from "@/types/vuelos";
+import type { ForceReplanResponse } from "@/types/planificacion";
 
 type NivelCarga = "disponible" | "limitado" | "saturado";
 
@@ -432,7 +433,9 @@ export default function ToolsPanel({
     try {
       const path = `operacionDiaria/${currentRunId}/force`;
 
-      const [data, error] = await handleApi(postJson<{}>(path));
+      const [data, error] = await handleApi(
+        postJson<ForceReplanResponse>(path)
+      )
 
       if (error) {
         console.error("[ToolsPanel] Error al forzar replan:", error);
