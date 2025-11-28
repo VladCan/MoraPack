@@ -17,6 +17,7 @@ hs_err_pid*
 replay_pid*
 *.hprof
 deploy.sh
+#deployOnServer.sh
 # =========================
 # Maven
 # =========================

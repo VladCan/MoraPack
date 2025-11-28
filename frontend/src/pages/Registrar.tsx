@@ -64,7 +64,7 @@ export default function Registrar() {
     //termina el toast de carga
     if (data) {
       toast.custom((t) => (
-        <ToastCustom t={t} message={data.message +" ✅"} type="success" />),
+        <ToastCustom t={t} message={data.message + " ✅"} type="success" />),
         { duration: 8000 }
       );
 
@@ -77,7 +77,7 @@ export default function Registrar() {
 
     } else if (error) {
       toast.custom((t) => (
-        <ToastCustom t={t} message={error.message +" ❗"} type="error" />),
+        <ToastCustom t={t} message={error.message + " ❗"} type="error" />),
         { duration: 8000 }
       );
       console.error("Detalles del error:", error); // útil para debug
@@ -85,138 +85,138 @@ export default function Registrar() {
   };
 
   const vuelosStatus = useQuery({
-  queryKey: ["status", "vuelos"],
-  queryFn: async () => {try {
-    const res = await getJson<Status>("vuelos/status");
-    console.log("📡 /vuelos/status →", res);
-    return res;
-  } catch (err) {
-    console.error("❌ Error en /vuelos/status:", err);
-    throw err;
-  }
-  },
-  refetchOnWindowFocus: false,
-})
+    queryKey: ["status", "vuelos"],
+    queryFn: async () => {
+      try {
+        const res = await getJson<Status>("vuelos/status");
+        console.log("📡 /vuelos/status →", res);
+        return res;
+      } catch (err) {
+        console.error("❌ Error en /vuelos/status:", err);
+        throw err;
+      }
+    },
+    refetchOnWindowFocus: false,
+  })
 
-//husos = aeropuertos
-const husosStatus  = useQuery({
-  queryKey: ["status", "aereopuertos"],
-  queryFn: () => getJson<Status>("aereopuertos/status"),
-  refetchOnWindowFocus: false,
-})
+  //husos = aeropuertos
+  const husosStatus = useQuery({
+    queryKey: ["status", "aereopuertos"],
+    queryFn: () => getJson<Status>("aereopuertos/status"),
+    refetchOnWindowFocus: false,
+  })
 
-//todavía no tenemos para cancelaciones, pero cuando tengamos:
-const cancelacionesStatus = useQuery({
-  queryKey: ["status", "cancelaciones"],
-  queryFn: () => getJson<Status>("cancelaciones/status"),
-  refetchOnWindowFocus: false,
-});
+  //todavía no tenemos para cancelaciones, pero cuando tengamos:
+  const cancelacionesStatus = useQuery({
+    queryKey: ["status", "cancelaciones"],
+    queryFn: () => getJson<Status>("cancelaciones/status"),
+    refetchOnWindowFocus: false,
+  });
 
-//husos = aeropuertos
-const pedidosStatus  = useQuery({
-  queryKey: ["status", "pedidos"],
-  queryFn: () => getJson<PedidosStatusSummary>("pedidos/status"),
-  refetchOnWindowFocus: false,
-})
+  //husos = aeropuertos
+  const pedidosStatus = useQuery({
+    queryKey: ["status", "pedidos"],
+    queryFn: () => getJson<PedidosStatusSummary>("pedidos/status"),
+    refetchOnWindowFocus: false,
+  })
 
-const operacionDiariaStatus = useQuery({
-  queryKey: ["status", "operacionDiaria"],
-  queryFn: () => getJson<Status>("operacionDiaria/status"),
-  refetchOnWindowFocus: false,
-})
+  const operacionDiariaStatus = useQuery({
+    queryKey: ["status", "operacionDiaria"],
+    queryFn: () => getJson<Status>("operacionDiaria/status"),
+    refetchOnWindowFocus: false,
+  })
 
-//Esto es porque operaciónDiaria, en principio, no necesita un status (ahora sí le puse xd) "ej: Archivo actual: vuelos.txt — 80248 bytes — 2025-11-10T19:50:31.7425859Z"
-const statuses: Partial<Record<Kind, { exists?: boolean; filename?: string } | undefined>> = {
-  vuelos: vuelosStatus.data,
-  aereopuertos: husosStatus.data,
-  cancelaciones: cancelacionesStatus?.data, // si no existe query, quedará undefined
-  operacionDiaria: undefined,               // explícitamente sin status
-}
-
-const withoutStatusCheck = new Set<Kind>(["operacionDiaria", "pedidos"]);
-
-//pero antes: handler de subida con confirmación + refresh (TODO falta agregar cancelaciones)
-const onUpload = async (file: File, kind: Kind) => {
-  
-  const status = statuses[kind];
-
-  //En caso no tenga statusCheck (osea, si es operacionDiaria)
-  if (!withoutStatusCheck.has(kind) && status?.exists) {
-    const ok = window.confirm(
-      `Ya existe un archivo (${status.filename}). Esto lo reemplazará. ¿Continuar?`
-    );
-    if (!ok) return;
+  //Esto es porque operaciónDiaria, en principio, no necesita un status (ahora sí le puse xd) "ej: Archivo actual: vuelos.txt — 80248 bytes — 2025-11-10T19:50:31.7425859Z"
+  const statuses: Partial<Record<Kind, { exists?: boolean; filename?: string } | undefined>> = {
+    vuelos: vuelosStatus.data,
+    aereopuertos: husosStatus.data,
+    cancelaciones: cancelacionesStatus?.data, // si no existe query, quedará undefined
+    operacionDiaria: undefined,               // explícitamente sin status
   }
 
-  //EN EL BACK EL CONTROLLER TIENE QUE TENER EL ENDPOINT '/upload' (VER Línea 98)
-  const [data, error] = await uploadFile(`${kind}/upload`, file);
-  if (data){
-    console.log("✅ [Registrar] Archivos enviados para operacionDiaria:", data);
+  const withoutStatusCheck = new Set<Kind>(["operacionDiaria", "pedidos"]);
 
-    toast.custom((t) => (
-      <ToastCustom
-        t={t}
-        message={data.message +"✅"}
-        type="success"
-      />),
-    { duration: 5000});
+  //pero antes: handler de subida con confirmación + refresh (TODO falta agregar cancelaciones)
+  const onUpload = async (file: File, kind: Kind) => {
 
-    //Refrescamos 
-    qc.invalidateQueries({ queryKey: ["status", kind] });
-    
-  }
-  else {
-    console.error(error);
+    const status = statuses[kind];
 
-    const msg =
-        (error as ApiError)?.message ??
-      "Ocurrió un error.";
+    //En caso no tenga statusCheck (osea, si es operacionDiaria)
+    if (!withoutStatusCheck.has(kind) && status?.exists) {
+      const ok = window.confirm(
+        `Ya existe un archivo (${status.filename}). Esto lo reemplazará. ¿Continuar?`
+      );
+      if (!ok) return;
+    }
+
+    //EN EL BACK EL CONTROLLER TIENE QUE TENER EL ENDPOINT '/upload' (VER Línea 98)
+    const [data, error] = await uploadFile(`${kind}/upload`, file);
+    if (data) {
+      console.log("✅ [Registrar] Archivos enviados para operacionDiaria:", data);
 
       toast.custom((t) => (
         <ToastCustom
           t={t}
-          message={msg+"❗"}
+          message={data.message + "✅"}
+          type="success"
+        />),
+        { duration: 5000 });
+
+      //Refrescamos 
+      qc.invalidateQueries({ queryKey: ["status", kind] });
+
+    }
+    else {
+      console.error(error);
+
+      const msg =
+        (error as ApiError)?.message ??
+        "Ocurrió un error.";
+
+      toast.custom((t) => (
+        <ToastCustom
+          t={t}
+          message={msg + "❗"}
           type="error"
         />),
-      { duration: 5000});
-  }
-}
-
-//1. handler para ver primeras 50 lineas
-const doPreview  = async (kind: Kind) => {
-
-  if (kind === "pedidos") {
-    alert("Preview no disponible para pedidos multi-archivo.");
-    return;
+        { duration: 5000 });
+    }
   }
 
-  const text = await getText(`${kind}/preview`, {lines: 50});
-  //Por ahora va como un alert
-  alert(text || "(archivo vacío)");
-}
+  //1. handler para ver primeras 50 lineas
+  const doPreview = async (kind: Kind) => {
 
-//2. handler de descarga
-const doDownload = async (kind: Kind, filename?: string) => {
+    if (kind === "pedidos") {
+      alert("Preview no disponible para pedidos multi-archivo.");
+      return;
+    }
 
-  if (kind === "pedidos") {
-    alert("Descarga no disponible para pedidos multi-archivo.");
-    return;
+    const text = await getText(`${kind}/preview`, { lines: 50 });
+    //Por ahora va como un alert
+    alert(text || "(archivo vacío)");
   }
 
-  await downloadFile(`${kind}/download`, filename ?? `${kind}.txt`);
-}
+  //2. handler de descarga
+  const doDownload = async (kind: Kind, filename?: string) => {
 
-type AnyStatus = Status | PedidosStatusSummary;
+    if (kind === "pedidos") {
+      alert("Descarga no disponible para pedidos multi-archivo.");
+      return;
+    }
 
-/**Esto usamos para mostrar el texto de los datos del archivo dentro del Dropzone**/
-const renderDropzoneFooter = (
-  kind: Kind,
-  status?: AnyStatus,
-  isLoading?: boolean
-) => 
-{
+    await downloadFile(`${kind}/download`, filename ?? `${kind}.txt`);
+  }
 
-  // Por cambios del profesor agregamos un caso especial: pedidos multi-archivo
+  type AnyStatus = Status | PedidosStatusSummary;
+
+  /**Esto usamos para mostrar el texto de los datos del archivo dentro del Dropzone**/
+  const renderDropzoneFooter = (
+    kind: Kind,
+    status?: AnyStatus,
+    isLoading?: boolean
+  ) => {
+
+    // Por cambios del profesor agregamos un caso especial: pedidos multi-archivo
     if (kind === "pedidos") {
       const summary = status as PedidosStatusSummary | undefined;
 
@@ -256,15 +256,15 @@ const renderDropzoneFooter = (
       );
     }
 
-  const s = status as Status | undefined;
+    const s = status as Status | undefined;
 
-  return(
-    <>
-      <div className="text-xs text-muted-foreground">
-        {isLoading
-          ? "Cargando estado..."
-          : s?.exists
-            ? <>
+    return (
+      <>
+        <div className="text-xs text-muted-foreground">
+          {isLoading
+            ? "Cargando estado..."
+            : s?.exists
+              ? <>
                 Archivo actual:{" "}
                 <button
                   className="underline"
@@ -275,47 +275,47 @@ const renderDropzoneFooter = (
                 </button>
                 {" "}— {s.sizeBytes} bytes — {s.lastModified}
               </>
-            : "No se pudo recuperar el estado."}
-      </div>
+              : "No se pudo recuperar el estado."}
+        </div>
 
-      <div className="flex gap-3 mt-2">
-        <button
-          className="text-sm underline disabled:opacity-50 hover:cursor-pointer"
-          onClick={() => doPreview(kind)}
-          disabled={!s?.exists}
-        >
-          Ver primeras líneas
-        </button>
-        <button
-          className="text-sm underline disabled:opacity-50 hover:cursor-pointer"
-          onClick={() => doDownload(kind, s?.filename)}
-          disabled={!s?.exists}
-        >
-          Descargar
-        </button>
-      </div>
-    </>
-  );
-}
+        <div className="flex gap-3 mt-2">
+          <button
+            className="text-sm underline disabled:opacity-50 hover:cursor-pointer"
+            onClick={() => doPreview(kind)}
+            disabled={!s?.exists}
+          >
+            Ver primeras líneas
+          </button>
+          <button
+            className="text-sm underline disabled:opacity-50 hover:cursor-pointer"
+            onClick={() => doDownload(kind, s?.filename)}
+            disabled={!s?.exists}
+          >
+            Descargar
+          </button>
+        </div>
+      </>
+    );
+  }
 
-const renderDropzoneFooterOP = (
-  kind: Kind,
-  status?: Status,
-  isLoading?: boolean
-) => (
-  <>
-    <div className="text-xs text-muted-foreground font-bold">
-      {isLoading
-        ? "Cargando estado..."
-        : status?.exists
-          ? <>
+  const renderDropzoneFooterOP = (
+    kind: Kind,
+    status?: Status,
+    isLoading?: boolean
+  ) => (
+    <>
+      <div className="text-xs text-muted-foreground font-bold">
+        {isLoading
+          ? "Cargando estado..."
+          : status?.exists
+            ? <>
               ☑️ Ya se cargó un archivo de Operación Diaria - {kind}.
             </>
-          : "No se pudo recuperar el estado o no existe archivo."}
-    </div>
+            : "No se pudo recuperar el estado o no existe archivo."}
+      </div>
 
-  </>
-);
+    </>
+  );
 
   const form = useForm<FormValues>({
     resolver,
@@ -323,7 +323,7 @@ const renderDropzoneFooterOP = (
     mode: "onTouched",
   });
 
-  const {begin, simNow} = useRunSession();
+  const { begin, simNow } = useRunSession();
 
 
   const createPedido = useMutation({
@@ -344,7 +344,7 @@ const renderDropzoneFooterOP = (
 
       console.log(data);
 
-      if (error){
+      if (error) {
         //Si hubo error, vamos directamente al onError de más abajo
         throw error;
       }
@@ -354,15 +354,15 @@ const renderDropzoneFooterOP = (
 
 
     },
-    
+
     onSuccess: (data) => {
       toast.custom((t) => (
         <ToastCustom
           t={t}
-          message={data.message +"✅"}
+          message={data.message + "✅"}
           type="success"
         />),
-      { duration: 5000});
+        { duration: 5000 });
       form.reset({ clienteId: "", aeropuerto: "SKBO", cantidad: 1 });
 
       //Colocamos lo necesario en el hook
@@ -378,15 +378,15 @@ const renderDropzoneFooterOP = (
       const msg =
         (err as ApiError)?.message ??
         (err as Error)?.message ??
-      "Ocurrió un error.";
+        "Ocurrió un error.";
 
       toast.custom((t) => (
         <ToastCustom
           t={t}
-          message={msg+"❗"}
+          message={msg + "❗"}
           type="error"
         />),
-      { duration: 5000});
+        { duration: 5000 });
     },
   });
 
@@ -400,21 +400,19 @@ const renderDropzoneFooterOP = (
           <CardTitle className="text-blue-900">Cargas masivas</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Dropzone label="Carga masiva de vuelos" onFiles={(fs) => onUpload(fs[0], "vuelos")} 
-            footer = {renderDropzoneFooter("vuelos", vuelosStatus.data, vuelosStatus.isLoading)}/>
-          <Dropzone label="Carga masiva de husos horarios" onFiles={(fs) => onUpload(fs[0], "aereopuertos")} 
-            footer={renderDropzoneFooter("aereopuertos", husosStatus.data, husosStatus.isLoading)}/>
-          <Dropzone label="Carga masiva de cancelaciones" 
-          onFiles={
-            (fs) =>toast.custom((t) => (
-              <ToastCustom t={t} message={"No implementado archivo: "+fs[0]?.name +" no subido"} type="error" />),
-              { duration: 5000 }
-            )
-            }
-            footer={renderDropzoneFooter("cancelaciones", cancelacionesStatus.data, cancelacionesStatus.isLoading)}
-            />
-
-            
+          <Dropzone label="Carga masiva de vuelos" onFiles={(fs) => onUpload(fs[0], "vuelos")}
+            footer={renderDropzoneFooter("vuelos", vuelosStatus.data, vuelosStatus.isLoading)} />
+          <Dropzone label="Carga masiva de husos horarios" onFiles={(fs) => onUpload(fs[0], "aereopuertos")}
+            footer={renderDropzoneFooter("aereopuertos", husosStatus.data, husosStatus.isLoading)} />
+          <Dropzone
+            label="Carga masiva de cancelaciones"
+            onFiles={(fs) => onUpload(fs[0], "cancelaciones")}
+            footer={renderDropzoneFooter(
+              "cancelaciones",
+              cancelacionesStatus.data,
+              cancelacionesStatus.isLoading
+            )}
+          />
           <Dropzone label="Carga masiva de pedidos" onFiles={(fs) => handleFileUpload(fs[0], "pedidos/upload", "pedidos")}
             footer={renderDropzoneFooter("pedidos", pedidosStatus.data, pedidosStatus.isLoading)} />
         </CardContent>
@@ -514,7 +512,7 @@ const renderDropzoneFooterOP = (
               onFiles={(fs) => onUpload(fs[0], "operacionDiaria")}
               footer={renderDropzoneFooterOP("operacionDiaria", operacionDiariaStatus.data, operacionDiariaStatus.isLoading)}
             />
-            
+
           </CardContent>
         </Card>
       </div>

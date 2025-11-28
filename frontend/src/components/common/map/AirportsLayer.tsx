@@ -1,7 +1,7 @@
 // src/components/common/map/AirportsLayer.tsx
 import { useMemo } from "react";
 import { Marker } from "react-map-gl/maplibre";
-import AirportIcon from "@/assets/airport2.svg?react";
+import AirportIcon from "@/assets/airport3.svg?react";
 import { z } from "zod";
 
 export const AirportPointSchema = z.object({

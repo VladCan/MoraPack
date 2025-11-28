@@ -2,10 +2,11 @@ package pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.helpe
 
 import lombok.Builder;
 import lombok.Value;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VueloCancelado;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.ArriboExogeno;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.OcupacionAlmacen;
-
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,5 +34,6 @@ public class TEGParametros {
     Map<String, Integer> stockInicial = Map.of();
 
     @Builder.Default
-    Map<String,List<Integer>> vuelosCancelados = Map.of();
+    List<VueloCancelado> vuelosCancelados = new ArrayList<>();
+
 }

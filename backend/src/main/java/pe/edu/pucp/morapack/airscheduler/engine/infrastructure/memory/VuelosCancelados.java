@@ -2,123 +2,113 @@ package pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory;
 
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Vuelo;
 
-import java.time.Instant;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
+import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 public class VuelosCancelados {
 
-    // Mapa: idVuelo -> lista de días en que fue cancelado
-    private final Map<String, List<Integer>> canceladosMap = new HashMap<>();
+    // Ahora usamos SET para búsqueda O(1)
+    private final Map<String, Set<Integer>> canceladosMap = new HashMap<>();
 
+    // Lee el archivo y llena el mapa
     public void leerDatos(Scanner sc) {
         while (sc.hasNextLine()) {
             String linea = sc.nextLine().trim();
-            if (linea.isEmpty()) continue; // Ignorar líneas vacías
+            if (linea.isEmpty()) continue;
 
             try {
                 // Ejemplo: 05.EBCI-OYSN-08:38
                 String[] partes = linea.split("\\.");
                 if (partes.length != 2) continue;
 
-                int dia = Integer.parseInt(partes[0]); // Día del mes
-                String idVuelo = partes[1];            // "EBCI-OYSN-08:38"
+                int dia = Integer.parseInt(partes[0]);     // Día del mes
+                String idVuelo = partes[1];                // "EBCI-OYSN-08:38"
 
-                // Registrar día de cancelación
                 canceladosMap
-                        .computeIfAbsent(idVuelo, k -> new ArrayList<>())
+                        .computeIfAbsent(idVuelo, k -> new HashSet<>())
                         .add(dia);
 
             } catch (Exception e) {
-                System.err.println("Error procesando línea: " + linea + " → " + e.getMessage());
+                System.err.println("Error procesando línea: " + linea);
             }
         }
     }
 
-    public List<Integer> diasCancelado(Vuelo vuelo) {
-        if (vuelo == null) return List.of();
+    public Set<Integer> diasCancelado(Vuelo vuelo) {
+        if (vuelo == null) return Set.of();
 
         String idVuelo = String.format("%s-%s-%s",
                 vuelo.getOrigen(),
                 vuelo.getDestino(),
                 vuelo.getHoraOrigen().toString());
 
-        List<Integer> dias = canceladosMap.get(idVuelo);
-
-        return dias != null ? List.copyOf(dias) : List.of();
+        return canceladosMap.getOrDefault(idVuelo, Set.of());
     }
 
-    public Map<String, List<Integer>> getCanceladosMap() {
+    public Map<String, Set<Integer>> getCanceladosMap() {
         return canceladosMap;
     }
-    public void setCanceladosMap(Map<String, List<Integer>> mapa) {
+
+    public void setCanceladosMap(Map<String, Set<Integer>> mapa) {
         if (mapa != null) {
             canceladosMap.clear();
             canceladosMap.putAll(mapa);
         }
     }
 
-public List<String> obtenerVuelosCancelados(Instant wStart, Instant wEnd) {
-    if (wStart == null || wEnd == null) return List.of();
+    // Tu método optimizado
+    public List<VueloCancelado> obtenerVuelosCancelados(Instant wStart, Instant wEnd) {
 
-    ZoneId zone = ZoneOffset.UTC;
-    DateTimeFormatter fFecha = DateTimeFormatter.ofPattern("yyyyMMdd").withZone(zone);
-    DateTimeFormatter fHora = DateTimeFormatter.ofPattern("HHmm").withZone(zone);
+        if (wStart == null || wEnd == null) return List.of();
 
-    List<String> resultado = new ArrayList<>();
+        ZoneId zone = ZoneOffset.UTC;
+        List<VueloCancelado> resultado = new ArrayList<>();
 
-    for (Map.Entry<String, List<Integer>> entry : canceladosMap.entrySet()) {
-        String idVuelo = entry.getKey(); // Ejemplo: EBCI-OYSN-08:38
-        List<Integer> dias = entry.getValue();
+        for (Map.Entry<String, Set<Integer>> entry : canceladosMap.entrySet()) {
 
-        // Separar origen, destino y hora
-        String[] partes = idVuelo.split("-");
-        if (partes.length < 3) continue;
+            String idVuelo = entry.getKey();  // Ejemplo: "EBCI-OYSN-08:38"
+            Set<Integer> dias = entry.getValue();
+            if (dias == null || dias.isEmpty())
+                continue;
 
-        String origen = partes[0];
-        String destino = partes[1];
-        String horaStr = partes[2];
+            String[] partes = idVuelo.split("-");
+            if (partes.length < 3)
+                continue;
 
-        LocalTime hora;
-        try {
-            hora = LocalTime.parse(horaStr);
-        } catch (Exception e) {
-            continue; // formato inválido
-        }
+            String origen = partes[0];
+            String destino = partes[1];
 
-        // Recorremos el rango de fechas de wStart a wEnd
-        Instant cursor = wStart;
-        while (!cursor.isAfter(wEnd)) {
-            var fechaZ = cursor.atZone(zone);
-            int diaActual = fechaZ.getDayOfMonth();
-
-            if (dias.contains(diaActual)) {
-                // Crear instante exacto del vuelo cancelado
-                Instant salida = fechaZ
-                        .withHour(hora.getHour())
-                        .withMinute(hora.getMinute())
-                        .withSecond(0)
-                        .toInstant();
-
-                String idInstancia = String.format("%s-%s-%s-%s",
-                        origen,
-                        destino,
-                        fFecha.format(salida),
-                        fHora.format(salida));
-
-                resultado.add(idInstancia);
+            LocalTime hora;
+            try {
+                hora = LocalTime.parse(partes[2]);
+            } catch (Exception e) {
+                continue;
             }
 
-            cursor = cursor.plus(1, ChronoUnit.DAYS);
+            // 👇 ESTE ES EL MES REAL: lo obtenemos de la ventana.
+            for (Instant cursor = wStart; !cursor.isAfter(wEnd); cursor = cursor.plus(1, ChronoUnit.DAYS)) {
+
+                LocalDate fecha = cursor.atZone(zone).toLocalDate();
+
+                // Verificamos si el día del mes coincide
+                if (!dias.contains(fecha.getDayOfMonth()))
+                    continue;
+
+                // Construimos el instante real en ese mes/año
+                Instant instante = fecha.atTime(hora).atZone(zone).toInstant();
+
+                resultado.add(new VueloCancelado(
+                        origen,
+                        destino,
+                        fecha,
+                        hora,
+                        instante
+                ));
+            }
         }
+
+        return resultado;
     }
 
-    return resultado;
 }
-
-}
-
