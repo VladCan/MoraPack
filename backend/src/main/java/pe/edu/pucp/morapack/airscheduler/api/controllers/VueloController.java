@@ -1,5 +1,6 @@
 package pe.edu.pucp.morapack.airscheduler.api.controllers;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.MediaType;
@@ -45,6 +46,7 @@ public class VueloController {
         public String llegadaUtc;
     }
 
+    @RegisterForReflection
     public static final class CancelarVueloResponse {
         public boolean cancelled;
         public String message;

@@ -5,10 +5,8 @@ import {
   Plane,
   Package,
   Filter,
-  MapPin,
   X,
   Check,
-  ChevronDown,
   Search,
   Calendar,
   Trash2,
@@ -80,11 +78,6 @@ export default function ToolsPanel({
     limitado: false,
     saturado: false,
   });
-
-  const [region, setRegion] = useState<string | undefined>(undefined);
-  const [ciudad, setCiudad] = useState<string | undefined>(undefined);
-
-  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const [vuelo, setVuelo] = useState<VueloDTO | null>(null);
   const [almacen, setAlmacen] = useState<string | null>(null);
@@ -406,8 +399,6 @@ export default function ToolsPanel({
   const handleClear = () => {
     setInicio(undefined);
     setFin(undefined);
-    setRegion(undefined);
-    setCiudad(undefined);
     setNiveles({ disponible: true, limitado: false, saturado: false });
     setVuelo(null);
     setAlmacen(null);
@@ -731,16 +722,6 @@ export default function ToolsPanel({
               Controles de simulación
             </h3>
           </div>
-          <button
-            className="inline-flex items-center gap-1 text-xs text-foreground/90 hover:opacity-80"
-            onClick={() => setShowAdvanced((s) => !s)}
-          >
-            <MapPin className="h-4 w-4 text-primary" />
-            {showAdvanced ? "Ocultar filtros" : "Más filtros"}
-            <ChevronDown
-              className={`h-4 w-4 transition-transform ${showAdvanced ? "rotate-180" : ""}`}
-            />
-          </button>
         </div>
 
         {/* contenido */}
@@ -803,45 +784,6 @@ export default function ToolsPanel({
               onClick={() => toggleNivel("saturado")}
             />
           </div>
-
-          {/* filtros avanzados */}
-          {showAdvanced && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              <Field label="Región">
-                <Select
-                  value={region ?? "all"}
-                  onValueChange={(v) => setRegion(v === "all" ? undefined : v)}
-                >
-                  <SelectTrigger className="dense-select">
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent className={GLASS_SOFT}>
-                    <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="andina">Andina</SelectItem>
-                    <SelectItem value="amazonica">Amazónica</SelectItem>
-                    <SelectItem value="costa">Costa</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field label="Ciudad">
-                <Select
-                  value={ciudad ?? "all"}
-                  onValueChange={(v) => setCiudad(v === "all" ? undefined : v)}
-                >
-                  <SelectTrigger className="dense-select">
-                    <SelectValue placeholder="Todas" />
-                  </SelectTrigger>
-                  <SelectContent className={GLASS_SOFT}>
-                    <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="lima">Lima</SelectItem>
-                    <SelectItem value="cusco">Cusco</SelectItem>
-                    <SelectItem value="piura">Piura</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-          )}
 
           {/* acciones */}
           <div className="flex items-center justify-end gap-2 pt-1">
