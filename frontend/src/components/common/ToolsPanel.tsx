@@ -89,10 +89,10 @@ export default function ToolsPanel({
   const setPedido = setSelectedPedido;
   const { data: airportsData } = useAirports();
 
-  // Obtener vuelos planificados del día siguiente (solo en modo simulacion/operacion semanal)
-  // IMPORTANTE: Solo consumir el endpoint si estamos en modo simulacion
-  // Si no estamos en simulacion, no consumir ningún endpoint (evitar consumo innecesario)
-  const shouldFetchScheduled = variant === "simulacion" && !!currentRunId;
+  // Obtener vuelos planificados del día siguiente (Simulación semanal y Colapso comparten la vista)
+  // IMPORTANTE: Solo consumir el endpoint si estamos en estos modos para evitar consumo innecesario
+  const isSimulacionLike = variant === "simulacion" || variant === "colapso";
+  const shouldFetchScheduled = isSimulacionLike && !!currentRunId;
   
   // Construir el endpoint con el runId si está disponible
   const scheduledEndpoint = useMemo(() => {
@@ -107,7 +107,6 @@ export default function ToolsPanel({
   // Debug desactivado
   
   const vuelosProgramados = useMemo<VueloDTO[]>(() => {
-    // Solo procesar si estamos en modo simulacion (operacion semanal)
     if (!shouldFetchScheduled) {
       return [];
     }
@@ -686,8 +685,8 @@ export default function ToolsPanel({
           value={vuelo}
           items={vuelosActivos}
           onSelect={setVuelo}
-          scheduledFlights={variant === "simulacion" ? (vuelosProgramados || []) : undefined}
-          showScheduledToggle={variant === "simulacion"}
+          scheduledFlights={isSimulacionLike ? (vuelosProgramados || []) : undefined}
+          showScheduledToggle={isSimulacionLike}
           variant={variant}
           simNowUtc={simNowUtc}
           cancelarVuelo={cancelarVuelo}
