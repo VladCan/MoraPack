@@ -871,7 +871,8 @@ public class RunManager {
                 if (isCancelled(id)) break;
 
                 // 6. Guardar solución para la siguiente ventana y sincronizar ocupación
-                actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
+                //actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
+                ocupacionesPorRun.put(id, ocupacionPorAeropuerto);
                 solucionesAnteriores.put(id, solucionOptima);
 
                 boolean SlaOk = VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46), vuelosMap);
@@ -1091,6 +1092,7 @@ public class RunManager {
 
                 /// 6. Guardar solución para la siguiente ventana y sincronizar ocupación
                 actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
+
                 solucionesAnteriores.put(id, solucionOptima);
 
                 /// 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
