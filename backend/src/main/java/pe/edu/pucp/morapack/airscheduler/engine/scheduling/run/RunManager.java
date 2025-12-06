@@ -799,8 +799,8 @@ public class RunManager {
 
                 // 2. Obtener pedidos de la ventana actual (ya actualizados)
                 cargarPedidosDesdeLector(id, pedidosCargados, wEnd);
-                //VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wEnd);
-                VentanaPedidos ventana = pedidosCargados.acumuladoEntre(wStart,wEnd);
+                VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wEnd);
+                //VentanaPedidos ventana = pedidosCargados.acumuladoEntre(wStart,wEnd);
                 List<Pedido> pedidosVentana = ventana.pedidos();
 
 
@@ -1655,54 +1655,92 @@ public class RunManager {
      * Extrae los vuelos que caen dentro de la ventana temporal especificada,
      * incluyendo el manifiesto de carga (qué pedidos van en cada vuelo)
      */
+
+
     private List<Object> extraerVuelosDeVentana(SolucionProgramacion solucion, Instant wStart, Instant wEnd) {
         List<Object> vuelosVentana = new ArrayList<>();
-        
+
         if (solucion == null || solucion.getCargaPorVuelo() == null) {
             return vuelosVentana;
         }
-        
+
         CargaPorVuelo cargaPorVuelo = solucion.getCargaPorVuelo();
-        
-        // Iterar sobre todos los vuelos asignados
+
+        // Usamos un set para no repetir vuelos
+        Set<VueloProgramadoId> vuelosSeleccionados = new LinkedHashSet<>();
+
+        // 1) Vuelos que salen dentro de la ventana (lo que ya hacías)
         for (Map.Entry<VueloProgramadoId, Integer> entry : cargaPorVuelo.getAsignado().entrySet()) {
             VueloProgramadoId vueloId = entry.getKey();
-            int cantidadAsignada = entry.getValue();
-            
-            // Solo incluir vuelos que tienen carga asignada
-            if (cantidadAsignada > 0) {
-                // Verificar si el vuelo cae dentro de la ventana temporal
-                // Un vuelo cae en la ventana si su salida está dentro de [wStart, wEnd)
-                if (vueloId.getSalidaUtc() != null && 
-                    !vueloId.getSalidaUtc().isBefore(wStart) && 
-                    vueloId.getSalidaUtc().isBefore(wEnd)) {
-                    
-                    // Generar ID único para el vuelo
-                    String vueloIdStr = vueloId.getOrigen() + "-" + 
-                                       vueloId.getDestino() + "-" + 
-                                       vueloId.getSalidaUtc().toString().replace(":", "");
-                    
-                    // Crear DTO del vuelo para el frontend
-                    Map<String, Object> vueloDTO = new HashMap<>();
-                    vueloDTO.put("id", vueloIdStr);
-                    vueloDTO.put("origen", vueloId.getOrigen());
-                    vueloDTO.put("destino", vueloId.getDestino());
-                    vueloDTO.put("salidaUtc", vueloId.getSalidaUtc().toString());
-                    vueloDTO.put("llegadaUtc", vueloId.getLlegadaUtc() != null ? vueloId.getLlegadaUtc().toString() : null);
-                    vueloDTO.put("cantidadAsignada", cantidadAsignada);
-                    vueloDTO.put("capacidad", cargaPorVuelo.capacidad(vueloId));
-                    vueloDTO.put("residual", cargaPorVuelo.residual(vueloId));
-                    vueloDTO.put("costo", vueloId.getCosto());
-                    
-                    // NUEVO: Extraer manifiesto de carga (qué pedidos van en este vuelo)
-                    List<Map<String, Object>> carga = extraerCargaDelVuelo(solucion, vueloId);
-                    vueloDTO.put("carga", carga);
-                    
-                    vuelosVentana.add(vueloDTO);
+            Instant salida = vueloId.getSalidaUtc();
+
+            if (salida != null &&
+                    !salida.isBefore(wStart) &&
+                    salida.isBefore(wEnd)) {
+                vuelosSeleccionados.add(vueloId);
+            }
+        }
+
+        // 2) Para cada ruta cuyo PRIMER TRAMO despega en la ventana,
+        //    agregamos TODOS los tramos (toda la cadena de conexiones)
+        Map<Integer, PlanPedido> planPorPedido = solucion.getPlanPorPedido();
+        if (planPorPedido != null) {
+            for (PlanPedido plan : planPorPedido.values()) {
+                if (plan == null || plan.getRutas() == null) continue;
+
+                for (RutaAsignada ruta : plan.getRutas()) {
+                    List<TramoAsignado> tramos = ruta.getTramos();
+                    if (tramos == null || tramos.isEmpty()) continue;
+
+                    VueloProgramadoId primerVuelo = tramos.get(0).getVuelo();
+                    Instant salidaPrimera = primerVuelo != null ? primerVuelo.getSalidaUtc() : null;
+
+                    // La ruta "nace" en esta ventana
+                    if (salidaPrimera != null &&
+                            !salidaPrimera.isBefore(wStart) &&
+                            salidaPrimera.isBefore(wEnd)) {
+
+                        for (TramoAsignado tramo : tramos) {
+                            if (tramo.getCantidad() <= 0) continue;
+                            VueloProgramadoId vRuta = tramo.getVuelo();
+                            if (vRuta != null) {
+                                vuelosSeleccionados.add(vRuta);
+                            }
+                        }
+                    }
                 }
             }
         }
-        
+
+        // 3) Construir DTO para cada vuelo seleccionado
+        for (VueloProgramadoId vueloId : vuelosSeleccionados) {
+            int cantidadAsignada = cargaPorVuelo
+                    .getAsignado()
+                    .getOrDefault(vueloId, 0);
+            if (cantidadAsignada <= 0) continue;
+
+            String vueloIdStr = vueloId.getOrigen() + "-" +
+                    vueloId.getDestino() + "-" +
+                    vueloId.getSalidaUtc().toString().replace(":", "");
+
+            Map<String, Object> vueloDTO = new HashMap<>();
+            vueloDTO.put("id", vueloIdStr);
+            vueloDTO.put("origen", vueloId.getOrigen());
+            vueloDTO.put("destino", vueloId.getDestino());
+            vueloDTO.put("salidaUtc", vueloId.getSalidaUtc().toString());
+            vueloDTO.put("llegadaUtc", vueloId.getLlegadaUtc() != null ? vueloId.getLlegadaUtc().toString() : null);
+            vueloDTO.put("cantidadAsignada", cantidadAsignada);
+            vueloDTO.put("capacidad", cargaPorVuelo.capacidad(vueloId));
+            vueloDTO.put("residual", cargaPorVuelo.residual(vueloId));
+            vueloDTO.put("costo", vueloId.getCosto());
+
+            // Manifiesto de carga (ya lo tienes implementado)
+            List<Map<String, Object>> carga = extraerCargaDelVuelo(solucion, vueloId);
+            vueloDTO.put("carga", carga);
+
+            vuelosVentana.add(vueloDTO);
+        }
+
         return vuelosVentana;
     }
     

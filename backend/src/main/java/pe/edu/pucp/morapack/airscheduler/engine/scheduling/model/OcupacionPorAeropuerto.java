@@ -52,6 +52,31 @@ public class OcupacionPorAeropuerto {
         this.aeropuertosMap = original.aeropuertosMap;
     }
 
+    /// 2 Métodos para no usar Journal en ALNS:
+
+    public OcupacionPorAeropuerto copiaProfunda() {
+        return new OcupacionPorAeropuerto(this);
+    }
+
+    public void copiarDesde(OcupacionPorAeropuerto original) {
+        // Copiar eventos
+        this.eventos.clear();
+        for (Map.Entry<String, TreeMap<Instant, Integer>> entry : original.eventos.entrySet()) {
+            this.eventos.put(entry.getKey(), new TreeMap<>(entry.getValue()));
+        }
+
+        // Copiar checkpoints
+        this.checkpoints.clear();
+        for (Map.Entry<String, TreeMap<Instant, Integer>> entry : original.checkpoints.entrySet()) {
+            this.checkpoints.put(entry.getKey(), new TreeMap<>(entry.getValue()));
+        }
+
+        // El aeropuertosMap debería ser el mismo "tipo" siempre.
+        // Si quieres ser explícito:
+        this.aeropuertosMap = original.aeropuertosMap;
+    }
+
+
     ///
     /// Funciones principales: disponible, ocupacion, maxReservable, reservar, liberar.
     ///

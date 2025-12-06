@@ -45,6 +45,11 @@ public class ALNS {
         double costoMejor = costoActual;
         double temperatura = costoActual * startTemperatureRatio;
 
+        /// Para ya no usar commit y rollback
+
+        OcupacionPorAeropuerto ocupacionBase = this.ocupacionPorAeropuerto.copiaProfunda();
+        OcupacionPorAeropuerto mejorOcupacion = this.ocupacionPorAeropuerto.copiaProfunda();
+
         int iteracionesSinMejora = 0;
 
         System.out.println(">> Costo Inicial: " + String.format("%,.0f", costoActual));
@@ -61,8 +66,17 @@ public class ALNS {
             StringBuilder sb = new StringBuilder();
             sb.append(String.format("[Iter %02d] ", iter));
 
+            //SolucionProgramacion solucionCandidata = new SolucionProgramacion(solucionBase);
+            //Journal journal = new Journal(ocupacionPorAeropuerto);
+
             SolucionProgramacion solucionCandidata = new SolucionProgramacion(solucionBase);
-            Journal journal = new Journal(ocupacionPorAeropuerto);
+
+            // Copia de la ocupación base para esta iteración
+            OcupacionPorAeropuerto ocupacionCandidata = ocupacionBase.copiaProfunda();
+
+            // El Journal trabaja SOBRE la ocupación candidata,
+            // no sobre la global:
+            Journal journal = new Journal(ocupacionCandidata);
 
             DestructionOperator destrOp = destructions.get(rnd.nextInt(destructions.size()));
             RepairOperator repairOp = repairs.get(rnd.nextInt(repairs.size()));
@@ -98,13 +112,15 @@ public class ALNS {
             }
 
             if (aceptar) {
-                journal.commit();
                 solucionBase = solucionCandidata;
+                ocupacionBase = ocupacionCandidata; //Esto es la clave
                 costoActual = costoCandidato;
                 sb.append(String.format("-> %s (%,.0f)", estadoDecision, costoActual));
 
                 if (esMejorGlobal) {
                     mejorSolucion = new SolucionProgramacion(solucionBase);
+                    // Guardamos una copia de la ocupación asociada a la mejor solución
+                    mejorOcupacion = ocupacionBase.copiaProfunda();
                     costoMejor = costoCandidato;
                     iteracionesSinMejora = 0; 
                     sb.append(" **R**");
@@ -112,7 +128,6 @@ public class ALNS {
                     iteracionesSinMejora++;
                 }
             } else {
-                journal.rollback();
                 iteracionesSinMejora++;
                 sb.append(String.format("-> X  (%,.0f)", costoCandidato));
             }
@@ -125,6 +140,8 @@ public class ALNS {
                 break;
             }
         }
+
+        this.ocupacionPorAeropuerto.copiarDesde(mejorOcupacion);
         
         long tTotal = (System.nanoTime() - tInicioGlobal) / 1_000_000;
         System.out.println(">>> FIN. Tiempo: " + tTotal + "ms. Mejor Costo: " + String.format("%,.0f", costoMejor));
