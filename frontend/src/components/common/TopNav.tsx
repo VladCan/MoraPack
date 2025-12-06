@@ -54,7 +54,8 @@ export default function TopNav() {
   const running = status === "running" && !!runId;
   
   //Acá expone connect(url, handlers) -> () => void
-  const { simNowUtc, windows, finished, wallStartUtc } = useRunSSE(
+  // --- CORRECCIÓN: Usamos finishedReason en lugar de finished ---
+  const { simNowUtc, windows, finishedReason, wallStartUtc } = useRunSSE(
     status === "running" && runId ? runId : undefined
   );
 
@@ -77,9 +78,10 @@ export default function TopNav() {
     }
   }, [windows, setWindow]);
 
+  // --- CORRECCIÓN: Chequeamos finishedReason ---
   useEffect(() => {
-    if (finished) end("finished");
-  }, [finished, end]);
+    if (finishedReason) end("finished");
+  }, [finishedReason, end]);
 
   //Para finalizar/cancelar el run:
   const handleCancelRun = async () => {
@@ -243,7 +245,8 @@ export default function TopNav() {
             <div className="hidden md:block">
               <ClockSwitcher
                 running={running}
-                finished={!!finished}
+                // --- CORRECCIÓN: Convertimos finishedReason a booleano ---
+                finished={!!finishedReason}
                 runNow={simNowUtc ? new Date(simNowUtc) : null}
                 runStart={wallStartUtc ? new Date(wallStartUtc) : null}
                 onCancel={handleCancelRun}
