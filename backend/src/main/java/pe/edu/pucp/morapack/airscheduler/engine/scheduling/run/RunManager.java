@@ -10,10 +10,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
-import java.io.BufferedReader;
-import java.time.*;
-import java.time.format.DateTimeFormatter;
-
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -103,8 +99,7 @@ public class RunManager {
     /**
      * Obtiene el último run activo (con estado RUNNING) de cualquier tipo.
      * Útil para obtener vuelos programados cuando no hay run de operación activo.
-     * 
-     * @return ID del último run activo, o null si no hay ninguno
+     * * @return ID del último run activo, o null si no hay ninguno
      */
     public String getLastActiveRunId() {
         // Buscar el último run con estado RUNNING
@@ -131,10 +126,6 @@ public class RunManager {
     }
 
     public void pushOrder(String runId, Pedido p){
-        //queues.computeIfAbsent(runId, k -> new ConcurrentLinkedQueue<>()).add(p);
-
-        ///Dejamos esto así solo para depuración (ver que la cola se actualiza en tiempo real). Cuando n
-        ///ya no sea necesario, descomentar lo de arribita y borra esto de abajo:
         var queue = queues.computeIfAbsent(runId, k -> new ConcurrentLinkedQueue<>());
         queue.add(p);
 
@@ -167,30 +158,6 @@ public class RunManager {
     public String ensureOperacionStarted(){
         String existing = operacionRunId.get();
         if (existing != null) return existing;
-
-        /*
-        //Evita que 2 primeros pedidos creen 2 runs. (Para efectos del curso nunca pasará, pero porseaca)
-        synchronized (this){
-            existing = operacionRunId.get();
-            if (existing != null) return existing;
-
-            RunId runId = RunId.create();
-
-            Set<String> sedes = new HashSet<>(Arrays.asList("SPIM", "EBCI", "UBBB"));
-            //Pd: Tenemos que usar minutos, en la clase RunConfig este inicializador es de 1 hora.
-            RunConfig config = RunConfig.operacion(sedes);
-
-            addContext(runId.value(), new RunContext(runId, config));
-            operacionRunId.set(runId.value());
-
-            System.out.println("Revisa: http://localhost:8080/runs/" + runId.value() + "/stream ");
-
-            start(runId, config);
-
-            return runId.value();
-        }
-        */
-
         return null;
     }
 
@@ -426,16 +393,6 @@ public class RunManager {
 
         if (fechaOD == null || pedidos == null) return;
 
-        /// Lo que está comentado solo anclaba el dd/mm/aaaa
-        /*
-        LocalDate actual = fechaOD.toLocalDate();
-        for (Pedido p : pedidos){
-            if (p == null) continue;
-            LocalTime horaOriginal = p.getFecha().toLocalTime();
-            p.setFecha(LocalDateTime.of(actual, horaOriginal));
-        }
-        */
-
         /// Esto ancla TODA la fecha (como en crearPedido de PedidosController)
         for (Pedido p : pedidos){
             if (p == null) continue;
@@ -470,14 +427,17 @@ public class RunManager {
     private final Map<String, java.util.concurrent.CopyOnWriteArraySet<RunListener>> listeners
             = new java.util.concurrent.ConcurrentHashMap<>();
 
-    // ---- Listener (para SSE). Podemos dejar NOOP por ahora.
+    // ---- Listener (para SSE) --- MODIFICADO para soportar Loading
     public interface RunListener {
         void onWindow(WindowPacket packet);
         void onFinished(String runId, StopReason reason);
+        void onLoading(String runId, String message); // NUEVO
     }
+    
     public static final RunListener NOOP_LISTENER = new RunListener() {
         @Override public void onWindow(WindowPacket packet) {}
         @Override public void onFinished(String runId, StopReason reason) {}
+        @Override public void onLoading(String runId, String message) {} // NUEVO
     };
 
 
@@ -506,83 +466,78 @@ public class RunManager {
     }
 
 
-    public void start (RunId runId, RunConfig config, RunListener listener) {
+    public void start(RunId runId, RunConfig config, RunListener listener) {
         Objects.requireNonNull(runId, "runId");
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(listener, "listener");
 
         final String id = runId.value();
+        
+        // 1. Registrar Listeners
         listeners.computeIfAbsent(id, k -> new java.util.concurrent.CopyOnWriteArraySet<>());
-
-        //Por si se pasa un listener como parámetro
         if (listener != null && listener != NOOP_LISTENER) {
             registerListener(runId, listener);
         }
 
-        states.put(id, RunState.RUNNING);
+        // 2. Estado Inicial: LOADING (Cargando archivos...)
+        states.put(id, RunState.LOADING);
+        
+        // 3. Inicializar Flags de Control
         paused.put(id, new AtomicBoolean(false));
         cancelled.put(id, new AtomicBoolean(false));
         forcePlanPorRun.put(id, new AtomicBoolean(false));
 
+        // Flag para detectar ruptura de SLA (Colapso)
         final AtomicBoolean slaFlag = slaBroken.computeIfAbsent(id, k -> new AtomicBoolean(false));
         slaFlag.set(false);
 
+        // 4. Ejecución Asíncrona
         executor.submit(() -> {
-            try{
-                switch (config.scenario()){
-                    case OPERACION ->
-                        runOperacion(runId, config);
-
-                    case SIM_SEMANAL, COLAPSO ->
-                        runSimulacion(runId, config);
-
+            try {
+                // Delegar al método específico según escenario
+                switch (config.scenario()) {
+                    case OPERACION -> runOperacion(runId, config);
+                    case SIM_SEMANAL, COLAPSO -> runSimulacion(runId, config);
                     default -> throw new IllegalStateException("Unexpected value: " + config.scenario());
                 }
 
-                System.out.println("Salí del bucle, mi id es:" + id);
+                // --- Lógica Post-Ejecución (Cuando el bucle while termina) ---
 
+                System.out.println("Salí del bucle de simulación, runId: " + id);
 
-                firstExecution = true;
-
-                if (firstExecution) {
-                    System.out.println("Ahora firstExecution es:" + firstExecution);
-                }
-
-
+                // Determinar la razón de finalización
                 if (slaFlag.get()) {
-                    // Fin por colapso
+                    // Terminó por Colapso Logístico
                     states.put(id, RunState.COMPLETED);
                     broadcastFinished(id, StopReason.COLAPSO);
-                }
+                } 
                 else if (cancelled.get(id).get()) {
-                    // Fin por cancelación manual
-                    states.put(id, RunState.COMPLETED);
-                    System.out.println("Emitiendo StopReason.MANUAL" + id);
+                    // Terminó por Cancelación Manual del Usuario
+                    states.put(id, RunState.COMPLETED); // O STOPPED, según prefieras
+                    System.out.println("Emitiendo StopReason.MANUAL para " + id);
                     broadcastFinished(id, StopReason.MANUAL);
-                }
+                } 
                 else {
-                    // Fin normal
+                    // Terminó Naturalmente (Fin del horizonte de tiempo)
                     states.put(id, RunState.COMPLETED);
                     broadcastFinished(id, StopReason.FIN_DE_RANGO);
                 }
 
-
-
-                // Limpiamos
-                // Solución rápida:
+                // Limpieza de referencias pesadas (GC friendly)
                 aeropuertosMap = null;
                 vuelosMap = null;
                 pedidosCargados = null;
 
-            }
-            catch (Throwable e){
+            } catch (Throwable e) {
+                // Manejo de Errores no controlados
+                System.err.println("Error fatal en el run " + id + ": " + e.getMessage());
+                e.printStackTrace();
                 states.put(id, RunState.FAILED);
                 broadcastFinished(id, StopReason.ERROR);
-            }
-            finally {
+            } finally {
+                // Limpieza final del estado en el RunManager
                 cleanupRunState(id);
             }
-
         });
     }
 
@@ -702,20 +657,21 @@ public class RunManager {
 
     /// Funciones para cada escenario.
 
-    /// 1. Run de Simulación (CON LOOKAHEAD)
-    private void runSimulacion(RunId runId, RunConfig config){
-        System.out.println("Estamos en SIM SEMANAL (Con Lookahead)");
+    /// 1. Run de Simulación (CON LOOKAHEAD & LOADING STATE)
+    private void runSimulacion(RunId runId, RunConfig config) {
+        System.out.println("Estamos en SIM SEMANAL (Con Lookahead & Loading State)");
 
         final String id = runId.value();
         final AtomicBoolean slaFlag = slaBroken.computeIfAbsent(id, k -> new AtomicBoolean(false));
         slaFlag.set(false);
 
-        // 1. Calcular Buffer de Anticipación
-        // Cuánto tiempo simulado 'consume' la ejecución real del algoritmo (30s).
+        // 1. Notificar inicio de carga
+        broadcastLoading(id, "Preparando simulación...");
+
+        // 2. Calcular Buffer de Anticipación
         Duration simulatedBuffer = PLANNING_LATENCY.multipliedBy((long) config.speed());
         System.out.println("[RunManager] Buffer de anticipación calculado: " + simulatedBuffer);
 
-        // wStart: Inicio de la ventana de simulación actual
         Instant wStart = config.fechaInicio();
         
         // wEmit: Fin de la ventana, momento en que el usuario debe recibir el resultado
@@ -727,8 +683,32 @@ public class RunManager {
         System.out.println("[RunManager] Config: fechaInicio=" + config.fechaInicio() + ", fechaFin=" + config.fechaFin());
         System.out.println("[RunManager] Primera ventana de emisión: " + wEmit);
 
-        // Inicializar lector una sola vez
+        // =================================================================================
+        // 🛑 FASE DE CARGA PESADA (LOADING)
+        // =================================================================================
+        System.out.println("[RunManager] Estado LOADING: Inicializando lectores y catálogos...");
+        
+        long tLoadStart = System.currentTimeMillis();
+
+        // Notificar al usuario que estamos leyendo archivos grandes
+        broadcastLoading(id, "Procesando archivos de pedidos...");
         inicializarLectorMultiArchivo(id, wStart); 
+        
+        broadcastLoading(id, "Cargando catálogos de vuelos y aeropuertos...");
+        inicializarCatalogos(config.scenario());
+
+        long tLoadEnd = System.currentTimeMillis();
+        System.out.println("[RunManager] Carga completada en " + (tLoadEnd - tLoadStart) + "ms.");
+
+        // =================================================================================
+        // 🚀 TRANSICIÓN A RUNNING
+        // =================================================================================
+        if (isCancelled(id)) return; // Si cancelaron mientras cargaba
+
+        states.put(id, RunState.RUNNING);
+        
+        // =================================================================================
+
         List<VueloCancelado> vuelosCanceladosTeg = new ArrayList<>();
 
         while (!isCancelled(id) && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
@@ -740,8 +720,6 @@ public class RunManager {
             if (isCancelled(id)) break;
 
             if (firstExecution){ System.out.println("Soy true"); }
-
-            inicializarCatalogos(config.scenario());
 
             // Verificar idempotencia (ventanas ya enviadas)
             String windowIdISO = wStart.toString();
@@ -902,7 +880,6 @@ public class RunManager {
             ImpresorSolucion.imprimirUltimaPlanificacion(ultimaPlan, reportePath.toString(), lastWStart);
         }
     }
-
     /// 2. Run de Operación Diaria
     private void runOperacion(RunId runId, RunConfig config){
         final String id = runId.value();
@@ -1279,7 +1256,7 @@ public class RunManager {
                     // 3) CARGA EN VUELOS: revertir asignaciones por tramo
                     /// Igual sospecho que esto es innecesario, ya que el vuelo se va a cancelar xd
                     for (TramoAsignado t : tr) {
-                        int qTramo = t.getCantidad();                      // usa la cantidad efectiva del tramo
+                        int qTramo = t.getCantidad();                       // usa la cantidad efectiva del tramo
                         if (qTramo != 0) {
                             solucionAnterior.getCargaPorVuelo().asignar(t.getVuelo(), -qTramo);
                         }
@@ -1341,6 +1318,12 @@ public class RunManager {
 
         var set = listeners.getOrDefault(pkt.runId, new java.util.concurrent.CopyOnWriteArraySet<>());
         set.forEach(l -> safe(() -> l.onWindow(pkt)));
+    }
+
+    // Nuevo Helper para Loading
+    private void broadcastLoading(String runId, String message) {
+        var set = listeners.getOrDefault(runId, new java.util.concurrent.CopyOnWriteArraySet<>());
+        set.forEach(l -> safe(() -> l.onLoading(runId, message)));
     }
 
     private void broadcastFinished(String runId, StopReason reason) {
@@ -1420,9 +1403,9 @@ public class RunManager {
     }
     
     private void actualizarOcupacionDesdeSolucion(String runId,
-                                                  SolucionProgramacion solucionOptima,
-                                                  List<OcupacionAlmacen> reservasPrevias,
-                                                  Map<String, List<ArriboExogeno>> arribosEnVuelo) {
+                                                                  SolucionProgramacion solucionOptima,
+                                                                  List<OcupacionAlmacen> reservasPrevias,
+                                                                  Map<String, List<ArriboExogeno>> arribosEnVuelo) {
         OcupacionPorAeropuerto nuevaOcupacion = construirOcupacionDesdeSolucion(solucionOptima);
         if (reservasPrevias != null && !reservasPrevias.isEmpty()) {
             for (OcupacionAlmacen reserva : reservasPrevias) {
@@ -1883,8 +1866,7 @@ public class RunManager {
      * Obtiene todos los vuelos planificados del día siguiente desde el tiempo actual de simulación.
      * Incluye vuelos planificados incluso si ya despegaron o no, siempre que su salida esté
      * dentro de las próximas 24 horas desde el tiempo actual.
-     * 
-     * @param runId ID del run para obtener la solución y el tiempo actual
+     * * @param runId ID del run para obtener la solución y el tiempo actual
      * @return Lista de vuelos planificados (DTOs) sin límite de cantidad
      */
     public List<Map<String, Object>> getScheduledFlightsNextDay(String runId) {
@@ -2001,7 +1983,4 @@ public class RunManager {
 
         return resultado;
     }
-
-
-
 }

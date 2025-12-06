@@ -75,9 +75,22 @@ export default function Simulacion() {
     return map;
   }, [airports]);
 
-  // Conectar al SSE
+  // Conectar al Session Context
   const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows, selectedPedido } = useRunSession();
-const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
+  
+  // --- MODIFICACIÓN CLAVE AQUÍ ---
+  // Usamos el nuevo hook actualizado con soporte para estados de carga
+  const { 
+    runState,         // LOADING, RUNNING, ETC
+    loadingMessage,   // Mensaje del backend ("Leyendo archivo...")
+    loadingProgress,  // Porcentaje 0-100
+    simNowUtc, 
+    airportOccupancy, 
+    finishedReason,   // Reemplaza al objeto 'finished'
+    simStartUtc, 
+    wallStartUtc, 
+    disconnect 
+  } = useRunSSE(runId || undefined);
 
   // Procesar vuelos para renderizar
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
@@ -92,8 +105,6 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
     selectedPedido.rutas.forEach(ruta => {
       ruta.vuelos.forEach(vuelo => {
         // El ID del vuelo se construye como: origen-destino-salidaUtc (sin :)
-        // El backend usa: vueloId.getOrigen() + "-" + vueloId.getDestino() + "-" + vueloId.getSalidaUtc().toString().replace(":", "")
-        // salidaUtc viene como ISO string, necesitamos quitar los :
         const salidaUtcSinColon = vuelo.salidaUtc.replace(/:/g, '');
         const vueloId = `${vuelo.origen}-${vuelo.destino}-${salidaUtcSinColon}`;
         vuelosIds.add(vueloId);
@@ -142,7 +153,7 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
         const destino = airportsMap.get(vuelo.destino);
 
         if (!origen || !destino) {
-          console.warn(`[Simulacion] Aeropuerto no encontrado: ${vuelo.origen} o ${vuelo.destino}`);
+          // console.warn(`[Simulacion] Aeropuerto no encontrado: ${vuelo.origen} o ${vuelo.destino}`);
           return;
         }
 
@@ -155,7 +166,6 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
         }
 
         // Calcular progreso (0.0 a 1.0)
-        //const duracion = llegadaTime - salidaTime; //not being used
         if (!flightFirstSeenRef.current.has(vuelo.id)) {
           flightFirstSeenRef.current.set(vuelo.id, Math.max(now, salidaTime));
         }
@@ -231,22 +241,23 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
   const esSede = selectedAirportId ? SEDES.includes(selectedAirportId) : false;
 
 
-  //Para la pantalla de fin:
+  // --- MODIFICACIÓN: Lógica de fin usando finishedReason ---
 
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
+  const [overlayVisible, setOverlayVisible] = useState(true);
 
+  // Escuchar 'finishedReason' en lugar de 'finished'
   useEffect(() => {
-    if (!finished) return;
-    console.log ("🔚 [Simulación] Terminó:", finished.reason);
-
+    if (!finishedReason) return;
+    console.log ("🔚 [Simulación] Terminó:", finishedReason);
     setOverlayVisible(true);
-  }, [finished, disconnect, reset]);
+  }, [finishedReason, disconnect, reset]);
 
   useEffect(() => {
-    if (finished && !finishedAt) {
+    if (finishedReason && !finishedAt) {
       setFinishedAt(Date.now());
     }
-  }, [finished, finishedAt]);
+  }, [finishedReason, finishedAt]);
 
   useEffect(() => {
     setFinishedAt(null);
@@ -254,32 +265,45 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
 
   const handleDownloadReports = async () => {
     if (!runId) return;
-
     await downloadFile(`reportes/downloadReporteSimulacion`, "reporteSimulacion.txt");
     await downloadFile(`reportes/downloadUltimaPlan`, "ultimaPlanificacion.txt")
-
-    // Endpoint a crear, por ejemplo:
-    // GET /runs/{id}/report  -> devuelve ZIP
-    // downloadFile(`runs/${runId}/report`, `reporte-simulacion-${runId}.zip`);
   };
 
   const handleCloseOverlay = () => {
     setOverlayVisible(false);
-
-    //Cortamos el SSE
     disconnect();
-
-    //Limpiamos el contexto de la simulación
     reset();
   };
 
-  const [overlayVisible, setOverlayVisible] = useState(true);
-
-  const showFinishedOverlay = !!finished && !!runId && overlayVisible;
+  // Check de renderizado del overlay
+  const showFinishedOverlay = !!finishedReason && !!runId && overlayVisible;
 
   return (
     <div className="min-h-screen bg-neutral-50 relative">
-      {/*<p className="text-rose-600">{simNowUtc}</p>*/}
+      
+      {/* --- MODIFICACIÓN: TOAST DE CARGA --- */}
+      {/* Se muestra solo si el runState es LOADING */}
+      {runState === 'LOADING' && (
+        <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-xl p-4 flex items-center gap-4 max-w-sm">
+              <div className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full items-center justify-center bg-blue-50 dark:bg-blue-900/20">
+                 {/* Spinner simple */}
+                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+              </div>
+              <div className="grid gap-1">
+                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    Cargando Simulación...
+                 </p>
+                 <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {/* Mensaje dinámico del backend */}
+                    {loadingMessage || "Preparando entorno..."} 
+                    {loadingProgress > 0 && <span className="ml-1 font-mono">({Math.round(loadingProgress)}%)</span>}
+                 </p>
+              </div>
+           </div>
+        </div>
+      )}
+
       {/* Tooltip de aeropuerto */}
       {activeAirportData && (
         <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
@@ -522,10 +546,11 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
         />
       </MainMap>
 
-      {finished && runId && (
+      {/* --- MODIFICACIÓN: Pasamos finishedReason en vez de reason={finished.reason} --- */}
+      {finishedReason && runId && (
         <SimulationFinishedOverlay
           open={showFinishedOverlay}
-          reason={finished.reason}
+          reason={finishedReason}
           simStartUtc={simStartUtc ?? null}
           simEndUtc={simNowUtc ?? null}
           wallAnchor={wallStartUtc}

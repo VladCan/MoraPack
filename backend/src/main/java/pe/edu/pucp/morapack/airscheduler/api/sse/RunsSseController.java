@@ -16,15 +16,13 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.time.format.DateTimeFormatter;
 
-// Imports para la anotación de reflexión
-import io.quarkus.runtime.annotations.RegisterForReflection; // <-- NUEVO IMPORT CRÍTICO
+import io.quarkus.runtime.annotations.RegisterForReflection; 
 
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunContext;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunId;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.StopReason;
-
-// ... (El método stream() se mantiene sin cambios) ...
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.WindowPacket; // Asegúrate de importar esto
 
 @Path("/runs")
 @RequestScoped
@@ -42,7 +40,9 @@ public class RunsSseController {
 
         return Multi.createFrom().emitter(emitter -> {
 
-            //Apenas se conecta, va a emitir un RUN_STARTED
+            // Apenas se conecta, emitimos estado inicial
+            // (Podrías verificar runManager.status(runId) para ver si enviar Loading o Started, 
+            // pero por simplicidad enviamos Started y luego los eventos corregirán el estado)
             RunContext ctx = runManager.requireContext(runId.value());
             emitter.emit(new RunStartedEvt(runId.value(), ctx.simStartUtc().toString(),
                     ctx.wallAnchor().toString(), ctx.speed()));
@@ -51,29 +51,36 @@ public class RunsSseController {
             // Listener que reenvía los eventos del RunManager al SSE
             RunManager.RunListener listener = new RunManager.RunListener() {
                 @Override
-                public void onWindow(pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.WindowPacket p) {
+                public void onWindow(WindowPacket p) {
                     emitter.emit(new WindowEvt(p.runId, p.windowId, p.windowStartUTC, p.windowEndUTC, p.vuelos, p.pedidos));
                 }
+
                 @Override
                 public void onFinished(String id, StopReason reason) {
                     emitter.emit(new FinishedEvt(id, reason.name()));
                     // NO cerramos el SSE aquí: los vuelos deben continuar hasta llegar
                 }
+
+                // --- NUEVO MÉTODO OBLIGATORIO ---
+                @Override
+                public void onLoading(String id, String message) {
+                    // Enviamos el evento de carga al frontend
+                    // Progress en 0.0 por defecto si no tenemos métrica exacta
+                    emitter.emit(new LoadingEvt(id, message, 0.0));
+                }
             };
+            
             // Suscribimos al run
             runManager.registerListener(runId, listener);
             
-            //Tick cada 1s real (esto es simNowUtc)
+            // Tick cada 1s real
             ScheduledExecutorService tickExec = Executors.newSingleThreadScheduledExecutor();
             ScheduledFuture<?> tickFuture = tickExec.scheduleAtFixedRate(() -> {
                 try {
                    Instant now = Instant.now();
                    Instant simNow = runManager.currentSimNow(runId.value());
 
-                   // Imprime una sola línea, bien formateada
-                   System.out.printf("Tick executed at %s | simNow=%s%n",
-                            ISO.format(now),
-                            ISO.format(simNow));
+                   // System.out.printf("Tick executed at %s | simNow=%s%n", ISO.format(now), ISO.format(simNow));
 
                    // Obtener ocupación actual de aeropuertos
                    var ocupacionAeropuertos = runManager.getCurrentAirportOccupancy(runId.value());
@@ -95,9 +102,9 @@ public class RunsSseController {
         });
     }
 
-    // ---------- DTOs mínimos del SSE (AÑADIR @RegisterForReflection a TODOS) ----------
+    // ---------- DTOs del SSE ----------
 
-    @RegisterForReflection // <-- ¡Añadir!
+    @RegisterForReflection
     public static final class RunStartedEvt {
         public final String type = "RUN_STARTED";
         public final String runId;
@@ -109,7 +116,22 @@ public class RunsSseController {
         }
     }
 
-    @RegisterForReflection // <-- ¡Añadir!
+    // --- NUEVO DTO PARA LOADING ---
+    @RegisterForReflection
+    public static final class LoadingEvt {
+        public final String type = "LOADING";
+        public final String runId;
+        public final String message;
+        public final Double progress; 
+        
+        public LoadingEvt(String runId, String message, Double progress) {
+            this.runId = runId;
+            this.message = message;
+            this.progress = progress;
+        }
+    }
+
+    @RegisterForReflection
     public static final class TickEvt{
         public final String type = "TICK";
         public final String runId;
@@ -120,7 +142,7 @@ public class RunsSseController {
         }
     }
 
-    @RegisterForReflection // <-- ¡Añadir!
+    @RegisterForReflection
     public static final class WindowEvt {
         public final String type = "WINDOW";
         public final String runId;
@@ -142,11 +164,11 @@ public class RunsSseController {
         }
     }
 
-    @RegisterForReflection // <-- ¡Añadir!
+    @RegisterForReflection
     public static final class FinishedEvt {
         public final String type = "FINISHED";
         public final String runId;
-        public final String reason; // MANUAL | FIN_DE_RANGO | COLAPSE | ERROR (StopReason.java)
+        public final String reason; // MANUAL | FIN_DE_RANGO | COLAPSO | ERROR
         public FinishedEvt(String runId, String reason) { this.runId = runId; this.reason = reason; }
     }
 }

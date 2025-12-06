@@ -33,7 +33,6 @@ type FlightForRender = {
   progress: number;
   pathColor: string;
   planeColor: string;
-  // Información adicional para el tooltip
   origenCodigo: string;
   destinoCodigo: string;
   salidaUtc: string;
@@ -77,7 +76,19 @@ export default function Colapso() {
 
   // Conectar al SSE
   const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows, selectedPedido } = useRunSession();
-const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
+  
+  // --- ACTUALIZACIÓN DEL HOOK ---
+  const { 
+    runState,          // Estado (LOADING, RUNNING, ETC)
+    loadingMessage,    // Mensaje de carga
+    loadingProgress,   // Progreso
+    simNowUtc, 
+    airportOccupancy, 
+    finishedReason,    // Reemplaza a 'finished'
+    simStartUtc, 
+    wallStartUtc, 
+    disconnect 
+  } = useRunSSE(runId || undefined);
 
   // Procesar vuelos para renderizar
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
@@ -85,21 +96,16 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
   // Extraer IDs de vuelos relacionados al pedido seleccionado
   const vuelosRelacionadosAlPedido = useMemo<Set<string>>(() => {
     if (!selectedPedido || !selectedPedido.rutas) {
-      return new Set(); // Si no hay pedido seleccionado, no filtrar
+      return new Set();
     }
-    
     const vuelosIds = new Set<string>();
     selectedPedido.rutas.forEach(ruta => {
       ruta.vuelos.forEach(vuelo => {
-        // El ID del vuelo se construye como: origen-destino-salidaUtc (sin :)
-        // El backend usa: vueloId.getOrigen() + "-" + vueloId.getDestino() + "-" + vueloId.getSalidaUtc().toString().replace(":", "")
-        // salidaUtc viene como ISO string, necesitamos quitar los :
         const salidaUtcSinColon = vuelo.salidaUtc.replace(/:/g, '');
         const vueloId = `${vuelo.origen}-${vuelo.destino}-${salidaUtcSinColon}`;
         vuelosIds.add(vueloId);
       });
     });
-    
     return vuelosIds;
   }, [selectedPedido]);
 
@@ -111,51 +117,35 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
     const now = new Date(simNowUtc).getTime();
     const allFlights: FlightForRender[] = [];
     const seenIds = new Set<string>();
-
-    // Crear un Set para evitar duplicados (mismo vuelo en múltiples ventanas)
     const vuelosUnicos = new Map<string, typeof windows[0]['vuelos'][0]>();
 
-    // Acumular vuelos de TODAS las ventanas para tener el panorama completo
     windows.forEach(window => {
       window.vuelos.forEach(vuelo => {
-        // Solo agregar si no existe o si queremos actualizar con info más reciente
         if (!vuelosUnicos.has(vuelo.id)) {
           vuelosUnicos.set(vuelo.id, vuelo);
         }
       });
     });
 
-    // Si hay un pedido seleccionado, solo mostrar vuelos relacionados
     const tienePedidoSeleccionado = selectedPedido !== null && vuelosRelacionadosAlPedido.size > 0;
 
-    // Ahora procesamos todos los vuelos únicos (excluyendo cancelados)
     vuelosUnicos.forEach(vuelo => {
-        // Excluir vuelos cancelados
         if (vuelosCancelados.has(vuelo.id)) return;
         
-        // Si hay un pedido seleccionado, solo mostrar vuelos relacionados
         if (tienePedidoSeleccionado && !vuelosRelacionadosAlPedido.has(vuelo.id)) {
-          return; // Ocultar vuelos no relacionados
+          return;
         }
         
         const origen = airportsMap.get(vuelo.origen);
         const destino = airportsMap.get(vuelo.destino);
 
-        if (!origen || !destino) {
-          console.warn(`[Simulacion] Aeropuerto no encontrado: ${vuelo.origen} o ${vuelo.destino}`);
-          return;
-        }
+        if (!origen || !destino) return;
 
         const salidaTime = new Date(vuelo.salidaUtc).getTime();
         const llegadaTime = new Date(vuelo.llegadaUtc).getTime();
 
-        // Solo mostrar vuelos que ya salieron y no han llegado
-        if (now < salidaTime || now > llegadaTime) {
-          return;
-        }
+        if (now < salidaTime || now > llegadaTime) return;
 
-        // Calcular progreso (0.0 a 1.0)
-        //const duracion = llegadaTime - salidaTime; //not being used
         if (!flightFirstSeenRef.current.has(vuelo.id)) {
           flightFirstSeenRef.current.set(vuelo.id, Math.max(now, salidaTime));
         }
@@ -164,16 +154,15 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
         const duracionRestante = Math.max(1, llegadaTime - firstSeen);
         const progress = Math.min(1, transcurridoDesdeVista / duracionRestante);
 
-        // Determinar color basado en ocupación
         const ocupacion = vuelo.cantidadAsignada / vuelo.capacidad;
-        let pathColor = "#38bdf8"; // Azul claro
-        let planeColor = "#0284c7"; // Azul
+        let pathColor = "#38bdf8";
+        let planeColor = "#0284c7";
 
         if (ocupacion > 0.8) {
-          pathColor = "#f97316"; // Naranja
+          pathColor = "#f97316";
           planeColor = "#ea580c";
         } else if (ocupacion > 0.5) {
-          pathColor = "#facc15"; // Amarillo
+          pathColor = "#facc15";
           planeColor = "#eab308";
         }
 
@@ -195,7 +184,6 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
         seenIds.add(vuelo.id);
     });
 
-    // Limpiar vuelos que ya no están visibles
     flightFirstSeenRef.current.forEach((_, key) => {
       if (!seenIds.has(key)) {
         flightFirstSeenRef.current.delete(key);
@@ -205,10 +193,8 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
     return allFlights;
   }, [windows, simNowUtc, airportsMap, vuelosCancelados, selectedPedido, vuelosRelacionadosAlPedido]);
 
-  // Sincronizar vuelo activo con datos actualizados y limpiar si fue cancelado
   useEffect(() => {
     if (!activeFlight) return;
-    // Limpiar si el vuelo fue cancelado
     if (vuelosCancelados.has(activeFlight.id)) {
       setActiveFlight(null);
       return;
@@ -221,32 +207,29 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
     }
   }, [flightsToRender, activeFlight, vuelosCancelados]);
 
-  // Obtener datos del aeropuerto activo
   const activeAirportData = selectedAirportId && airportOccupancy[selectedAirportId]
     ? airportOccupancy[selectedAirportId]
     : null;
 
-  // Verificar si el aeropuerto seleccionado es una sede (SPIM, EBCI, UBBB)
   const SEDES = ["SPIM", "EBCI", "UBBB"];
   const esSede = selectedAirportId ? SEDES.includes(selectedAirportId) : false;
 
-
-  //Para la pantalla de fin:
-
+  // --- LÓGICA DE FIN ACTUALIZADA ---
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
+  const [overlayVisible, setOverlayVisible] = useState(true);
 
+  // Usamos finishedReason
   useEffect(() => {
-    if (!finished) return;
-    console.log ("🔚 [Simulación] Terminó:", finished.reason);
-
+    if (!finishedReason) return;
+    console.log ("🔚 [Colapso] Terminó:", finishedReason);
     setOverlayVisible(true);
-  }, [finished, disconnect, reset]);
+  }, [finishedReason, disconnect, reset]);
 
   useEffect(() => {
-    if (finished && !finishedAt) {
+    if (finishedReason && !finishedAt) {
       setFinishedAt(Date.now());
     }
-  }, [finished, finishedAt]);
+  }, [finishedReason, finishedAt]);
 
   useEffect(() => {
     setFinishedAt(null);
@@ -254,37 +237,45 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
 
   const handleDownloadReports = async () => {
     if (!runId) return;
-
     await downloadFile(`reportes/downloadReporteSimulacion`, "reporteSimulacion.txt");
     await downloadFile(`reportes/downloadUltimaPlan`, "ultimaPlanificacion.txt")
-
-    // Endpoint a crear, por ejemplo:
-    // GET /runs/{id}/report  -> devuelve ZIP
-    // downloadFile(`runs/${runId}/report`, `reporte-simulacion-${runId}.zip`);
   };
 
   const handleCloseOverlay = () => {
     setOverlayVisible(false);
-
-    //Cortamos el SSE
     disconnect();
-
-    //Limpiamos el contexto de la simulación
     reset();
   };
 
-  const [overlayVisible, setOverlayVisible] = useState(true);
-
-  const showFinishedOverlay = !!finished && !!runId && overlayVisible;
+  const showFinishedOverlay = !!finishedReason && !!runId && overlayVisible;
 
   return (
     <div className="min-h-screen bg-neutral-50 relative">
-      {/*<p className="text-rose-600">{simNowUtc}</p>*/}
+
+      {/* --- TOAST DE CARGA --- */}
+      {runState === 'LOADING' && (
+        <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-xl p-4 flex items-center gap-4 max-w-sm">
+              <div className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full items-center justify-center bg-blue-50 dark:bg-blue-900/20">
+                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+              </div>
+              <div className="grid gap-1">
+                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    Cargando Escenario...
+                 </p>
+                 <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {loadingMessage || "Preparando datos..."} 
+                    {loadingProgress > 0 && <span className="ml-1 font-mono">({Math.round(loadingProgress)}%)</span>}
+                 </p>
+              </div>
+           </div>
+        </div>
+      )}
+
       {/* Tooltip de aeropuerto */}
       {activeAirportData && (
         <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
           <div className="space-y-3">
-            {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
               <div className="flex items-center gap-2">
                 {!esSede && (
@@ -312,7 +303,6 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
               </div>
             </div>
 
-            {/* Capacidad - Solo mostrar si NO es sede */}
             {!esSede && (
               <div>
                 <div className="flex justify-between text-sm mb-1">
@@ -333,7 +323,6 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
               </div>
             )}
 
-            {/* Disponible - Solo mostrar si NO es sede */}
             {!esSede && (
               <div>
                 <p className="text-muted-foreground text-xs">Disponible</p>
@@ -341,7 +330,6 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
               </div>
             )}
 
-            {/* Eventos en tiempo real */}
             {(activeAirportData.cargaLlegando !== undefined && activeAirportData.cargaLlegando > 0) ||
              (activeAirportData.cargaSaliendo !== undefined && activeAirportData.cargaSaliendo > 0) ? (
               <div className="border-t border-border pt-3 mt-3">
@@ -363,7 +351,6 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
               </div>
             ) : null}
 
-            {/* Estadísticas futuras (24h) */}
             {activeAirportData.estadisticasFuturas && (
               <div className="border-t border-border pt-3 mt-3">
                 <p className="text-xs font-semibold mb-2 text-muted-foreground">Próximas 24 horas</p>
@@ -389,7 +376,6 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
       {activeFlight && !selectedAirportId && (
         <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
           <div className="space-y-3">
-            {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeFlight.planeColor }}></div>
@@ -413,7 +399,6 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
               </div>
             </div>
 
-            {/* Tiempos */}
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <p className="text-muted-foreground text-xs">Salida</p>
@@ -437,7 +422,6 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
               </div>
             </div>
 
-            {/* Capacidad */}
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-muted-foreground">Ocupación</span>
@@ -456,7 +440,6 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
               </div>
             </div>
 
-            {/* Carga */}
             {activeFlight.carga.length > 0 && (
               <div>
                 <p className="text-sm font-semibold mb-2">
@@ -522,10 +505,10 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
         />
       </MainMap>
 
-      {finished && runId && (
+      {finishedReason && runId && (
         <SimulationFinishedOverlay
           open={showFinishedOverlay}
-          reason={finished.reason}
+          reason={finishedReason}
           simStartUtc={simStartUtc ?? null}
           simEndUtc={simNowUtc ?? null}
           wallAnchor={wallStartUtc}

@@ -1,3 +1,4 @@
+// src/pages/Operacion.tsx
 "use client";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { z } from "zod";
@@ -13,7 +14,7 @@ import { downloadFile } from "@/services/api";
 import SimulationFinishedOverlay from "@/components/common/SimulationFinishedOverlay";
 
 const COLOR_SEDE   = "#005097";
-const COLOR_NORMAL = "#38bdf8"; // 👈 más suave que #0ea5e9
+const COLOR_NORMAL = "#38bdf8"; 
 const HOVER_COLOR  = "#ef4444";
 const ACTIVE_COLOR = "#005097";
 
@@ -81,9 +82,22 @@ export default function Operacion() {
     }));
   }, [airportsDtoRaw]);
 
-  // Obtener vuelos de ambas fuentes
+  // Conectar a la sesión y al SSE
   const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows, selectedPedido } = useRunSession();
-const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
+  
+  // --- ACTUALIZACIÓN DEL HOOK useRunSSE ---
+  const { 
+    runState,          // Estado (LOADING, RUNNING, ETC)
+    loadingMessage,    // Mensaje de carga
+    loadingProgress,   // Progreso
+    simNowUtc, 
+    airportOccupancy, 
+    finishedReason,    // Reemplaza a 'finished' object
+    simStartUtc, 
+    wallStartUtc, 
+    disconnect 
+  } = useRunSSE(runId || undefined);
+
   // Usar tiempo simulado si hay runId, sino usar hora del sistema
   const liveFlightsEndpoint = runId 
     ? `vuelos/live?runId=${runId}&limit=200`
@@ -115,15 +129,12 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
   // Extraer IDs de vuelos relacionados al pedido seleccionado
   const vuelosRelacionadosAlPedido = useMemo<Set<string>>(() => {
     if (!selectedPedido || !selectedPedido.rutas) {
-      return new Set(); // Si no hay pedido seleccionado, no filtrar
+      return new Set();
     }
     
     const vuelosIds = new Set<string>();
     selectedPedido.rutas.forEach(ruta => {
       ruta.vuelos.forEach(vuelo => {
-        // El ID del vuelo se construye como: origen-destino-salidaUtc (sin :)
-        // El backend usa: vueloId.getOrigen() + "-" + vueloId.getDestino() + "-" + vueloId.getSalidaUtc().toString().replace(":", "")
-        // salidaUtc viene como ISO string, necesitamos quitar los :
         const salidaUtcSinColon = vuelo.salidaUtc.replace(/:/g, '');
         const vueloId = `${vuelo.origen}-${vuelo.destino}-${salidaUtcSinColon}`;
         vuelosIds.add(vueloId);
@@ -156,9 +167,8 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
 
       // Procesar vuelos planificados que están en el aire
       vuelosUnicos.forEach(vuelo => {
-        // Si hay un pedido seleccionado, solo mostrar vuelos relacionados
         if (tienePedidoSeleccionado && !vuelosRelacionadosAlPedido.has(vuelo.id)) {
-          return; // Ocultar vuelos no relacionados
+          return;
         }
         
         const origen = airportsMap.get(vuelo.origen);
@@ -180,16 +190,14 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
           const duracionRestante = Math.max(1, llegadaTime - firstSeen);
           const progress = Math.min(1, transcurridoDesdeVista / duracionRestante);
 
-          // Determinar color basado en ocupación
-          // Vuelos planificados por el algoritmo tienen colores diferentes
           const ocupacion = vuelo.cantidadAsignada / vuelo.capacidad;
           let pathColor = "#8b5cf6"; // Morado para vuelos planificados
           let planeColor = "#7c3aed";
           if (ocupacion > 0.8) {
-            pathColor = "#dc2626"; // Rojo oscuro para alta ocupación
+            pathColor = "#dc2626";
             planeColor = "#b91c1c";
           } else if (ocupacion > 0.5) {
-            pathColor = "#f59e0b"; // Naranja para ocupación media
+            pathColor = "#f59e0b";
             planeColor = "#d97706";
           }
 
@@ -208,7 +216,7 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
             capacidad: vuelo.capacidad,
             cantidadAsignada: vuelo.cantidadAsignada,
             carga: vuelo.carga || [],
-            esDeSolucion: true, // Marcar como vuelo de la solución
+            esDeSolucion: true,
           });
           seenIds.add(vuelo.id);
         }
@@ -216,27 +224,24 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
     }
 
     // 2. SEGUNDO: Vuelos de vuelos.txt que NO están planificados por el algoritmo
-    // Limitar a los primeros 20 para evitar saturación visual
     const arr = (liveFlights ?? []) as FlightDto[];
     let vuelosTxtCount = 0;
-    const MAX_VUELOS_TXT = 20; // Límite de vuelos de vuelos.txt a mostrar
+    const MAX_VUELOS_TXT = 20; 
     
     arr.forEach(f => {
-      // Si hay un pedido seleccionado, ocultar vuelos SSE (solo mostrar vuelos de la solución)
       if (tienePedidoSeleccionado) {
         return; // Ocultar todos los vuelos SSE cuando hay un pedido seleccionado
       }
       
-      // Solo incluir si no está cancelado, no está ya en la lista (planificado), y no excedemos el límite
       if (!vuelosCancelados.has(f.id) && !seenIds.has(f.id) && vuelosTxtCount < MAX_VUELOS_TXT) {
         allFlights.push({
-      id: f.id,
-      origin: { lat: f.originLat, lon: f.originLon },
-      dest: { lat: f.destLat, lon: f.destLon },
-      progress: f.progress,
-      pathColor: f.pathColor,
-      planeColor: f.planeColor,
-          esDeSolucion: false, // Marcar como vuelo de vuelos.txt (sin información completa)
+          id: f.id,
+          origin: { lat: f.originLat, lon: f.originLon },
+          dest: { lat: f.destLat, lon: f.destLon },
+          progress: f.progress,
+          pathColor: f.pathColor,
+          planeColor: f.planeColor,
+          esDeSolucion: false,
         });
         seenIds.add(f.id);
         vuelosTxtCount++;
@@ -253,10 +258,9 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
     return allFlights;
   }, [liveFlights, vuelosCancelados, windows, simNowUtc, airportsMap, selectedPedido, vuelosRelacionadosAlPedido]);
 
-  // Sincronizar vuelo activo con datos actualizados y limpiar si fue cancelado
+  // Sincronizar vuelo activo con datos actualizados
   useEffect(() => {
     if (!activeFlight) return;
-    // Limpiar si el vuelo fue cancelado
     if (vuelosCancelados.has(activeFlight.id)) {
       setActiveFlight(null);
       return;
@@ -270,7 +274,6 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
   }, [flightPaths, activeFlight, vuelosCancelados]);
 
   // Obtener datos del aeropuerto activo
-  // Mostrar popup incluso si no hay datos todavía (mostrar valores por defecto)
   const activeAirportData = selectedAirportId
     ? (airportOccupancy[selectedAirportId] || {
         ocupacionActual: 0,
@@ -282,59 +285,68 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
       })
     : null;
 
-  // Verificar si el aeropuerto seleccionado es una sede (SPIM, EBCI, UBBB)
   const SEDES = ["SPIM", "EBCI", "UBBB"];
   const esSede = selectedAirportId ? SEDES.includes(selectedAirportId) : false;
 
-  //Para la pantalla de fin:
-      
-        const [finishedAt, setFinishedAt] = useState<number | null>(null);
-      
-        useEffect(() => {
-          if (!finished) return;
-          console.log ("🔚 [Simulación] Terminó:", finished.reason);
-      
-          setOverlayVisible(true);
-        }, [finished, disconnect, reset]);
-      
-        useEffect(() => {
-          if (finished && !finishedAt) {
-            setFinishedAt(Date.now());
-          }
-        }, [finished, finishedAt]);
-      
-        useEffect(() => {
-          setFinishedAt(null);
-        }, [runId]);
-      
-        const handleDownloadReports = async () => {
-          if (!runId) return;
-      
-          await downloadFile(`reportes/downloadReporteSimulacion`, "reporteSimulacion.txt");
-          await downloadFile(`reportes/downloadUltimaPlan`, "ultimaPlanificacion.txt")
-      
-          // Endpoint a crear, por ejemplo:
-          // GET /runs/{id}/report  -> devuelve ZIP
-          // downloadFile(`runs/${runId}/report`, `reporte-simulacion-${runId}.zip`);
-        };
-      
-        const handleCloseOverlay = () => {
-          setOverlayVisible(false);
-      
-          //Cortamos el SSE
-          disconnect();
-      
-          //Limpiamos el contexto de la simulación
-          reset();
-        };
-      
-        const [overlayVisible, setOverlayVisible] = useState(true);
-      
-        const showFinishedOverlay = !!finished && !!runId && overlayVisible;
+  // --- LÓGICA DE FIN ACTUALIZADA ---
+  const [finishedAt, setFinishedAt] = useState<number | null>(null);
+  const [overlayVisible, setOverlayVisible] = useState(true);
 
+  // Usamos finishedReason en lugar de finished
+  useEffect(() => {
+    if (!finishedReason) return;
+    console.log ("🔚 [Operación] Terminó:", finishedReason);
+    setOverlayVisible(true);
+  }, [finishedReason, disconnect, reset]);
+
+  useEffect(() => {
+    if (finishedReason && !finishedAt) {
+      setFinishedAt(Date.now());
+    }
+  }, [finishedReason, finishedAt]);
+
+  useEffect(() => {
+    setFinishedAt(null);
+  }, [runId]);
+
+  const handleDownloadReports = async () => {
+    if (!runId) return;
+    await downloadFile(`reportes/downloadReporteSimulacion`, "reporteSimulacion.txt");
+    await downloadFile(`reportes/downloadUltimaPlan`, "ultimaPlanificacion.txt")
+  };
+
+  const handleCloseOverlay = () => {
+    setOverlayVisible(false);
+    disconnect();
+    reset();
+  };
+
+  // Check de finishedReason
+  const showFinishedOverlay = !!finishedReason && !!runId && overlayVisible;
 
   return (
     <div className="min-h-screen bg-neutral-50 relative">
+
+      {/* --- TOAST DE CARGA --- */}
+      {runState === 'LOADING' && (
+        <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-xl p-4 flex items-center gap-4 max-w-sm">
+              <div className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full items-center justify-center bg-blue-50 dark:bg-blue-900/20">
+                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+              </div>
+              <div className="grid gap-1">
+                 <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                    Cargando Operación...
+                 </p>
+                 <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {loadingMessage || "Sincronizando datos..."} 
+                    {loadingProgress > 0 && <span className="ml-1 font-mono">({Math.round(loadingProgress)}%)</span>}
+                 </p>
+              </div>
+           </div>
+        </div>
+      )}
+
       {/* Tooltip de aeropuerto */}
       {selectedAirportId && activeAirportData && (
         <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
@@ -600,19 +612,18 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
         />
       </MainMap>
 
-      {finished && runId && (
-                <SimulationFinishedOverlay
-                  open={showFinishedOverlay}
-                  reason={finished.reason}
-                  simStartUtc={simStartUtc ?? null}
-                  simEndUtc={simNowUtc ?? null}
-                  wallAnchor={wallStartUtc}
-                  finishedAt={finishedAt}
-                  onClose={handleCloseOverlay}
-                  onDownloadReports={handleDownloadReports}
-                />
-              )}
-
+      {finishedReason && runId && (
+        <SimulationFinishedOverlay
+          open={showFinishedOverlay}
+          reason={finishedReason}
+          simStartUtc={simStartUtc ?? null}
+          simEndUtc={simNowUtc ?? null}
+          wallAnchor={wallStartUtc}
+          finishedAt={finishedAt}
+          onClose={handleCloseOverlay}
+          onDownloadReports={handleDownloadReports}
+        />
+      )}
 
     </div>
   );
