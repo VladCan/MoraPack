@@ -31,11 +31,6 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.
 
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.LectorPedidoMultiArchivo;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.EstadoAnteriorExtractor;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosCancelados;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.*;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.TEGEventBuilder;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.helpers.TEGParametros;
@@ -62,10 +57,12 @@ public class RunManager {
     ArchivoManager archivoManager;
     private static final String AEROPUERTOS_FILENAME = "aereopuertos.txt";
     private static final String VUELOS_FILENAME = "vuelos.txt";
-    private static final String PEDIDOS_FILENAME = "pedidos.txt";
+    //private static final String PEDIDOS_FILENAME = "pedidos.txt";
     private static boolean firstExecution = false;
 
     private static final String VUELOS_CANCELADOS_FILENAME = "cancelaciones.txt";
+
+    private static final Duration PLANNING_LATENCY = Duration.ofSeconds(30);
 
     @Inject
     ReportesService reportesService;
@@ -705,138 +702,125 @@ public class RunManager {
 
     /// Funciones para cada escenario.
 
-    /// 1. Run de Simulación
+    /// 1. Run de Simulación (CON LOOKAHEAD)
     private void runSimulacion(RunId runId, RunConfig config){
-        System.out.println("Estamos en SIM SEMANAL");
+        System.out.println("Estamos en SIM SEMANAL (Con Lookahead)");
 
         final String id = runId.value();
-
         final AtomicBoolean slaFlag = slaBroken.computeIfAbsent(id, k -> new AtomicBoolean(false));
         slaFlag.set(false);
 
-        Instant wStart = config.fechaInicio();
-        Instant wEnd = wStart.plus(config.horasVentana());
-        int idx = 0;
+        // 1. Calcular Buffer de Anticipación
+        // Cuánto tiempo simulado 'consume' la ejecución real del algoritmo (30s).
+        Duration simulatedBuffer = PLANNING_LATENCY.multipliedBy((long) config.speed());
+        System.out.println("[RunManager] Buffer de anticipación calculado: " + simulatedBuffer);
 
+        // wStart: Inicio de la ventana de simulación actual
+        Instant wStart = config.fechaInicio();
+        
+        // wEmit: Fin de la ventana, momento en que el usuario debe recibir el resultado
+        Instant wEmit = wStart.plus(config.horasVentana()); 
+
+        int idx = 0;
         Instant lastWStart = wStart;
 
         System.out.println("[RunManager] Config: fechaInicio=" + config.fechaInicio() + ", fechaFin=" + config.fechaFin());
-        System.out.println("[RunManager] Ventana inicial: wStart=" + wStart + ", wEnd=" + wEnd);
+        System.out.println("[RunManager] Primera ventana de emisión: " + wEmit);
 
-        System.out.println("Dentro de runSimulación firstExecution es:" + firstExecution);
-
-
-        inicializarLectorMultiArchivo(id, wStart);
-
-
+        // Inicializar lector una sola vez
+        inicializarLectorMultiArchivo(id, wStart); 
         List<VueloCancelado> vuelosCanceladosTeg = new ArrayList<>();
 
         while (!isCancelled(id) && (config.fechaFin() == null || !wStart.isAfter(config.fechaFin()))) {
-            /// Revisar esto:
-            // Pausa cooperativa entre ventanas
+            
+            // Pausa cooperativa
             while (paused.get(id).get() && !isCancelled(id)) {
                 sleepQuietly(Duration.ofMillis(80));
             }
             if (isCancelled(id)) break;
 
-            // ===== LÓGICA DE PLANIFICACIÓN POR VENTANAS =====
+            if (firstExecution){ System.out.println("Soy true"); }
 
-            if (firstExecution){
-                System.out.println("Soy true");
-                int a = 0;
-            }
-
-            // Inicializar catálogos si es necesario
             inicializarCatalogos(config.scenario());
 
-            // Verificar si ya enviamos esta ventana (idempotencia)
+            // Verificar idempotencia (ventanas ya enviadas)
             String windowIdISO = wStart.toString();
             Set<String> ventanasEnviadasRun = ventanasEnviadas.computeIfAbsent(id, k -> new HashSet<>());
             if (ventanasEnviadasRun.contains(windowIdISO)) {
                 System.out.println("[RunManager] Ventana ya enviada, saltando: " + windowIdISO);
-                // Avanzar a la siguiente ventana antes de continuar
                 idx++;
-                wStart = wEnd;
-                wEnd = wEnd.plus(config.horasVentana());
+                wStart = wEmit;
+                wEmit = wEmit.plus(config.horasVentana());
                 continue;
             }
 
-            System.out.println("[RunManager] Procesando ventana " + idx + ": " + wStart + " - " + wEnd);
+            // ===== LÓGICA DE LOOKAHEAD =====
+            
+            // wCut: Tiempo de corte para los datos de entrada.
+            // "Engañamos" al algoritmo dándole datos solo hasta (TiempoEmisión - Buffer).
+            Instant wCut = wEmit.minus(simulatedBuffer);
+            
+            // Seguridad: No cortar antes del inicio absoluto
+            if (wCut.isBefore(wStart)) wCut = wStart;
+
+            System.out.println("[RunManager] Procesando ventana " + idx + 
+                               " | T_Inicio: " + wStart + 
+                               " | T_Corte (Input): " + wCut + 
+                               " | T_Emision (Output): " + wEmit);
 
             try {
-                // 1. Preparar estado anterior si existe
+                // 1. Preparar estado anterior
                 SolucionProgramacion solucionAnterior = solucionesAnteriores.get(id);
                 Map<String, List<ArriboExogeno>> enVuelo = Map.of();
                 List<OcupacionAlmacen> reservas = List.of();
 
-                // Actualizar pedidos: eliminar completados y ajustar cantidades de los en progreso
                 if (solucionAnterior != null) {
-                    System.out.println("[RunManager] Antes de eliminarYActualizarCumplidosHasta: " + 
-                        pedidosCargados.getLista().size() + " pedidos en cola");
-
-                    Set<VueloProgramadoId> vuelosCancelados =
-                            vuelosCanceladosPorRun.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
-                    //
-
+                    Set<VueloProgramadoId> vuelosCancelados = vuelosCanceladosPorRun.computeIfAbsent(id, k -> ConcurrentHashMap.newKeySet());
                     if (!vuelosCancelados.isEmpty()) {
-                        System.out.println("[RunManager]: Procesando cancelaciones: " + vuelosCancelados.size());
-
-                        //Considerar si hay que colocar los vuelos cancelados en algun otro lado para enchufar en el TEG
                         List <VueloCancelado> vuelosCancelString = transformar(vuelosCancelados);
                         vuelosCanceladosTeg.addAll(vuelosCancelString);
                         procesarCancelaciones(id, vuelosCancelados, solucionAnterior);
-
-                        /// Dejamos el set vacío (por ahora):
                         vuelosCanceladosPorRun.get(id).clear();
                     }
-
+                    
+                    // Actualizar pedidos hasta wCut (no hasta wEmit)
                     pedidosCargados.eliminarYActualizarCumplidosHasta(wStart, solucionAnterior);
-                    System.out.println("[RunManager] Después de eliminarYActualizarCumplidosHasta: " + 
-                        pedidosCargados.getLista().size() + " pedidos en cola");
                     enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior, wStart);
                     reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior, wStart, Duration.ofHours(2));
                 }
 
-                // 2. Obtener pedidos de la ventana actual (ya actualizados)
-                cargarPedidosDesdeLector(id, pedidosCargados, wEnd);
-                VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wEnd);
-                //VentanaPedidos ventana = pedidosCargados.acumuladoEntre(wStart,wEnd);
+                // 2. Obtener pedidos hasta el tiempo de CORTE (wCut)
+                cargarPedidosDesdeLector(id, pedidosCargados, wCut); // 🛑 Leer hasta wCut
+                VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wCut); // 🛑 Acumular hasta wCut
                 List<Pedido> pedidosVentana = ventana.pedidos();
 
+                System.out.println("[RunManager] Pedidos para planificar (hasta " + wCut + "): " + pedidosVentana.size());
 
-                System.out.println("[RunManager] Los pedidos para esta ventana son: " + pedidosVentana.size());
-
+                // Si no hay pedidos, igual esperamos a wEmit para mantener el ritmo
                 if (pedidosVentana.isEmpty()) {
-                    System.out.println("[RunManager] No hay pedidos en la ventana " + idx);
-                    // Marcar ventana como enviada aunque esté vacía
+                    System.out.println("[RunManager] Ventana vacía (sin pedidos nuevos hasta " + wCut + ")");
+                    
+                    // Esperar sincronización con wEmit
+                    if (sleepToEndWindow(id, wEmit)) break;
+
                     ventanasEnviadasRun.add(windowIdISO);
-                    broadcastWindow(new WindowPacket(id, idx, wStart, wEnd, List.of(),
-                            convertirPedidosADTO(List.of(), null)));
+                    broadcastWindow(new WindowPacket(id, idx, wStart, wEmit, List.of(), convertirPedidosADTO(List.of(), null)));
 
-                    //Llamamos al sleep (para que el reloj simulado cruce fin de ventana):
-                    //Si se cancela durante el sleep, salimos del bucle
-                    if (sleepToEndWindow(id, wEnd)) break;
-
-                    // Avanzar a la siguiente ventana antes de continuar
                     idx++;
-                    wStart = wEnd;
-                    wEnd = wEnd.plus(config.horasVentana());
+                    wStart = wEmit;
+                    wEmit = wEmit.plus(config.horasVentana());
                     pedidosCargados.setUtcNormalizada(false);
                     continue;
                 }
 
                 if (isCancelled(id)) break;
 
-                List<VueloCancelado> vuelosCanceladosArch = cancelados.obtenerVuelosCancelados(wStart,wEnd);
+                // Cargar cancelaciones hasta wCut
+                List<VueloCancelado> vuelosCanceladosArch = cancelados.obtenerVuelosCancelados(wStart, wCut);
                 vuelosCanceladosTeg.addAll(vuelosCanceladosArch);
 
-                if(!vuelosCanceladosTeg.isEmpty()){
-                    System.out.println("[RunManager] Vuelos cancelados en la ventana " + idx + ": " + vuelosCanceladosTeg);
-                    //teg.cancelarVuelos(vuelosCanceladosTeg);
-                }
-
-                // 3. Construir TEG para la ventana
-                Instant finTEG = wEnd.plus(config.horizon());
+                // 3. Construir TEG (Horizonte proyectado desde wEmit para consistencia futura)
+                Instant finTEG = wEmit.plus(config.horizon());
                 TEGParametros params = TEGParametros.builder()
                         .inicioUtc(wStart)
                         .finUtc(finTEG)
@@ -847,20 +831,15 @@ public class RunManager {
                         .build();
 
                 VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, vuelosMap).construir(params);
-                // 3.5 Cancelar vuelos de archivo
 
-
-
-                // 4. Generar solución inicial (seed)
+                // 4. Generar Seed y 5. Ejecutar ALNS (Tarda ~30s reales)
                 OcupacionPorAeropuerto ocupacionPorAeropuerto = ocupacionesPorRun.computeIfAbsent(id, k -> new OcupacionPorAeropuerto(aeropuertosMap));
                 SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of(), ocupacionPorAeropuerto);
                 SolucionProgramacion seed = ssp.generarSeed(teg, pedidosVentana, wStart);
 
-                // 5. Ejecutar ALNS
                 List<DestructionOperator> destructores = new ArrayList<>();
                 destructores.add(new RandomRemoval(20));
                 destructores.add(new WorstRemoval(20));
-
                 List<RepairOperator> reparadores = new ArrayList<>();
                 reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
                 reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
@@ -870,7 +849,7 @@ public class RunManager {
 
                 if (isCancelled(id)) break;
 
-                // 6. Guardar solución para la siguiente ventana y sincronizar ocupación
+                // 6. Guardar solución
                 actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
                 solucionesAnteriores.put(id, solucionOptima);
 
@@ -880,58 +859,48 @@ public class RunManager {
                     break;
                 }
 
+                // 🛑 SINCRONIZACIÓN FINAL
+                // El algoritmo terminó (usando datos del pasado). Ahora esperamos a que el reloj simulado
+                // alcance el momento de emisión (wEmit).
+                if (sleepToEndWindow(id, wEmit)) break;
 
-                // 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
+                // 7. Extraer y Emitir
+                // Ahora es wEmit. Emitimos los resultados.
                 final Instant wStartFinal = wStart;
-                final Instant wEndFinal = wEnd;
-
-                if (isCancelled(id)) break;
+                final Instant wEndFinal = wEmit;
 
                 List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStartFinal, wEndFinal);
-                
-                // IMPORTANTE: Enviar TODOS los pedidos procesados (incluye parciales de ventanas anteriores)
-                // para que el frontend vea el estado actualizado de cada pedido
                 List<Object> pedidosVentanaDTO = convertirPedidosADTO(pedidosVentana, solucionOptima);
 
-                //Esto es para depurar
-
-                // 8. Marcar ventana como enviada y hacer broadcast
                 ventanasEnviadasRun.add(windowIdISO);
-                broadcastWindow(new WindowPacket(id, idx, wStart, wEnd, vuelosVentana, pedidosVentanaDTO));
+                broadcastWindow(new WindowPacket(id, idx, wStart, wEmit, vuelosVentana, pedidosVentanaDTO));
 
-                //9. Imprimimos en archivo
+                // 9. Reportes
                 Path reportePath = reportesService.getReportesFilePath();
                 ImpresorSolucion.imprimirEnArchivo(solucionOptima, reportePath.toString(), wStart);
 
                 lastWStart = wStart;
-
-                System.out.println("[RunManager] Ventana " + idx + " procesada exitosamente. Vuelos: " + vuelosVentana.size() + ", Pedidos: " + pedidosVentanaDTO.size());
+                System.out.println("[RunManager] Ventana " + idx + " procesada y emitida en " + currentSimNow(id));
 
             } catch (Exception e) {
                 System.err.println("[RunManager] Error procesando ventana " + idx + ": " + e.getMessage());
                 e.printStackTrace();
-                // Continuar con la siguiente ventana en caso de error
             }
-
-            //Llamamos al sleep (para que el reloj simulado cruce fin de ventana):
-            if (sleepToEndWindow(id, wEnd)) break;
 
             // Siguiente ventana
             idx++;
-            wStart = wEnd;
-            wEnd   = wEnd.plus(config.horasVentana());
+            wStart = wEmit; // El nuevo inicio es el fin de la actual
+            wEmit = wEmit.plus(config.horasVentana()); // El nuevo fin avanza una ventana
             pedidosCargados.setUtcNormalizada(false);
         }
 
-        /// Acá debería de ir imprimirUltimaPlanificacion
+        // Reporte final
         SolucionProgramacion ultimaPlan = solucionesAnteriores.get(id);
-
         if (ultimaPlan != null) {
-            System.out.println("[RunManaqer]: Vamos a imprimir la última planificación.");
+            System.out.println("[RunManager]: Imprimiendo última planificación.");
             Path reportePath = reportesService.getLastPlanFilePath();
             ImpresorSolucion.imprimirUltimaPlanificacion(ultimaPlan, reportePath.toString(), lastWStart);
         }
-
     }
 
     /// 2. Run de Operación Diaria
