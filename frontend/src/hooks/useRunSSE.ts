@@ -185,6 +185,7 @@ export function useRunSSE(runId?: string){
                         }
                         break;
                     case "WINDOW":
+                        //console.log("[SSE] WINDOW", evt.windowIndex, "vuelos:", evt.vuelos.map(v => v.id));
                         setWindows((prev) => {
                             const nextWindow: WindowData = {
                                 index: evt.windowIndex,

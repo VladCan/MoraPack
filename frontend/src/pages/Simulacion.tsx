@@ -79,6 +79,27 @@ export default function Simulacion() {
   const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows, selectedPedido } = useRunSession();
 const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
 
+  //Cambio para agregar color a los aeropuertos
+  const airportsForRender = useMemo<AirportPoint[]>(() => {
+    return airports.map((a) => {
+      const occ = airportOccupancy[a.id];
+
+      //Si es sede o no hay ocupación, no pasa nada
+      if (!occ || a.isSede) return a;
+
+      let color = COLOR_NORMAL;
+      if (occ.porcentaje > 0.8){
+        color = "#f97316"; //Naranja
+      }
+      else if (occ.porcentaje > 0.5){
+        color = "#facc15"; //Amarillo
+      }
+      
+
+      return { ...a, color };
+    });
+  }, [airports, airportOccupancy])
+
   // Procesar vuelos para renderizar
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
 
@@ -150,6 +171,7 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
         const llegadaTime = new Date(vuelo.llegadaUtc).getTime();
 
         // Solo mostrar vuelos que ya salieron y no han llegado
+        
         if (now < salidaTime || now > llegadaTime) {
           return;
         }
@@ -508,7 +530,7 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
 
         {/* Renderizar aeropuertos */}
         <AirportMarkers
-          items={airports}
+          items={airportsForRender}
           activeId={selectedAirportId}
           hoveredId={hoveredAirportId}
           baseColor={COLOR_NORMAL}
