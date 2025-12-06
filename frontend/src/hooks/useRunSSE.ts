@@ -88,13 +88,12 @@ const AeropuertoOcupacionSchema = z.object({
 const StopReasonSchema = z.enum(["FIN_DE_RANGO", "MANUAL", "COLAPSO", "ERROR"]);
 
 // --- EVENTOS DEL SSE ---
-// Aquí mapeamos los eventos que envía el backend para transicionar los estados
 const RunEvtSchema = z.discriminatedUnion("type", [
-  // 1. Estado LOADING: El backend está cargando archivos/optimizando
+  // 1. Estado LOADING
   z.object({
     type: z.literal("LOADING"), 
-    message: z.string().optional(), // "Leyendo Excel...", "Optimizando rutas..."
-    progress: z.number().optional() // 0 - 100
+    message: z.string().optional(),
+    progress: z.number().optional()
   }),
   // 2. Estado RUNNING (Inicio)
   z.object({
@@ -111,7 +110,7 @@ const RunEvtSchema = z.discriminatedUnion("type", [
     simNowUtc: z.string(),
     aeropuertos: z.record(z.string(), AeropuertoOcupacionSchema).optional(),
   }),
-  // 4. Ventanas de decisión (Sigue en RUNNING)
+  // 4. Ventanas de decisión
   z.object({
     type: z.literal("WINDOW"),
     runId: z.string(),
@@ -121,13 +120,13 @@ const RunEvtSchema = z.discriminatedUnion("type", [
     vuelos: z.array(VueloDTOSchema),
     pedidos: z.array(PedidoDTOSchema),
   }),
-  // 5. Estados finales (COMPLETED, STOPPED, FAILED)
+  // 5. Estados finales
   z.object({
     type: z.literal("FINISHED"),
     runId: z.string(),
     reason: StopReasonSchema,
   }),
-  // 6. Caso de Error explícito del backend
+  // 6. Error explícito
   z.object({
     type: z.literal("ERROR"),
     message: z.string()
@@ -155,11 +154,11 @@ export type WindowData = {
 // ==========================================
 
 export function useRunSSE(runId?: string) {
-  // Estado de conexión técnica (SSE conectado o no)
+  // Estado de conexión técnica
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // --- NUEVO: Estado Lógico del Run (PENDING, LOADING, RUNNING, etc) ---
+  // --- Estado Lógico del Run ---
   const [runState, setRunState] = useState<RunState>("PENDING");
   
   // Datos extra para UI de carga
@@ -177,7 +176,19 @@ export function useRunSSE(runId?: string) {
 
   const esRef = useRef<EventSource | null>(null);
 
-  // Construcción de URL (igual que antes)
+  // =========================================================
+  // 🕵️ LOG DE DIAGNÓSTICO: MONITOREO DE CAMBIO DE ESTADO
+  // =========================================================
+  useEffect(() => {
+    // Si cambia el estado, lo imprimimos con color verde brillante
+    console.log(`%c[HOOK STATE] runState cambió a: ${runState}`, 'background: #000; color: #0f0; font-size: 14px; padding: 3px;');
+    
+    if (runState === 'LOADING') {
+        console.log('%c[HOOK STATE] ⏳ ESTAMOS EN LOADING (La UI debería mostrar spinner)', 'background: orange; color: black; font-weight: bold; padding: 4px;');
+    }
+  }, [runState]);
+
+  // Construcción de URL
   const url = useMemo(() => {
     if (!runId) return null;
     const path = `runs/${runId}/stream`;
@@ -194,9 +205,10 @@ export function useRunSSE(runId?: string) {
 
   // Reset al cambiar runId
   useEffect(() => {
+    console.log(`[HOOK RESET] Nuevo runId detectado: ${runId}`);
     setConnected(false);
     setError(null);
-    setRunState("PENDING"); // Volvemos a PENDING
+    setRunState("PENDING"); 
     setLoadingMessage("");
     setLoadingProgress(0);
     setSpeed(undefined);
@@ -210,7 +222,7 @@ export function useRunSSE(runId?: string) {
   useEffect(() => {
     if (!url) return;
 
-    console.log(`[RUN DIAG] Conectando a ${url}`);
+    console.log(`%c[RUN DIAG] Conectando a ${url}`, 'color: cyan');
     const es = new EventSource(url, { withCredentials: false });
     esRef.current = es;
 
@@ -218,10 +230,10 @@ export function useRunSSE(runId?: string) {
 
     es.onopen = () => {
       if (!alive) return;
+      console.log("%c[SSE OPEN] Conexión abierta", 'color: cyan');
       setConnected(true);
       setError(null);
-      // Al conectar, asumimos que puede estar cargando o esperando
-      // Idealmente el backend manda un evento inicial, pero por defecto:
+      // Por defecto, si estábamos pending, pasamos a loading al conectar (esperando datos)
       if (runState === 'PENDING') setRunState("LOADING"); 
     };
 
@@ -229,24 +241,35 @@ export function useRunSSE(runId?: string) {
       if (!alive) return;
       try {
         const raw = JSON.parse(ev.data);
+        
+        // =========================================================
+        // 🕵️ LOG DE DIAGNÓSTICO: DATOS CRUDOS DEL BACKEND
+        // =========================================================
+        // Solo logueamos si NO es un TICK para no saturar la consola, 
+        // pero SI logueamos LOADING, ERROR, WINDOW, etc.
+        if (raw.type !== 'TICK') {
+            console.log(`%c📩 [SSE RAW] Evento recibido: ${raw.type}`, 'color: #aaa', raw);
+        }
+
         const evt = RunEvtSchema.parse(raw); // Validación Zod
 
         switch (evt.type) {
           case "LOADING":
-            setRunState("LOADING"); // Sincronizamos con el Enum
+            console.log("%c✅ [SSE] Entrando al case LOADING", 'color: orange');
+            setRunState("LOADING"); 
             if (evt.message) setLoadingMessage(evt.message);
             if (evt.progress !== undefined) setLoadingProgress(evt.progress);
             break;
 
           case "RUN_STARTED":
-            setRunState("RUNNING"); // Cambiamos estado a RUNNING
+            console.log("%c🚀 [SSE] RUN STARTED", 'color: lime');
+            setRunState("RUNNING");
             setSimStart(evt.simStartUtc);
             setWallStart(evt.wallAnchorUtc);
             setSpeed(evt.speed);
             break;
 
           case "TICK":
-            // Solo actualizamos datos, el estado sigue siendo RUNNING
             setSimNow(evt.simNowUtc);
             if (evt.aeropuertos) setAirportOccupancy(evt.aeropuertos);
             break;
@@ -271,13 +294,15 @@ export function useRunSSE(runId?: string) {
             break;
 
           case "FINISHED":
-            setRunState("COMPLETED"); // O STOPPED, dependiendo de tu lógica, pero ya no es RUNNING
+            console.log("%c🏁 [SSE] FINISHED", 'color: red');
+            setRunState("COMPLETED");
             setFinishedReason(evt.reason);
             es.close();
             setConnected(false);
             break;
             
           case "ERROR":
+            console.error("❌ [SSE ERROR EVENT]", evt.message);
             setRunState("FAILED");
             setError(evt.message);
             es.close();
@@ -285,7 +310,10 @@ export function useRunSSE(runId?: string) {
         }
       } catch (err) {
         if (err instanceof z.ZodError) {
-          console.error("Zod Validation Error:", err.issues);
+          // =========================================================
+          // 🕵️ LOG DE DIAGNÓSTICO: ERROR DE VALIDACIÓN
+          // =========================================================
+          console.error("%c❌ [ZOD ERROR] El backend mandó datos inválidos:", 'background: red; color: white', err.issues);
           setError("Error de validación de datos (Backend mismatch)");
         } else {
           console.error("SSE Error:", err);
@@ -295,9 +323,9 @@ export function useRunSSE(runId?: string) {
 
     es.onerror = () => {
       if (!alive) return;
+      console.error("⚠️ [SSE NETWORK ERROR] Conexión fallida o cerrada");
       setConnected(false);
       setError("Conexión perdida con el servidor");
-      // Opcional: setRunState("FAILED") si la conexión muere
     };
 
     return () => {
@@ -314,18 +342,11 @@ export function useRunSSE(runId?: string) {
   };
 
   return {
-    // Estado Principal (Enum)
-    runState,         // "PENDING" | "LOADING" | "RUNNING" | "COMPLETED" | "FAILED"
-    
-    // Datos de Loading
+    runState,
     loadingMessage,
     loadingProgress,
-
-    // Datos técnicos
     connected,
     error,
-
-    // Datos de Simulación
     speed,
     simStartUtc,
     wallStartUtc,
