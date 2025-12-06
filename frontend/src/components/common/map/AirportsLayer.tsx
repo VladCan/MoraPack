@@ -35,7 +35,7 @@ export default function AirportsLayer({
   baseColor = "#38bdf8",
   activeColor = "#005097",
   hoverColor = "#ef4444",
-  iconSize = 16,
+  iconSize = 20,
   showLabelsOnHighlightOnly = true,
   onClick,
   onHoverChange,
