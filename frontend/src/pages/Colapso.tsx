@@ -222,7 +222,6 @@ export default function Colapso() {
 
     const now = new Date(simNowUtc).getTime();
     const next24h = now + 24 * 60 * 60 * 1000; // 24 horas en ms
-    const past24h = now - 24 * 60 * 60 * 1000; // Últimas 24 horas también
 
     const llegadas: Array<{ id: string; origen: string; cantidad: number }> = [];
     const salidas: Array<{ id: string; destino: string; cantidad: number }> = [];
@@ -251,9 +250,8 @@ export default function Colapso() {
       }
 
       // Vuelos que saldrán del aeropuerto seleccionado
-      // Incluir vuelos que salieron en las últimas 24h o saldrán en las próximas 24h
-      // Filtrar estrictamente para evitar mantener vuelos antiguos en memoria
-      if (vuelo.origen === selectedAirportId && salidaTime >= past24h && salidaTime <= next24h) {
+      // Solo incluir vuelos que aún no han llegado a su destino (aún están en vuelo o saldrán en el futuro)
+      if (vuelo.origen === selectedAirportId && salidaTime <= next24h && llegadaTime > now) {
         salidas.push({ 
           id: vuelo.id, 
           destino: vuelo.destino, 
@@ -333,7 +331,7 @@ export default function Colapso() {
 
       {/* Tooltip de aeropuerto */}
       {activeAirportData && (
-        <div className="absolute top-20 right-4 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
+        <div className="absolute top-20 right-2 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b border-border pb-2">
               <div className="flex items-center gap-2">
@@ -488,7 +486,7 @@ export default function Colapso() {
 
       {/* Tooltip de vuelo */}
       {activeFlight && !selectedAirportId && (
-        <div className="absolute top-20 right-4 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
+        <div className="absolute top-20 right-2 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b border-border pb-2">
               <div className="flex items-center gap-2">
