@@ -332,7 +332,7 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
       {/*<p className="text-rose-600">{simNowUtc}</p>*/}
       {/* Tooltip de aeropuerto */}
       {activeAirportData && (
-        <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
+        <div className="absolute top-20 right-8 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
           <div className="space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
@@ -427,8 +427,7 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
                             <div className="flex items-center gap-1">
                               <span className="font-mono text-muted-foreground text-[9px]">{v.id}</span>
                             </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground">Origen: {v.origen}</span>
+                            <div className="flex justify-end items-center">
                               <span className="font-semibold text-orange-600 dark:text-orange-400">-{v.cantidad}</span>
                             </div>
                           </div>
@@ -491,7 +490,7 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
 
       {/* Tooltip de vuelo */}
       {activeFlight && !selectedAirportId && (
-        <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
+        <div className="absolute top-20 right-8 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
           <div className="space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
