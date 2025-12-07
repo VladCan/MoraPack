@@ -339,7 +339,6 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
 
     const now = new Date(simNowUtc).getTime();
     const next24h = now + 24 * 60 * 60 * 1000; // 24 horas en ms
-    const past24h = now - 24 * 60 * 60 * 1000; // Últimas 24 horas también
 
     const llegadas: Array<{ id: string; origen: string; cantidad: number }> = [];
     const salidas: Array<{ id: string; destino: string; cantidad: number }> = [];
