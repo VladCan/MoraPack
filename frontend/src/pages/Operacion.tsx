@@ -368,9 +368,8 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
       }
 
       // Vuelos que saldrán del aeropuerto seleccionado
-      // Incluir vuelos que salieron en las últimas 24h o saldrán en las próximas 24h
-      // Filtrar estrictamente para evitar mantener vuelos antiguos en memoria
-      if (vuelo.origen === selectedAirportId && salidaTime >= past24h && salidaTime <= next24h) {
+      // Solo incluir vuelos que aún no han llegado a su destino (aún están en vuelo o saldrán en el futuro)
+      if (vuelo.origen === selectedAirportId && salidaTime <= next24h && llegadaTime > now) {
         salidas.push({ 
           id: vuelo.id, 
           destino: vuelo.destino, 
@@ -394,7 +393,7 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
     <div className="min-h-screen bg-neutral-50 relative">
       {/* Tooltip de aeropuerto */}
       {selectedAirportId && activeAirportData && (
-        <div className="absolute top-20 right-4 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
+        <div className="absolute top-20 right-2 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
           <div className="space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
@@ -569,7 +568,7 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
 
       {/* Tooltip de vuelo (solo para vuelos de la solución) */}
       {activeFlight && activeFlight.esDeSolucion && !selectedAirportId && (
-        <div className="absolute top-20 right-4 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
+        <div className="absolute top-20 right-2 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
           <div className="space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
