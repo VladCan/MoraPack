@@ -24,6 +24,7 @@ interface RunSessionState {
     selectedAirportId: string | null;
     selectedPedido: PedidoDTO | null;  // Pedido seleccionado para filtrar vuelos
     vuelosCancelados: Set<string>;  // IDs de vuelos cancelados localmente
+    preparing: boolean; //Para la ventana de "loading" para la primera planificación
 
     //Esto va a usar TopNav:
     begin: (runId: string) => void;
@@ -39,6 +40,8 @@ interface RunSessionState {
 
     autoReconnect: boolean;
     setAutoReconnect: (state: boolean) => void;
+                   // NUEVO
+    setPreparing: (value: boolean) => void;
 
 }
 
@@ -53,6 +56,7 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
     const [selectedAirportId, setSelectedAirportId] = useState<string | null>(null);
     const [selectedPedido, setSelectedPedidoState] = useState<PedidoDTO | null>(null);
     const [vuelosCancelados, setVuelosCancelados] = useState<Set<string>>(new Set());
+    const [preparing, setPreparing] = useState(false);
 
     const [autoReconnect, setAutoReconnect] = useState<boolean>(true);
 
@@ -146,6 +150,7 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setSelectedAirportId(null);
         setSelectedPedidoState(null);
         setVuelosCancelados(new Set());
+        setPreparing(false);
     }, []);
 
     const cancelarVuelo = useCallback((vueloId: string) => {
@@ -186,6 +191,7 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         selectedAirportId,
         selectedPedido,
         vuelosCancelados,
+        preparing,
         begin,
         end,
         setSimNow,
@@ -195,7 +201,8 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         cancelarVuelo,
         reset,
         autoReconnect,
-        setAutoReconnect
+        setAutoReconnect,
+        setPreparing
     }), [runId, status, simNow, lastWindow, windows, selectedAirportId, selectedPedido, vuelosCancelados, begin, end, setSimNow, setWindow, setSelectedAirport, setSelectedPedido, cancelarVuelo, reset, autoReconnect]);
 
     return (

@@ -79,6 +79,7 @@ export type StopReason = "FIN_DE_RANGO" | "MANUAL" | "COLAPSO" | "ERROR";
 
 export type RunEvt = 
 | {type:"RUN_STARTED"; runId: string; simStartUtc: string; wallAnchorUtc: string; speed: number }
+| {type: "PREPARING"; runId: string}
 | { type: "TICK"; runId: string; simNowUtc: string; aeropuertos: Record<string, AeropuertoOcupacion> }
 | { type: "WINDOW"; runId: string; windowIndex: number; windowStartUtc: string; windowEndUtc: string; vuelos: VueloDTO[]; pedidos: PedidoDTO[] }
 | { type: "FINISHED"; runId: string; reason: StopReason };
@@ -103,6 +104,8 @@ export function useRunSSE(runId?: string){
     const [windows, setWindows]   = useState<WindowData[]>([]);
     const [finished, setFinished] = useState<{reason: StopReason}|null>(null);
     const [airportOccupancy, setAirportOccupancy] = useState<Record<string, AeropuertoOcupacion>>({});
+
+    const [preparing, setPreparing] = useState(false);
 
     const esRef = useRef<EventSource | null>(null);
 
@@ -148,6 +151,7 @@ export function useRunSSE(runId?: string){
         setWindows([]);
         setFinished(null);
         setAirportOccupancy({});
+        setPreparing(false);
     }, [runId]);
 
     useEffect(() => {
@@ -173,6 +177,9 @@ export function useRunSSE(runId?: string){
                 const evt: RunEvt = JSON.parse(ev.data);
 
                 switch (evt.type){
+                    case "PREPARING":
+                        setPreparing(true);
+                        break;
                     case "RUN_STARTED":
                         setSimStart(evt.simStartUtc);
                         setWallStart(evt.wallAnchorUtc);
@@ -203,6 +210,7 @@ export function useRunSSE(runId?: string){
                             }
                             return [...prev, nextWindow];
                         });
+                        setPreparing(false);
                         break;
                     case "FINISHED":
                         setFinished({ reason: evt.reason });
@@ -262,6 +270,7 @@ export function useRunSSE(runId?: string){
         setWindows([]);
         setFinished(null);
         setAirportOccupancy({});
+        setPreparing(false);
 
     };
 
@@ -276,6 +285,7 @@ export function useRunSSE(runId?: string){
         windows,
         finished,
         airportOccupancy,
+        preparing,
         disconnect,
     };
 }

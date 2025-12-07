@@ -1,3 +1,4 @@
+// src/components/common/FlightPath.tsx
 import PlaneIcon from "@/assets/plane2.svg?react";
 import { Marker, Source, Layer } from "react-map-gl/maplibre";
 import { useMemo } from "react";
@@ -162,10 +163,10 @@ export default function FlightPath({
               "interpolate",
               ["linear"],
               ["zoom"],
-              0, 0.3,
-              3, 0.6,
-              6, 1.2,
-              10, 2
+              0, 0.6,  // Antes 0.3
+              3, 1.2,  // Antes 0.6
+              6, 2.4,  // Antes 1.2
+              10, 4    // Antes 2
             ],
             // ligera suavidad para que no “corte”
             "line-blur": isDark ? 0.3 : 0.15,
@@ -184,7 +185,8 @@ export default function FlightPath({
           className="cursor-pointer"
         >
           <PlaneIcon
-            className="w-3 h-3 transition-transform duration-300"
+            // <--- CAMBIO: Aumentado tamaño de w-3 h-3 (12px) a w-4 h-4 (16px)
+            className="w-4 h-4 transition-transform duration-300"
             style={{
               color: planeColorFinal,
               transform: `rotate(${hdg + ROTATION_OFFSET}deg)`,

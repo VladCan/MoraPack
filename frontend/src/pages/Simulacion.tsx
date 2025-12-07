@@ -76,7 +76,7 @@ export default function Simulacion() {
   }, [airports]);
 
   // Conectar al SSE
-  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows, selectedPedido } = useRunSession();
+  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows, selectedPedido, preparing } = useRunSession();
 const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
 
   //Cambio para agregar color a los aeropuertos
@@ -301,7 +301,24 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
 
   return (
     <div className="min-h-screen bg-neutral-50 relative">
-      {/*<p className="text-rose-600">{simNowUtc}</p>*/}
+
+      {preparing && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center 
+                        bg-black/40 backdrop-blur-sm">
+          
+          <div className="flex flex-col items-center gap-3 p-6 rounded-xl 
+                          bg-white/70 backdrop-blur-md shadow-xl">
+
+            <div className="animate-spin h-8 w-8 border-4 border-blue-400 border-t-transparent rounded-full"></div>
+
+            <p className="font-semibold text-gray-700">Cargando...</p>
+            <p className="text-xs text-gray-500">Por favor, espere</p>
+          </div>
+
+        </div>
+      )}
+
+
       {/* Tooltip de aeropuerto */}
       {activeAirportData && (
         <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">

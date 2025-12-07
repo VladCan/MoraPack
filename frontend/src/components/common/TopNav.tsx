@@ -48,16 +48,21 @@ export default function TopNav() {
   //Esto es para la conexión SSE de la solución
 
   //Traemos el contexto
-  const { runId, status, end, setSimNow, setWindow, setAutoReconnect } = useRunSession();
+  const { runId, status, end, setSimNow, setWindow, setAutoReconnect, setPreparing} = useRunSession();
 
   //Para el reloj
   const running = status === "running" && !!runId;
   
   //Acá expone connect(url, handlers) -> () => void
-  const { simNowUtc, windows, finished, wallStartUtc } = useRunSSE(
+  const { simNowUtc, windows, finished, wallStartUtc, preparing } = useRunSSE(
     status === "running" && runId ? runId : undefined
   );
 
+  //Propagamos el preparing
+  useEffect(() => {
+    setPreparing(preparing);
+  }, [preparing, setPreparing]);
+  
   //Propagamos los TICKs al contexto
   useEffect(() => {
     if (simNowUtc) setSimNow(simNowUtc);
