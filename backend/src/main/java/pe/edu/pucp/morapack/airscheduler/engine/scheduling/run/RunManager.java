@@ -95,6 +95,8 @@ public class RunManager {
     // Para validar si se violó un SLA o no
     private final ConcurrentHashMap<String, AtomicBoolean> slaBroken = new ConcurrentHashMap<>();
 
+    private final Map<String, Long> warmupMs = new ConcurrentHashMap<>();
+
     public WindowPacket getLastWindow(String runId) { return lastWindows.get(runId); }
 
     public String currentOperacionRunId(){ return operacionRunId.get(); }
@@ -392,9 +394,20 @@ public class RunManager {
         RunContext ctx = requireContext(runId);
         //Acá calculamos el tiempo real transcurrido desde que arrancó el run
         long deltaMs = Duration.between(ctx.wallAnchor(), Instant.now()).toMillis();
-        //Acá calculamos la velocidad en segundos simulados por segundo real
-        long simDeltaMs = (long) Math.floor(deltaMs * ctx.speed());
 
+        // warmupMs almacena cuanto tiempo real tenemos que descontar
+        Long warmup = warmupMs.get(runId);
+
+        long effectiveMs;
+        if (warmup == null || warmup < 0){
+            effectiveMs = deltaMs; //Aún no se sabe el warmup (Ventana 0 no calculada)
+        }
+        else {
+            effectiveMs = Math.max(0, deltaMs - warmup);
+        }
+
+        //Acá calculamos la velocidad en segundos simulados por segundo real
+        long simDeltaMs = (long) Math.floor(effectiveMs  * ctx.speed());
         // Retornamos el ahora simulado
         Instant simulatedNow = ctx.simStartUtc().plusMillis(simDeltaMs);
         
@@ -530,6 +543,14 @@ public class RunManager {
         final AtomicBoolean slaFlag = slaBroken.computeIfAbsent(id, k -> new AtomicBoolean(false));
         slaFlag.set(false);
 
+        if (config.scenario() == RunConfig.Scenario.SIM_SEMANAL ||
+                config.scenario() == RunConfig.Scenario.SIM_SEMANAL){
+            warmupMs.put(id, -1L); //Aun no se calculó el warmup
+        }
+        else {
+            warmupMs.put(id, 0L); //En OD no se aplica offset temporal
+        }
+
         executor.submit(() -> {
             try{
                 switch (config.scenario()){
@@ -611,6 +632,8 @@ public class RunManager {
         operacionRunId.set(null);
 
         slaBroken.remove(id);
+
+        warmupMs.remove(id);
     }
 
     private boolean isCancelled(String id){
@@ -810,6 +833,9 @@ public class RunManager {
                     System.out.println("[RunManager] No hay pedidos en la ventana " + idx);
                     // Marcar ventana como enviada aunque esté vacía
                     ventanasEnviadasRun.add(windowIdISO);
+                    if (idx == 0) {
+                        calcularOffsetMs(id);
+                    }
                     broadcastWindow(new WindowPacket(id, idx, wStart, wEnd, List.of(),
                             convertirPedidosADTO(List.of(), null)));
 
@@ -898,6 +924,9 @@ public class RunManager {
 
                 // 8. Marcar ventana como enviada y hacer broadcast
                 ventanasEnviadasRun.add(windowIdISO);
+                if (idx == 0) {
+                    calcularOffsetMs(id);
+                }
                 broadcastWindow(new WindowPacket(id, idx, wStart, wEnd, vuelosVentana, pedidosVentanaDTO));
 
                 //9. Imprimimos en archivo
@@ -933,6 +962,16 @@ public class RunManager {
             ImpresorSolucion.imprimirUltimaPlanificacion(ultimaPlan, reportePath.toString(), lastWStart);
         }
 
+    }
+
+    private void calcularOffsetMs(String runId){
+        Long w = warmupMs.get(runId);
+        RunContext ctx = requireContext(runId);
+        if (w != null && w < 0) {
+            long warm = Duration.between(ctx.wallAnchor(), Instant.now()).toMillis();
+            warmupMs.put(runId, warm);
+            System.out.println("[RunManager] Warmup registrado: " + warm + " ms");
+        }
     }
 
     /// 2. Run de Operación Diaria

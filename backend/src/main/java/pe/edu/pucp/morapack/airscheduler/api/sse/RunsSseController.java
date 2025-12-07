@@ -44,9 +44,13 @@ public class RunsSseController {
 
             //Apenas se conecta, va a emitir un RUN_STARTED
             RunContext ctx = runManager.requireContext(runId.value());
+
+            //Emitimos el inicio como siempre
             emitter.emit(new RunStartedEvt(runId.value(), ctx.simStartUtc().toString(),
                     ctx.wallAnchor().toString(), ctx.speed()));
 
+            //Emitimos el aviso de preparar (CONSIDERAR OD)
+            emitter.emit(new PreparingEvt(runId.value()));
 
             // Listener que reenvía los eventos del RunManager al SSE
             RunManager.RunListener listener = new RunManager.RunListener() {
@@ -106,6 +110,15 @@ public class RunsSseController {
         public final double speed;
         public RunStartedEvt(String runId, String simStartUtc, String wallAnchorUtc, double speed) {
             this.runId = runId; this.simStartUtc = simStartUtc; this.wallAnchorUtc = wallAnchorUtc; this.speed = speed;
+        }
+    }
+
+    @RegisterForReflection
+    public static final class PreparingEvt {
+        public final String type = "PREPARING";
+        public final String runId;
+        public PreparingEvt(String runId) {
+            this.runId = runId;
         }
     }
 
