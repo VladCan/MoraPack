@@ -299,7 +299,7 @@ export default function Operacion() {
     const past24h = now - 24 * 60 * 60 * 1000; // Últimas 24 horas también
 
     const llegadas: Array<{ id: string; origen: string; cantidad: number }> = [];
-    const salidas: Array<{ id: string; origen: string; cantidad: number }> = [];
+    const salidas: Array<{ id: string; destino: string; cantidad: number }> = [];
 
     // Recopilar todos los vuelos únicos de todas las ventanas
     const vuelosUnicos = new Map<string, typeof windows[0]['vuelos'][0]>();
@@ -326,13 +326,22 @@ export default function Operacion() {
 
       // Vuelos que saldrán del aeropuerto seleccionado
       // Incluir vuelos que salieron en las últimas 24h o saldrán en las próximas 24h
+      // Filtrar estrictamente para evitar mantener vuelos antiguos en memoria
       if (vuelo.origen === selectedAirportId && salidaTime >= past24h && salidaTime <= next24h) {
         salidas.push({ 
           id: vuelo.id, 
-          origen: vuelo.origen, 
+          destino: vuelo.destino, 
           cantidad: vuelo.cantidadAsignada 
         });
       }
+    });
+
+    // Ordenar salidas por tiempo de salida (más recientes primero)
+    salidas.sort((a, b) => {
+      const vueloA = vuelosUnicos.get(a.id);
+      const vueloB = vuelosUnicos.get(b.id);
+      if (!vueloA || !vueloB) return 0;
+      return new Date(vueloB.salidaUtc).getTime() - new Date(vueloA.salidaUtc).getTime();
     });
 
     return { llegadas, salidas };
@@ -399,7 +408,7 @@ export default function Operacion() {
 
       {/* Tooltip de aeropuerto */}
       {selectedAirportId && activeAirportData && (
-        <div className="absolute top-20 right-8 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
+        <div className="absolute top-20 right-4 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
           <div className="space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
@@ -510,7 +519,8 @@ export default function Operacion() {
                             <div className="flex items-center gap-1">
                               <span className="font-mono text-muted-foreground text-[9px]">{v.id}</span>
                             </div>
-                            <div className="flex justify-end items-center">
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">Destino: {v.destino}</span>
                               <span className="font-semibold text-orange-600 dark:text-orange-400">-{v.cantidad}</span>
                             </div>
                           </div>
@@ -554,7 +564,7 @@ export default function Operacion() {
                               <span className="font-mono text-muted-foreground text-[9px]">{v.id}</span>
                             </div>
                             <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground">Origen: {v.origen}</span>
+                              <span className="text-muted-foreground">Destino: {v.destino}</span>
                               <span className="font-semibold text-orange-600 dark:text-orange-400">-{v.cantidad}</span>
                             </div>
                           </div>
@@ -573,7 +583,7 @@ export default function Operacion() {
 
       {/* Tooltip de vuelo (solo para vuelos de la solución) */}
       {activeFlight && activeFlight.esDeSolucion && !selectedAirportId && (
-        <div className="absolute top-20 right-8 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
+        <div className="absolute top-20 right-4 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
           <div className="space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
