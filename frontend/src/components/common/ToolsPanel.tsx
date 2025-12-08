@@ -376,7 +376,7 @@ export default function ToolsPanel({
         toast.custom((t) => (
           <ToastCustom
             t={t}
-            message={"¡Simulación iniciada exitosamente!"+"✅"}
+            message={"¡Simulación iniciada exitosamente!"}
             type="success"
           />),
         { duration: 5000});
@@ -444,7 +444,7 @@ export default function ToolsPanel({
         toast.custom((t) => (
             <ToastCustom
               t={t}
-              message={"Planificación forzada exitosamente!" + "✅"}
+              message={"Planificación forzada exitosamente!"}
               type="success"
             />
           ), { duration: 4000 });
@@ -1119,7 +1119,7 @@ function FlightSelectCard({
         toast.custom((t) => (
           <ToastCustom
             t={t}
-            message={"Vuelo cancelado exitosamente!"+"✅"}
+            message={"Vuelo cancelado exitosamente!"}
             type="success"
           />),
         { duration: 5000});

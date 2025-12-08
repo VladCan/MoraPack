@@ -64,7 +64,7 @@ export default function Registrar() {
     //termina el toast de carga
     if (data) {
       toast.custom((t) => (
-        <ToastCustom t={t} message={data.message + " ✅"} type="success" />),
+        <ToastCustom t={t} message={data.message} type="success" />),
         { duration: 8000 }
       );
 
@@ -152,12 +152,12 @@ export default function Registrar() {
     //EN EL BACK EL CONTROLLER TIENE QUE TENER EL ENDPOINT '/upload' (VER Línea 98)
     const [data, error] = await uploadFile(`${kind}/upload`, file);
     if (data) {
-      console.log("✅ [Registrar] Archivos enviados para operacionDiaria:", data);
+      console.log("[Registrar] Archivos enviados para operacionDiaria:", data);
 
       toast.custom((t) => (
         <ToastCustom
           t={t}
-          message={data.message + "✅"}
+          message={data.message}
           type="success"
         />),
         { duration: 5000 });
@@ -359,7 +359,7 @@ export default function Registrar() {
       toast.custom((t) => (
         <ToastCustom
           t={t}
-          message={data.message + "✅"}
+          message={data.message}
           type="success"
         />),
         { duration: 5000 });

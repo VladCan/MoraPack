@@ -110,11 +110,11 @@ export default function TopNav() {
     }
     else if (data) {
       if (data.cancelled){
-        console.log("✅ [TopNav] Simulación finalizada exitosamente:", data);
+        console.log("[TopNav] Simulación finalizada exitosamente:", data);
         toast.custom((t) => (
           <ToastCustom
             t={t}
-            message={"¡Simulación finalizada exitosamente!"+"✅"}
+            message={"¡Simulación finalizada exitosamente!"}
             type="success"
           />),
         { duration: 5000});

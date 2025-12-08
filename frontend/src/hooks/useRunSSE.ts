@@ -255,7 +255,7 @@ export function useRunSSE(runId?: string) {
 
         switch (evt.type) {
           case "LOADING":
-            console.log("%c✅ [SSE] Entrando al case LOADING", 'color: orange');
+            console.log("%c[SSE] Entrando al case LOADING", 'color: orange');
             setRunState("LOADING"); 
             if (evt.message) setLoadingMessage(evt.message);
             if (evt.progress !== undefined) setLoadingProgress(evt.progress);

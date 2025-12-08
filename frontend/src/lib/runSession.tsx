@@ -116,7 +116,7 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
                     toast.custom((t) => (
                         <ToastCustom
                             t={t}
-                            message={"Conexión establecida"+ msg + "! ✅"}
+                            message={"Conexión establecida"+ msg}
                             type="success"
                         />),
                     { duration: 5000})

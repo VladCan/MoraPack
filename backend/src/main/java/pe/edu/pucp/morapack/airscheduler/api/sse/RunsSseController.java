@@ -22,7 +22,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunContext;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunId;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.StopReason;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.WindowPacket; // Asegúrate de importar esto
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.WindowPacket;
 
 @Path("/runs")
 @RequestScoped
@@ -40,12 +40,18 @@ public class RunsSseController {
 
         return Multi.createFrom().emitter(emitter -> {
 
-            // Apenas se conecta, emitimos estado inicial
-            // (Podrías verificar runManager.status(runId) para ver si enviar Loading o Started, 
-            // pero por simplicidad enviamos Started y luego los eventos corregirán el estado)
-            RunContext ctx = runManager.requireContext(runId.value());
-            emitter.emit(new RunStartedEvt(runId.value(), ctx.simStartUtc().toString(),
-                    ctx.wallAnchor().toString(), ctx.speed()));
+            // 1. BLINDAJE INICIAL: Verificamos si el Run existe antes de empezar
+            try {
+                RunContext ctx = runManager.requireContext(runId.value());
+                // Si existe, emitimos el evento de inicio
+                emitter.emit(new RunStartedEvt(runId.value(), ctx.simStartUtc().toString(),
+                        ctx.wallAnchor().toString(), ctx.speed()));
+            } catch (IllegalStateException | IllegalArgumentException e) {
+                // Si el run no existe (ya terminó o id incorrecto), cerramos el stream suavemente
+                // System.out.println("SSE: El run " + runIdStr + " no existe o ya terminó. Cerrando conexión.");
+                emitter.complete();
+                return; // Salimos para no registrar listeners fantasmas
+            }
 
 
             // Listener que reenvía los eventos del RunManager al SSE
@@ -61,33 +67,40 @@ public class RunsSseController {
                     // NO cerramos el SSE aquí: los vuelos deben continuar hasta llegar
                 }
 
-                // --- NUEVO MÉTODO OBLIGATORIO ---
                 @Override
                 public void onLoading(String id, String message) {
-                    // Enviamos el evento de carga al frontend
-                    // Progress en 0.0 por defecto si no tenemos métrica exacta
                     emitter.emit(new LoadingEvt(id, message, 0.0));
                 }
             };
             
             // Suscribimos al run
-            runManager.registerListener(runId, listener);
+            // Nota: Aquí también podría fallar si se borra en el milisegundo exacto entre el try de arriba y esto,
+            // así que un try-catch extra no hace daño.
+            try {
+                runManager.registerListener(runId, listener);
+            } catch (Exception e) {
+                emitter.complete();
+                return;
+            }
             
             // Tick cada 1s real
             ScheduledExecutorService tickExec = Executors.newSingleThreadScheduledExecutor();
             ScheduledFuture<?> tickFuture = tickExec.scheduleAtFixedRate(() -> {
                 try {
-                   Instant now = Instant.now();
-                   Instant simNow = runManager.currentSimNow(runId.value());
+                    // 2. BLINDAJE DEL TICK: Si el run se borra, estos métodos lanzan excepción
+                    Instant simNow = runManager.currentSimNow(runId.value());
+                    var ocupacionAeropuertos = runManager.getCurrentAirportOccupancy(runId.value());
 
-                   // System.out.printf("Tick executed at %s | simNow=%s%n", ISO.format(now), ISO.format(simNow));
-
-                   // Obtener ocupación actual de aeropuertos
-                   var ocupacionAeropuertos = runManager.getCurrentAirportOccupancy(runId.value());
-
-                   emitter.emit(new TickEvt(runId.value(), simNow.toString(), ocupacionAeropuertos));
+                    emitter.emit(new TickEvt(runId.value(), simNow.toString(), ocupacionAeropuertos));
+                }
+                catch (IllegalStateException ie) {
+                    // El run fue eliminado de memoria (normal al finalizar).
+                    // Capturamos la excepción para evitar el stack trace gigante en logs.
+                    // Lanzamos RuntimeException para detener el scheduler silenciosamente o no hacemos nada.
+                    throw new RuntimeException("Run finished, stopping ticker");
                 }
                 catch (Exception e) {
+                    // Otros errores reales sí los imprimimos
                     e.printStackTrace();
                 }
             }, 0L, 1L, TimeUnit.SECONDS);
@@ -116,7 +129,6 @@ public class RunsSseController {
         }
     }
 
-    // --- NUEVO DTO PARA LOADING ---
     @RegisterForReflection
     public static final class LoadingEvt {
         public final String type = "LOADING";
