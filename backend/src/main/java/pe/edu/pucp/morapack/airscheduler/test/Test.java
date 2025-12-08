@@ -3,7 +3,6 @@ package pe.edu.pucp.morapack.airscheduler.test;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -13,7 +12,6 @@ import java.util.*;
 
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.VentanaPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.*;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.TEGEventBuilder;
@@ -200,7 +198,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             List<RepairOperator> reparadores = new ArrayList<>();
             reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
             reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
-            ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC, ocupacionPorAeropuerto);
+            ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC, ocupacionPorAeropuerto,aeropuertosMap);
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
             //SEQM    410
             //48
@@ -220,7 +218,12 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
                     presenteUTC, finUTC,
                     "out/reporteCapacidadVuelos_" + presenteUTC.toString().replace(':', '-') + ".txt");
             */
-            VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46),mapa);
+            if(VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46),mapa, aeropuertosMap)){
+                System.out.println("✅ Solución verificada para la ventana actual.");
+            } else {
+                System.err.println("❌ La solución tiene violaciones en la ventana actual.");
+                System.exit(1);
+            }
             long endVentanaDeTiempo = System.nanoTime();
             double durationSeconds = (endVentanaDeTiempo - startVentanaDeTiempo) / 1_000_000_000.0;
             System.out.println("⏱️ Tiempo total de ejecución: " + durationSeconds + " segundos");

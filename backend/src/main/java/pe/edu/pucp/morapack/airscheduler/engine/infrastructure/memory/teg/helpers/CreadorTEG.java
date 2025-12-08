@@ -134,8 +134,8 @@ public final class CreadorTEG {
                         teg.agregarArco(new VuelosEdge(nSalida, nLlegada, VuelosEdge.Type.FLIGHT, v.getCapacidad(), v));
                     }else{
 
-                        System.out.println("[Flights] SALTANDO vuelo cancelado: "
-                                + v.getOrigen() + " salida=" + salida);
+                        /*System.out.println("[Flights] SALTANDO vuelo cancelado: "
+                                + v.getOrigen() + " salida=" + salida);*/
                     }
                 }
             }

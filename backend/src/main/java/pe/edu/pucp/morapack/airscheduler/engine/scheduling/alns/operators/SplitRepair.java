@@ -11,10 +11,6 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * SplitRepair Optimizado (Relaxed Constraints):
- * - Busca rutas aunque violen SLA, para evitar dejar pedidos sin asignar.
- */
 public class SplitRepair implements RepairOperator {
 
     private final List<String> sedes;
@@ -22,7 +18,8 @@ public class SplitRepair implements RepairOperator {
 
     private static final Duration PICKUP_FINAL = Duration.ofHours(2);
     private static final int MAX_NODES_IN_PATH = 4;
-    private static final int MAX_SPLITS_PER_ORDER = 10; 
+    private static final int MAX_SPLITS_PER_ORDER = 10;
+    private static final int MAX_CAPACIDAD_SEGURA = 100000; 
 
     public SplitRepair(List<String> sedes, VuelosTEG teg) {
         this.sedes = sedes;
@@ -35,24 +32,35 @@ public class SplitRepair implements RepairOperator {
         Collections.shuffle(planes, new Random());
 
         for (PlanPedido plan : planes) {
+            
+            if (plan.getDemanda() <= 0) continue; 
+            if (plan.getDemanda() > MAX_CAPACIDAD_SEGURA) continue; 
+            
             if (plan.estaCompleto()) continue;
 
             Map<VueloProgramadoId, Integer> prevByFlight = contribucionPorVuelo(plan);
             
             List<RutaAsignada> nuevas = buildPackingMax(plan, s, prevByFlight);
             
+            // Fusión y limpieza de rutas con 0kg
+            if (nuevas.isEmpty()) continue;
+            nuevas = combinarRutasIguales(nuevas);
+            nuevas.removeIf(r -> r.getCantidad() <= 0); // Seguridad extra final
+
             if (nuevas.isEmpty()) continue;
 
-            nuevas = combinarRutasIguales(nuevas);
             aplicarDeltasCargaPorVuelo(s, prevByFlight, contribucionPorVuelo(nuevas));
             reservarBodegasDeRutas(journal, plan.getCreadoUtc(), plan.getAeropuertoDestino(), nuevas);
+
+            // BLINDAJE: Crear ArrayList mutable explícitamente
+            List<RutaAsignada> listaFinal = new ArrayList<>(nuevas);
 
             PlanPedido nuevoPlan = PlanPedido.builder()
                     .idPedido(plan.getIdPedido())
                     .aeropuertoDestino(plan.getAeropuertoDestino())
                     .creadoUtc(plan.getCreadoUtc())
                     .demanda(plan.getDemanda())
-                    .rutas(nuevas)
+                    .rutas(listaFinal)
                     .build();
             s.getPlanPorPedido().put(nuevoPlan.getIdPedido(), nuevoPlan);
         }
@@ -73,7 +81,6 @@ public class SplitRepair implements RepairOperator {
             if (intentos >= MAX_SPLITS_PER_ORDER) break;
             intentos++;
 
-            // Búsqueda relajada (sin deadline estricto)
             List<VueloProgramadoId> pathIds = buscarMejorRutaTimeAttack(plan.getAeropuertoDestino(), s, prevByFlight, addedNow, ref);
 
             if (pathIds == null || pathIds.isEmpty()) break;
@@ -86,16 +93,18 @@ public class SplitRepair implements RepairOperator {
             if (cuello <= 0) break;
 
             int lote = Math.min(restante, cuello);
+            if (lote <= 0) break; 
+
             qtyByPath.merge(pathIds, lote, Integer::sum);
             for (VueloProgramadoId id : pathIds) addedNow.merge(id, lote, Integer::sum);
 
             restante -= lote;
         }
 
-        List<RutaAsignada> rutas = new ArrayList<>(qtyByPath.size());
+        List<RutaAsignada> rutas = new ArrayList<>();
         for (var e : qtyByPath.entrySet()) {
             int q = e.getValue();
-            if (e.getKey() == null || e.getKey().isEmpty()) continue;
+            if (q <= 0 || e.getKey() == null || e.getKey().isEmpty()) continue;
 
             List<TramoAsignado> tramos = e.getKey().stream()
                     .map(id -> new TramoAsignado(id, q, id.getLlegadaUtc()))
@@ -111,13 +120,14 @@ public class SplitRepair implements RepairOperator {
     }
 
     private List<VueloProgramadoId> buscarMejorRutaTimeAttack(String destino,
-                                                SolucionProgramacion s,
-                                                Map<VueloProgramadoId, Integer> prevByFlight,
-                                                Map<VueloProgramadoId, Integer> addedNow,
-                                                Instant refCreacion) {
+                                                              SolucionProgramacion s,
+                                                              Map<VueloProgramadoId, Integer> prevByFlight,
+                                                              Map<VueloProgramadoId, Integer> addedNow,
+                                                              Instant refCreacion) {
         List<List<VueloProgramadoId>> candidatos = new ArrayList<>();
         
         for (String sede : sedes) {
+            if (sede.equals(destino)) continue;
             List<VueloProgramadoId> path = dijkstraTimeBased(sede, destino, s, prevByFlight, addedNow, refCreacion);
             if (path != null && !path.isEmpty()) candidatos.add(path);
         }
@@ -134,9 +144,9 @@ public class SplitRepair implements RepairOperator {
     }
 
     private List<VueloProgramadoId> dijkstraTimeBased(String origen, String destino, SolucionProgramacion s,
-                                             Map<VueloProgramadoId, Integer> prevByFlight,
-                                             Map<VueloProgramadoId, Integer> addedNow,
-                                             Instant refCreacion) {
+                                                      Map<VueloProgramadoId, Integer> prevByFlight,
+                                                      Map<VueloProgramadoId, Integer> addedNow,
+                                                      Instant refCreacion) {
 
         if (origen.equals(destino)) return null;
 
@@ -172,8 +182,6 @@ public class SplitRepair implements RepairOperator {
 
                 if (salidaUtc.isBefore(current.llegada.plusSeconds(60))) continue;
                 
-                // 🛑 REMOVIDO: Filtro SLA estricto.
-                
                 if (residualAjustado(id, s, prevByFlight, addedNow) <= 0) continue;
 
                 if (llegadaUtc.isBefore(bestArrival.getOrDefault(id.getDestino(), Instant.MAX))) {
@@ -181,7 +189,6 @@ public class SplitRepair implements RepairOperator {
                     depth.put(id.getDestino(), d + 1);
                     prevVuelo.put(id.getDestino(), id);
                     prevNodo.put(id.getDestino(), u);
-                    
                     pq.add(new State(id.getDestino(), llegadaUtc));
                 }
             }
@@ -203,56 +210,96 @@ public class SplitRepair implements RepairOperator {
         return ruta;
     }
 
-    // ... (Resto de métodos auxiliares: residualAjustado, contribucionPorVuelo, etc. se mantienen IGUALES)
-    // Incluye los métodos auxiliares del archivo anterior aquí abajo para que compile.
-    private int residualAjustado(VueloProgramadoId id, SolucionProgramacion s, Map<VueloProgramadoId, Integer> prevByFlight, Map<VueloProgramadoId, Integer> addedNow) {
-        int cap = s.getCargaPorVuelo().capacidad(id); int asg = s.getCargaPorVuelo().asignado(id);
-        int prev = prevByFlight.getOrDefault(id, 0); int added = addedNow.getOrDefault(id, 0);
-        return Math.max(0, cap - (asg - prev + added));
+    private int residualAjustado(VueloProgramadoId id, SolucionProgramacion s, 
+                                 Map<VueloProgramadoId, Integer> prevByFlight, 
+                                 Map<VueloProgramadoId, Integer> addedNow) {
+        int cap = s.getCargaPorVuelo().capacidad(id);
+        int asg = s.getCargaPorVuelo().asignado(id);
+        int prev = prevByFlight.getOrDefault(id, 0);
+        int added = addedNow.getOrDefault(id, 0);
+        
+        int ocupadoVirtual = (asg - prev) + added;
+        return Math.max(0, cap - ocupadoVirtual);
     }
-    private Map<VueloProgramadoId, Integer> contribucionPorVuelo(PlanPedido plan) { return contribucionPorVuelo(plan.getRutas()); }
+
+    private Map<VueloProgramadoId, Integer> contribucionPorVuelo(PlanPedido plan) { 
+        return contribucionPorVuelo(plan.getRutas()); 
+    }
+
     private Map<VueloProgramadoId, Integer> contribucionPorVuelo(List<RutaAsignada> rutas) {
         Map<VueloProgramadoId, Integer> acc = new HashMap<>();
         if (rutas == null) return acc;
         for (RutaAsignada r : rutas) {
-            if (r.getTramos() != null) for (TramoAsignado t : r.getTramos()) acc.merge(t.getVuelo(), r.getCantidad(), Integer::sum);
+            if (r.getCantidad() <= 0) continue; 
+            if (r.getTramos() != null) {
+                for (TramoAsignado t : r.getTramos()) {
+                    acc.merge(t.getVuelo(), r.getCantidad(), Integer::sum);
+                }
+            }
         }
         return acc;
     }
+
     private List<RutaAsignada> combinarRutasIguales(List<RutaAsignada> rutas) {
         LinkedHashMap<List<VueloProgramadoId>, Integer> acc = new LinkedHashMap<>();
         for (RutaAsignada r : rutas) {
+            if (r.getCantidad() <= 0) continue;
             List<VueloProgramadoId> key = (r.getTramos() == null ? List.of() : r.getTramos().stream().map(TramoAsignado::getVuelo).toList());
+            if (key.isEmpty()) continue;
             acc.merge(key, r.getCantidad(), Integer::sum);
         }
         List<RutaAsignada> res = new ArrayList<>();
         for (var e : acc.entrySet()) {
             int q = e.getValue();
+            if (q <= 0) continue;
             List<TramoAsignado> tramos = e.getKey().stream().map(id -> new TramoAsignado(id, q, id.getLlegadaUtc())).collect(Collectors.toList());
             res.add(new RutaAsignada(q, tramos));
         }
         return res;
     }
+
     private void aplicarDeltasCargaPorVuelo(SolucionProgramacion s, Map<VueloProgramadoId, Integer> prev, Map<VueloProgramadoId, Integer> nuevo) {
         Map<VueloProgramadoId, Integer> map = s.getCargaPorVuelo().getAsignado();
         Map<VueloProgramadoId, Integer> delta = new HashMap<>(nuevo);
+        
         prev.forEach((k, v) -> delta.merge(k, -v, Integer::sum));
-        delta.forEach((k, v) -> { if (v != 0) map.merge(k, v, Integer::sum); });
+        
+        delta.forEach((k, v) -> { 
+            if (v != 0) {
+                map.merge(k, v, Integer::sum);
+                if (map.get(k) < 0) {
+                    map.put(k, 0); // Corrección de seguridad
+                }
+            }
+        });
     }
+
     private void reservarBodegasDeRutas(ALNS.Journal journal, Instant cr, String dst, List<RutaAsignada> rutas) {
         if (journal == null || rutas == null) return;
+        
         for (RutaAsignada r : rutas) {
             List<TramoAsignado> tr = r.getTramos();
             if (tr == null || tr.isEmpty()) continue;
+            
+            int q = r.getCantidad();
+            if (q <= 0) continue; // SEGURIDAD EXTRA
+
             for (int i = 0; i < tr.size(); i++) {
-                TramoAsignado t = tr.get(i); VueloProgramadoId v = t.getVuelo(); int q = r.getCantidad();
+                TramoAsignado t = tr.get(i); 
+                VueloProgramadoId v = t.getVuelo(); 
+
                 if (!sedes.contains(v.getOrigen())) {
                     Instant ini = (i == 0) ? cr : tr.get(i - 1).getVuelo().getLlegadaUtc();
-                    if (ini != null && v.getSalidaUtc() != null && !v.getSalidaUtc().isBefore(ini)) journal.reservar(v.getOrigen(), ini, v.getSalidaUtc(), q);
+                    if (ini != null && v.getSalidaUtc() != null && v.getSalidaUtc().isAfter(ini)) {
+                        journal.reservar(v.getOrigen(), ini, v.getSalidaUtc(), q);
+                    }
                 }
+
                 if (!sedes.contains(v.getDestino())) {
                     Instant fin = (i + 1 < tr.size()) ? tr.get(i + 1).getVuelo().getSalidaUtc() : v.getLlegadaUtc().plus(PICKUP_FINAL);
-                    if (v.getLlegadaUtc() != null && fin != null && !fin.isBefore(v.getLlegadaUtc())) journal.reservar(v.getDestino(), v.getLlegadaUtc(), fin, q);
+                    if (v.getLlegadaUtc() != null && fin != null && fin.isAfter(v.getLlegadaUtc())) {
+                        journal.reservar(v.getDestino(), v.getLlegadaUtc(), fin, q);
+                    }
                 }
             }
         }

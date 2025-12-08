@@ -822,7 +822,7 @@ public class RunManager {
                 reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
                 reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
 
-                ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto);
+                ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto,aeropuertosMap);
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
                 if (isCancelled(id)) break;
@@ -831,7 +831,7 @@ public class RunManager {
                 actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
                 solucionesAnteriores.put(id, solucionOptima);
 
-                boolean SlaOk = VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46), vuelosMap);
+                boolean SlaOk = VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46), vuelosMap, aeropuertosMap);
                 if (!SlaOk){
                     slaFlag.set(true);
                     break;
@@ -1032,7 +1032,7 @@ public class RunManager {
                 reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
                 reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
 
-                ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto);
+                ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto,aeropuertosMap);
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
                 /// 6. Guardar solución para la siguiente ventana y sincronizar ocupación
