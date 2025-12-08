@@ -80,7 +80,7 @@ public class RunConfig {
     }
 
     public static RunConfig simSemanal(Instant inicio, Instant fin, Set<String> sedes){
-        return simSemanal(inicio, fin, sedes, Duration.ofHours(6));
+        return simSemanal(inicio, fin, sedes, Duration.ofHours(4));
     }
     
     public static RunConfig simSemanal(Instant inicio, Instant fin, Set<String> sedes, Duration windowSize){
@@ -98,7 +98,7 @@ public class RunConfig {
     }
 
     public static RunConfig colapso(Instant inicio, Set<String> sedes) {
-        return colapso(inicio, sedes, Duration.ofHours(6));
+        return colapso(inicio, sedes, Duration.ofHours(4));
     }
     
     public static RunConfig colapso(Instant inicio, Set<String> sedes, Duration windowSize) {
