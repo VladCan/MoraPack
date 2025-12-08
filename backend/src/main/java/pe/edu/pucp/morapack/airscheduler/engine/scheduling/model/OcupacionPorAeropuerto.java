@@ -152,10 +152,10 @@ public class OcupacionPorAeropuerto {
 
         int maxQ = maxReservable(idAeropuerto, inicio, fin);
         if (q > maxQ){ //Si queremos asignar más de lo que realmente se puede.
-            /*
-            System.out.println("Reserva excede holgura. aeropuerto=" + idAeropuerto +
+
+            System.out.println("⚠\uFE0FReserva excede holgura. aeropuerto=" + idAeropuerto +
                     " q=" + q + " > maxReservable=" + maxQ +
-                    " en [" + inicio + ", " + fin + ")"); */
+                    " en [" + inicio + ", " + fin + ") de "+ idAeropuerto);
             return;
         }
 
@@ -208,7 +208,7 @@ public class OcupacionPorAeropuerto {
         int qEfectivo = Math.min(q, Math.max(0, minOcc));
         //if (qEfectivo != q) System.out.println("qEfectivo != q: " + qEfectivo + " != " + q);
         if (qEfectivo == 0) {
-            //System.out.println("No podemos liberar de forma segura");
+            System.out.println("⚠\uFE0FNo podemos liberar de forma segura de" + idAeropuerto);
             // Nada que liberar de forma segura; salimos sin tocar eventos
             return;
         }
