@@ -897,7 +897,7 @@ public class RunManager {
                 if (isCancelled(id)) break;
 
                 // 6. Guardar solución para la siguiente ventana y sincronizar ocupación
-                actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
+                actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo, wStart);
                 //ocupacionesPorRun.put(id, ocupacionPorAeropuerto);
                 solucionesAnteriores.put(id, solucionOptima);
 
@@ -1130,7 +1130,7 @@ public class RunManager {
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
                 /// 6. Guardar solución para la siguiente ventana y sincronizar ocupación
-                actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
+                actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo, wStart);
 
                 solucionesAnteriores.put(id, solucionOptima);
 
@@ -1455,6 +1455,35 @@ public class RunManager {
         // Iterar sobre todos los aeropuertos
         for (String codigo : aeropuertosMap.keys()) {
             try {
+                // DEBUG: Verificar eventos y checkpoints para aeropuertos problemáticos
+                String[] aeropuertosDebug = {"SVMI", "SBBR", "SABE"}; // Venezuela, Brasil, Argentina
+                boolean esDebug = java.util.Arrays.asList(aeropuertosDebug).contains(codigo);
+                
+                if (esDebug) {
+                    TreeMap<Instant, Integer> eventosAp = ocupacion.getEventos().get(codigo);
+                    TreeMap<Instant, Integer> checkpointsAp = ocupacion.getCheckpoints().get(codigo);
+                    Instant dayStart = simNow.atZone(java.time.ZoneOffset.UTC).toLocalDate().atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+                    int checkpointDia = checkpointsAp != null ? checkpointsAp.getOrDefault(dayStart, 0) : 0;
+                    
+                    int eventosAntesSimNow = 0;
+                    int sumaDeltasAntes = 0;
+                    if (eventosAp != null && !eventosAp.isEmpty()) {
+                        for (Map.Entry<Instant, Integer> e : eventosAp.entrySet()) {
+                            if (e.getKey().isAfter(dayStart) && (e.getKey().isBefore(simNow) || e.getKey().equals(simNow))) {
+                                eventosAntesSimNow++;
+                                sumaDeltasAntes += e.getValue();
+                            }
+                        }
+                    }
+                    
+                    int ocupacionCalculada = checkpointDia + sumaDeltasAntes;
+                    System.out.println("[DEBUG getCurrentAirportOccupancy] " + codigo + 
+                        " - Checkpoint día: " + checkpointDia + 
+                        ", Eventos antes simNow: " + eventosAntesSimNow + 
+                        ", Suma deltas: " + sumaDeltasAntes + 
+                        ", Ocupación calculada: " + ocupacionCalculada);
+                }
+                
                 int ocupacionActual = ocupacion.ocupacion(codigo, simNow);
                 int capacidadTotal = aeropuertosMap.getCapBodega(codigo);
                 
@@ -1462,6 +1491,13 @@ public class RunManager {
                 Map<String, Object> eventosActuales = calcularEventosActuales(runId, codigo, simNow);
                 int cargaLlegando = (Integer) eventosActuales.getOrDefault("cargaLlegando", 0);
                 int cargaSaliendo = (Integer) eventosActuales.getOrDefault("cargaSaliendo", 0);
+                
+                if (esDebug) {
+                    System.out.println("[DEBUG getCurrentAirportOccupancy] " + codigo + 
+                        " - Ocupación actual: " + ocupacionActual + 
+                        ", Carga llegando: " + cargaLlegando + 
+                        ", Carga saliendo: " + cargaSaliendo);
+                }
                 
                 // Ocupación "efectiva" incluyendo lo que está llegando (pero no lo que está saliendo, ya no está)
                 // La ocupación actual ya refleja lo que salió, pero podemos mostrar lo que está llegando
@@ -1494,34 +1530,196 @@ public class RunManager {
     private void actualizarOcupacionDesdeSolucion(String runId,
                                                   SolucionProgramacion solucionOptima,
                                                   List<OcupacionAlmacen> reservasPrevias,
-                                                  Map<String, List<ArriboExogeno>> arribosEnVuelo) {
-        OcupacionPorAeropuerto nuevaOcupacion = construirOcupacionDesdeSolucion(solucionOptima);
+                                                  Map<String, List<ArriboExogeno>> arribosEnVuelo,
+                                                  Instant wStart) {
+        // Obtener la ocupación existente o crear una nueva si es la primera ventana
+        OcupacionPorAeropuerto ocupacionExistente = ocupacionesPorRun.computeIfAbsent(
+            runId, 
+            k -> new OcupacionPorAeropuerto(aeropuertosMap)
+        );
+        
+        // DEBUG SVMI: Verificar eventos ANTES de limpiar
+        TreeMap<Instant, Integer> eventosSVMIAntes = ocupacionExistente.getEventos().get("SVMI");
+        int eventosSVMIAntesCount = (eventosSVMIAntes != null) ? eventosSVMIAntes.size() : 0;
+        System.out.println("[DEBUG SVMI] ANTES limpiar - Eventos: " + eventosSVMIAntesCount + ", wStart: " + wStart);
+        
+        // Limpiar eventos futuros desde wStart para evitar duplicación
+        // Esto elimina eventos de la solución anterior que están en el futuro desde wStart
+        // pero preserva eventos históricos (pasados) que ya ocurrieron
+        ocupacionExistente.limpiarEventosFuturosDesde(wStart);
+        
+        // DEBUG SVMI: Verificar eventos DESPUÉS de limpiar
+        TreeMap<Instant, Integer> eventosSVMIDespues = ocupacionExistente.getEventos().get("SVMI");
+        int eventosSVMIDespuesCount = (eventosSVMIDespues != null) ? eventosSVMIDespues.size() : 0;
+        System.out.println("[DEBUG SVMI] DESPUÉS limpiar - Eventos: " + eventosSVMIDespuesCount);
+        
+        // Construir la ocupación de la solución actual en un objeto temporal
+        OcupacionPorAeropuerto ocupacionNueva = construirOcupacionDesdeSolucion(solucionOptima);
+        
+        // DEBUG SVMI: Verificar eventos en ocupacionNueva
+        TreeMap<Instant, Integer> eventosSVMINuevos = ocupacionNueva.getEventos().get("SVMI");
+        int eventosSVMINuevosCount = (eventosSVMINuevos != null) ? eventosSVMINuevos.size() : 0;
+        if (eventosSVMINuevos != null && !eventosSVMINuevos.isEmpty()) {
+            System.out.println("[DEBUG SVMI] ocupacionNueva tiene " + eventosSVMINuevosCount + " eventos");
+            for (Map.Entry<Instant, Integer> e : eventosSVMINuevos.entrySet()) {
+                System.out.println("  - " + e.getKey() + " -> " + e.getValue() + " (wStart: " + wStart + ", es futuro: " + !e.getKey().isBefore(wStart) + ")");
+            }
+        } else {
+            System.out.println("[DEBUG SVMI] ocupacionNueva NO tiene eventos para SVMI");
+        }
+        
+        // Fusionar eventos: agregar todos los eventos de la solución nueva (desde wStart) a la ocupación existente
+        // IMPORTANTE: Usamos put() directo (merge) para evitar validaciones de reservar()/liberar()
+        for (Map.Entry<String, TreeMap<Instant, Integer>> entry : ocupacionNueva.getEventos().entrySet()) {
+            String aeropuerto = entry.getKey();
+            TreeMap<Instant, Integer> eventosNuevos = entry.getValue();
+            if (eventosNuevos == null || eventosNuevos.isEmpty()) continue;
+            
+            TreeMap<Instant, Integer> eventosExistentes = ocupacionExistente.getEventos().computeIfAbsent(
+                aeropuerto, 
+                k -> new TreeMap<>()
+            );
+            
+            // DEBUG SVMI específico
+            if ("SVMI".equals(aeropuerto)) {
+                System.out.println("[DEBUG SVMI] Fusionando eventos - Existentes antes: " + eventosExistentes.size());
+            }
+            
+            // Agregar solo eventos desde wStart (inclusive) hacia adelante
+            var eventosFuturos = eventosNuevos.tailMap(wStart, true);
+            int eventosAgregados = 0;
+            for (Map.Entry<Instant, Integer> evento : eventosFuturos.entrySet()) {
+                Instant instante = evento.getKey();
+                Integer deltaNuevo = evento.getValue();
+                
+                if (deltaNuevo == null || deltaNuevo == 0) continue;
+                
+                // DEBUG SVMI específico
+                if ("SVMI".equals(aeropuerto)) {
+                    System.out.println("[DEBUG SVMI] Agregando evento: " + instante + " -> " + deltaNuevo);
+                    eventosAgregados++;
+                }
+                
+                // Usar merge con Integer::sum para sumar correctamente múltiples eventos en el mismo instante
+                eventosExistentes.merge(instante, deltaNuevo, Integer::sum);
+                
+                // Limpiar si el delta total queda en 0
+                Integer deltaTotal = eventosExistentes.get(instante);
+                if (deltaTotal != null && deltaTotal == 0) {
+                    eventosExistentes.remove(instante);
+                    if ("SVMI".equals(aeropuerto)) {
+                        System.out.println("[DEBUG SVMI] ⚠️ Evento cancelado (delta=0): " + instante);
+                    }
+                }
+            }
+            
+            if ("SVMI".equals(aeropuerto)) {
+                System.out.println("[DEBUG SVMI] Eventos agregados: " + eventosAgregados + ", Existentes después: " + eventosExistentes.size());
+            }
+        }
+        
+        // NO fusionar checkpoints directamente - los checkpoints se calculan dinámicamente
+        // cuando se consulta la ocupación. Fusionar checkpoints manualmente puede causar inconsistencias
+        // porque los checkpoints representan la ocupación acumulada al inicio de cada día,
+        // y deben calcularse desde los eventos históricos, no fusionarse directamente.
+        
+        // DEBUG: Verificar eventos fusionados para aeropuertos problemáticos
+        String[] aeropuertosDebug = {"SVMI", "SBBR", "SABE"}; // Venezuela, Brasil, Argentina
+        for (String ap : aeropuertosDebug) {
+            TreeMap<Instant, Integer> eventosAp = ocupacionExistente.getEventos().get(ap);
+            if (eventosAp != null && !eventosAp.isEmpty()) {
+                int totalEventos = eventosAp.size();
+                int eventosPositivos = 0;
+                int eventosNegativos = 0;
+                int sumaDeltas = 0;
+                for (Integer delta : eventosAp.values()) {
+                    if (delta > 0) eventosPositivos++;
+                    else if (delta < 0) eventosNegativos++;
+                    sumaDeltas += delta;
+                }
+                System.out.println("[DEBUG actualizarOcupacion] " + ap + 
+                    " - Total eventos: " + totalEventos + 
+                    ", Positivos: " + eventosPositivos + 
+                    ", Negativos: " + eventosNegativos + 
+                    ", Suma deltas: " + sumaDeltas);
+            }
+        }
+        
+        // Agregar reservas previas y arribos en vuelo
+        // Estas NO están incluidas en construirOcupacionDesdeSolucion porque solo incluye vuelos asignados
+        // Las reservas y arribos se pasan al TEG pero no se reflejan automáticamente en la ocupación
+        // Por eso necesitamos agregarlas manualmente
+        
+        // Agregar reservas previas usando put() directo en eventos (no usar reservar())
         if (reservasPrevias != null && !reservasPrevias.isEmpty()) {
             for (OcupacionAlmacen reserva : reservasPrevias) {
                 if (reserva == null || reserva.cantidad() <= 0) continue;
                 Instant inicio = reserva.desde();
                 Instant fin = reserva.hasta();
-                if (inicio != null && fin != null && inicio.isBefore(fin)) {
-                    nuevaOcupacion.reservar(reserva.aeropuerto(), inicio, fin, reserva.cantidad());
+                if (inicio == null || fin == null || !inicio.isBefore(fin)) continue;
+                
+                // Solo agregar si el inicio está en el futuro desde wStart (para evitar duplicación)
+                if (inicio.isBefore(wStart)) continue;
+                
+                String aeropuerto = reserva.aeropuerto();
+                TreeMap<Instant, Integer> eventosAeropuerto = ocupacionExistente.getEventos().computeIfAbsent(
+                    aeropuerto, 
+                    k -> new TreeMap<>()
+                );
+                
+                // Agregar eventos directamente: +q en inicio, -q en fin
+                eventosAeropuerto.merge(inicio, reserva.cantidad(), Integer::sum);
+                eventosAeropuerto.merge(fin, -reserva.cantidad(), Integer::sum);
+                
+                // Limpiar si quedan en 0
+                if (eventosAeropuerto.get(inicio) != null && eventosAeropuerto.get(inicio) == 0) {
+                    eventosAeropuerto.remove(inicio);
+                }
+                if (eventosAeropuerto.get(fin) != null && eventosAeropuerto.get(fin) == 0) {
+                    eventosAeropuerto.remove(fin);
                 }
             }
         }
+        
+        // Agregar arribos en vuelo usando put() directo en eventos (no usar reservar())
         if (arribosEnVuelo != null && !arribosEnVuelo.isEmpty()) {
             for (Map.Entry<String, List<ArriboExogeno>> entry : arribosEnVuelo.entrySet()) {
                 String aeropuerto = entry.getKey();
                 if (aeropuerto == null) continue;
                 List<ArriboExogeno> llegadas = entry.getValue();
                 if (llegadas == null) continue;
+                
+                TreeMap<Instant, Integer> eventosAeropuerto = ocupacionExistente.getEventos().computeIfAbsent(
+                    aeropuerto, 
+                    k -> new TreeMap<>()
+                );
+                
                 for (ArriboExogeno arribo : llegadas) {
                     if (arribo == null || arribo.cantidad() <= 0) continue;
                     Instant llegada = arribo.arriboUtc();
                     if (llegada == null) continue;
+                    
+                    // Solo agregar si la llegada está en el futuro desde wStart (para evitar duplicación)
+                    if (llegada.isBefore(wStart)) continue;
+                    
                     Instant fin = llegada.plus(PICKUP_WAIT);
-                    nuevaOcupacion.reservar(aeropuerto, llegada, fin, arribo.cantidad());
+                    
+                    // Agregar eventos directamente: +q en llegada, -q en fin
+                    eventosAeropuerto.merge(llegada, arribo.cantidad(), Integer::sum);
+                    eventosAeropuerto.merge(fin, -arribo.cantidad(), Integer::sum);
+                    
+                    // Limpiar si quedan en 0
+                    if (eventosAeropuerto.get(llegada) != null && eventosAeropuerto.get(llegada) == 0) {
+                        eventosAeropuerto.remove(llegada);
+                    }
+                    if (eventosAeropuerto.get(fin) != null && eventosAeropuerto.get(fin) == 0) {
+                        eventosAeropuerto.remove(fin);
+                    }
                 }
             }
         }
-        ocupacionesPorRun.put(runId, nuevaOcupacion);
+        
+        // La ocupación existente ya está actualizada en el mapa (no necesitamos hacer put de nuevo)
     }
 
     private OcupacionPorAeropuerto construirOcupacionDesdeSolucion(SolucionProgramacion solucionOptima) {
@@ -1556,7 +1754,23 @@ public class RunManager {
                     Instant inicio = vueloActual.getLlegadaUtc();
                     Instant fin = vueloSiguiente.getSalidaUtc();
                     if (inicio != null && fin != null && inicio.isBefore(fin)) {
-                        nueva.reservar(vueloActual.getDestino(), inicio, fin, cantidad);
+                        // Agregar eventos directamente sin usar reservar() para evitar actualizar checkpoints
+                        // Los checkpoints se mantendrán en la ocupación existente
+                        String aeropuerto = vueloActual.getDestino();
+                        TreeMap<Instant, Integer> eventosAeropuerto = nueva.getEventos().computeIfAbsent(
+                            aeropuerto, 
+                            k -> new TreeMap<>()
+                        );
+                        eventosAeropuerto.merge(inicio, cantidad, Integer::sum);
+                        eventosAeropuerto.merge(fin, -cantidad, Integer::sum);
+                        
+                        // Limpiar si quedan en 0
+                        if (eventosAeropuerto.get(inicio) != null && eventosAeropuerto.get(inicio) == 0) {
+                            eventosAeropuerto.remove(inicio);
+                        }
+                        if (eventosAeropuerto.get(fin) != null && eventosAeropuerto.get(fin) == 0) {
+                            eventosAeropuerto.remove(fin);
+                        }
                     }
                 }
 
@@ -1565,7 +1779,22 @@ public class RunManager {
                     Instant llegadaFinal = ultimo.getVuelo().getLlegadaUtc();
                     if (llegadaFinal != null) {
                         Instant fin = llegadaFinal.plus(PICKUP_WAIT);
-                        nueva.reservar(ultimo.getVuelo().getDestino(), llegadaFinal, fin, cantidad);
+                        // Agregar eventos directamente sin usar reservar() para evitar actualizar checkpoints
+                        String aeropuerto = ultimo.getVuelo().getDestino();
+                        TreeMap<Instant, Integer> eventosAeropuerto = nueva.getEventos().computeIfAbsent(
+                            aeropuerto, 
+                            k -> new TreeMap<>()
+                        );
+                        eventosAeropuerto.merge(llegadaFinal, cantidad, Integer::sum);
+                        eventosAeropuerto.merge(fin, -cantidad, Integer::sum);
+                        
+                        // Limpiar si quedan en 0
+                        if (eventosAeropuerto.get(llegadaFinal) != null && eventosAeropuerto.get(llegadaFinal) == 0) {
+                            eventosAeropuerto.remove(llegadaFinal);
+                        }
+                        if (eventosAeropuerto.get(fin) != null && eventosAeropuerto.get(fin) == 0) {
+                            eventosAeropuerto.remove(fin);
+                        }
                     }
                 }
             }

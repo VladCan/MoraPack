@@ -318,5 +318,36 @@ public class OcupacionPorAeropuerto {
         return cap;
     }
 
+    /**
+     * Limpia eventos futuros desde el instante dado (inclusive).
+     * Preserva eventos históricos (pasados) y checkpoints.
+     * Útil para replanificación: elimina eventos de ventanas anteriores que ya no son válidos.
+     * 
+     * IMPORTANTE: NO recalcula checkpoints automáticamente porque puede causar inconsistencias.
+     * Los checkpoints se mantienen como están y se actualizarán cuando se agreguen nuevos eventos.
+     */
+    public void limpiarEventosFuturosDesde(Instant desde) {
+        if (desde == null) return;
+        
+        // Limpiar eventos futuros para cada aeropuerto
+        for (Map.Entry<String, TreeMap<Instant, Integer>> entry : eventos.entrySet()) {
+            TreeMap<Instant, Integer> eventosAeropuerto = entry.getValue();
+            if (eventosAeropuerto == null || eventosAeropuerto.isEmpty()) continue;
+            
+            // Obtener eventos futuros (desde 'desde' inclusive hacia adelante)
+            var eventosFuturos = eventosAeropuerto.tailMap(desde, true);
+            if (!eventosFuturos.isEmpty()) {
+                // Crear una copia de las claves para evitar ConcurrentModificationException
+                List<Instant> instantesAEliminar = new ArrayList<>(eventosFuturos.keySet());
+                for (Instant instante : instantesAEliminar) {
+                    eventosAeropuerto.remove(instante);
+                }
+            }
+        }
+        
+        // NO recalcular checkpoints - se preservan para mantener la ocupación histórica
+        // Los checkpoints representan la ocupación acumulada al inicio de cada día
+        // y deben mantenerse intactos para preservar la información histórica
+    }
 
 }
