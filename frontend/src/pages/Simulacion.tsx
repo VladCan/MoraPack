@@ -240,6 +240,63 @@ export default function Simulacion() {
   const SEDES = ["SPIM", "EBCI", "UBBB"];
   const esSede = selectedAirportId ? SEDES.includes(selectedAirportId) : false;
 
+  // Calcular vuelos que llegarán y saldrán en las próximas 24 horas
+  const vuelosFuturos = useMemo(() => {
+    if (!selectedAirportId || !simNowUtc || windows.length === 0) {
+      return { llegadas: [], salidas: [] };
+    }
+
+    const now = new Date(simNowUtc).getTime();
+    const next24h = now + 24 * 60 * 60 * 1000; // 24 horas en ms
+
+    const llegadas: Array<{ id: string; origen: string; cantidad: number }> = [];
+    const salidas: Array<{ id: string; destino: string; cantidad: number }> = [];
+
+    // Recopilar todos los vuelos únicos de todas las ventanas
+    const vuelosUnicos = new Map<string, typeof windows[0]['vuelos'][0]>();
+    windows.forEach(window => {
+      window.vuelos.forEach(vuelo => {
+        if (!vuelosCancelados.has(vuelo.id) && !vuelosUnicos.has(vuelo.id)) {
+          vuelosUnicos.set(vuelo.id, vuelo);
+        }
+      });
+    });
+
+    vuelosUnicos.forEach(vuelo => {
+      const salidaTime = new Date(vuelo.salidaUtc).getTime();
+      const llegadaTime = new Date(vuelo.llegadaUtc).getTime();
+
+      // Vuelos que llegarán al aeropuerto seleccionado (solo futuros)
+      if (vuelo.destino === selectedAirportId && llegadaTime > now && llegadaTime <= next24h) {
+        llegadas.push({ 
+          id: vuelo.id, 
+          origen: vuelo.origen, 
+          cantidad: vuelo.cantidadAsignada 
+        });
+      }
+
+      // Vuelos que saldrán del aeropuerto seleccionado
+      // Solo incluir vuelos que aún no han llegado a su destino (aún están en vuelo o saldrán en el futuro)
+      if (vuelo.origen === selectedAirportId && salidaTime <= next24h && llegadaTime > now) {
+        salidas.push({ 
+          id: vuelo.id, 
+          destino: vuelo.destino, 
+          cantidad: vuelo.cantidadAsignada 
+        });
+      }
+    });
+
+    // Ordenar salidas por tiempo de salida (más recientes primero)
+    salidas.sort((a, b) => {
+      const vueloA = vuelosUnicos.get(a.id);
+      const vueloB = vuelosUnicos.get(b.id);
+      if (!vueloA || !vueloB) return 0;
+      return new Date(vueloB.salidaUtc).getTime() - new Date(vueloA.salidaUtc).getTime();
+    });
+
+    return { llegadas, salidas };
+  }, [selectedAirportId, simNowUtc, windows, vuelosCancelados]);
+
 
   // --- MODIFICACIÓN: Lógica de fin usando finishedReason ---
 
@@ -306,7 +363,7 @@ export default function Simulacion() {
 
       {/* Tooltip de aeropuerto */}
       {activeAirportData && (
-        <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
+        <div className="absolute top-20 right-2 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
           <div className="space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
@@ -387,31 +444,85 @@ export default function Simulacion() {
               </div>
             ) : null}
 
-            {/* Estadísticas futuras (24h) */}
-            {activeAirportData.estadisticasFuturas && (
-              <div className="border-t border-border pt-3 mt-3">
-                <p className="text-xs font-semibold mb-2 text-muted-foreground">Próximas 24 horas</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+            {/* Estadísticas futuras (24h) - Siempre visible */}
+            <div className="border-t border-border pt-3 mt-3">
+              {esSede ? (
+                // Para sedes: solo mostrar Salidas
+                <div className="text-xs">
                   <div>
-                    <p className="text-muted-foreground">Llegadas</p>
-                    <p className="font-semibold">{activeAirportData.estadisticasFuturas.llegadasPrevistas} vuelos</p>
-                    <p className="text-[10px] text-muted-foreground">+{activeAirportData.estadisticasFuturas.cargaEntrante} uds</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Salidas</p>
-                    <p className="font-semibold">{activeAirportData.estadisticasFuturas.salidasPrevistas} vuelos</p>
-                    <p className="text-[10px] text-muted-foreground">-{activeAirportData.estadisticasFuturas.cargaSaliente} uds</p>
+                    <p className="text-muted-foreground mb-1">Salidas</p>
+                    {vuelosFuturos.salidas.length > 0 ? (
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                        {vuelosFuturos.salidas.map((v, idx) => (
+                          <div key={idx} className="text-[10px] space-y-0.5">
+                            <div className="flex items-center gap-1">
+                              <span className="font-mono text-muted-foreground text-[9px]">{v.id}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">Destino: {v.destino}</span>
+                              <span className="font-semibold text-orange-600 dark:text-orange-400">-{v.cantidad}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-muted-foreground">0 vuelos</p>
+                    )}
                   </div>
                 </div>
-              </div>
-            )}
+              ) : (
+                // Para no sedes: mostrar Llegadas y Salidas
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <p className="text-muted-foreground mb-1">Llegadas</p>
+                    {vuelosFuturos.llegadas.length > 0 ? (
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                        {vuelosFuturos.llegadas.map((v, idx) => (
+                          <div key={idx} className="text-[10px] space-y-0.5">
+                            <div className="flex items-center gap-1">
+                              <span className="font-mono text-muted-foreground text-[9px]">{v.id}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">Origen: {v.origen}</span>
+                              <span className="font-semibold text-green-600 dark:text-green-400">+{v.cantidad}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-muted-foreground">0 vuelos</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground mb-1">Salidas</p>
+                    {vuelosFuturos.salidas.length > 0 ? (
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                        {vuelosFuturos.salidas.map((v, idx) => (
+                          <div key={idx} className="text-[10px] space-y-0.5">
+                            <div className="flex items-center gap-1">
+                              <span className="font-mono text-muted-foreground text-[9px]">{v.id}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground">Destino: {v.destino}</span>
+                              <span className="font-semibold text-orange-600 dark:text-orange-400">-{v.cantidad}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-muted-foreground">0 vuelos</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* Tooltip de vuelo */}
       {activeFlight && !selectedAirportId && (
-        <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
+        <div className="absolute top-20 right-2 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
           <div className="space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
