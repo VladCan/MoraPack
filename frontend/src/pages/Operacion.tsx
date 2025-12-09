@@ -7,7 +7,7 @@ import AirportMarkers, { type AirportPoint } from "@/components/common/map/Airpo
 import { useAirports } from "@/hooks/useAirports";
 import { useFlightsSSE } from "@/hooks/useFlightsSSE";
 import { useRunSession } from "@/lib/runSession";
-import { useRunSSE } from "@/hooks/useRunSSE";
+import { useRunSSE, type VueloDTO } from "@/hooks/useRunSSE";
 import type { AeropuertoDTO } from "@/types/api";
 import { downloadFile } from "@/services/api";
 import SimulationFinishedOverlay from "@/components/common/SimulationFinishedOverlay";
@@ -68,6 +68,9 @@ export default function Operacion() {
   const [hoveredAirportId, setHoveredAirportId] = useState<string | null>(null);
   const [activeFlight, setActiveFlight] = useState<FlightForRender | null>(null);
 
+  //Para que ahora el tooltip se active con hover
+  const [hoveredFlight, setHoveredFlight] = useState<FlightForRender | null>(null);
+
   const airports: AirportPoint[] = useMemo(() => {
     const parsed = AirportsDtoSchema.safeParse(airportsDtoRaw);
     if (!parsed.success) return [];
@@ -82,8 +85,23 @@ export default function Operacion() {
   }, [airportsDtoRaw]);
 
   // Obtener vuelos de ambas fuentes
-  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows, selectedPedido } = useRunSession();
+  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows, selectedPedido,
+    setSelectedVuelo, setToolsPanelOpen} = useRunSession();
 const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
+
+    const vuelosMap = useMemo(() => {
+      const map = new Map<string, VueloDTO>();
+      windows.forEach(w => {
+        w.vuelos.forEach(v => {
+          if (!map.has(v.id)) {
+            map.set(v.id, v);
+          }
+        });
+      });
+      return map;
+    }, [windows]);
+
+
   // Usar tiempo simulado si hay runId, sino usar hora del sistema
   const liveFlightsEndpoint = runId 
     ? `vuelos/live?runId=${runId}&limit=200`
@@ -183,8 +201,8 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
           // Determinar color basado en ocupación
           // Vuelos planificados por el algoritmo tienen colores diferentes
           const ocupacion = vuelo.cantidadAsignada / vuelo.capacidad;
-          let pathColor = "#8b5cf6"; // Morado para vuelos planificados
-          let planeColor = "#7c3aed";
+          let pathColor = "#38bdf8"; // Azul claro
+          let planeColor = "#0284c7";
           if (ocupacion > 0.8) {
             pathColor = "#dc2626"; // Rojo oscuro para alta ocupación
             planeColor = "#b91c1c";
@@ -566,20 +584,20 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
       )}
 
       {/* Tooltip de vuelo (solo para vuelos de la solución) */}
-      {activeFlight && activeFlight.esDeSolucion && !selectedAirportId && (
+      {hoveredFlight && hoveredFlight.esDeSolucion && !selectedAirportId && (
         <div className="absolute top-20 right-2 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
           <div className="space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeFlight.planeColor }}></div>
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: hoveredFlight.planeColor }}></div>
                 <h3 className="font-semibold text-lg">
-                  {activeFlight.origenCodigo} → {activeFlight.destinoCodigo}
+                  {hoveredFlight.origenCodigo} → {hoveredFlight.destinoCodigo}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">
-                  {Math.round(activeFlight.progress * 100)}%
+                  {Math.round(hoveredFlight.progress * 100)}%
                 </span>
                 <button
                   onClick={() => setActiveFlight(null)}
@@ -594,12 +612,12 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
             </div>
 
             {/* Tiempos */}
-            {activeFlight.salidaUtc && activeFlight.llegadaUtc && (
+            {hoveredFlight.salidaUtc && hoveredFlight.llegadaUtc && (
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
                   <p className="text-muted-foreground text-xs">Salida</p>
                   <p className="font-mono text-xs">
-                    {new Date(activeFlight.salidaUtc).toLocaleTimeString('es-PE', {
+                    {new Date(hoveredFlight.salidaUtc).toLocaleTimeString('es-PE', {
                       hour: '2-digit',
                       minute: '2-digit',
                       timeZone: 'UTC'
@@ -609,7 +627,7 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
                 <div>
                   <p className="text-muted-foreground text-xs">Llegada</p>
                   <p className="font-mono text-xs">
-                    {new Date(activeFlight.llegadaUtc).toLocaleTimeString('es-PE', {
+                    {new Date(hoveredFlight.llegadaUtc).toLocaleTimeString('es-PE', {
                       hour: '2-digit',
                       minute: '2-digit',
                       timeZone: 'UTC'
@@ -620,20 +638,20 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
             )}
 
             {/* Capacidad */}
-            {activeFlight.capacidad !== undefined && activeFlight.cantidadAsignada !== undefined && (
+            {hoveredFlight.capacidad !== undefined && hoveredFlight.cantidadAsignada !== undefined && (
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-muted-foreground">Ocupación</span>
                   <span className="font-semibold">
-                    {activeFlight.cantidadAsignada} / {activeFlight.capacidad}
+                    {hoveredFlight.cantidadAsignada} / {hoveredFlight.capacidad}
                   </span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                   <div
                     className="h-full transition-all"
                     style={{
-                      width: `${(activeFlight.cantidadAsignada / activeFlight.capacidad) * 100}%`,
-                      backgroundColor: activeFlight.pathColor,
+                      width: `${(hoveredFlight.cantidadAsignada / hoveredFlight.capacidad) * 100}%`,
+                      backgroundColor: hoveredFlight.pathColor,
                     }}
                   />
                 </div>
@@ -641,13 +659,13 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
             )}
 
             {/* Carga */}
-            {activeFlight.carga && activeFlight.carga.length > 0 && (
+            {hoveredFlight.carga && hoveredFlight.carga.length > 0 && (
               <div>
                 <p className="text-sm font-semibold mb-2">
-                  Carga ({activeFlight.carga.length} {activeFlight.carga.length === 1 ? 'pedido' : 'pedidos'})
+                  Carga ({hoveredFlight.carga.length} {hoveredFlight.carga.length === 1 ? 'pedido' : 'pedidos'})
                 </p>
                 <div className="max-h-40 overflow-y-auto space-y-1">
-                  {activeFlight.carga.map((item, idx) => (
+                  {hoveredFlight.carga.map((item, idx) => (
                     <div
                       key={idx}
                       className="flex items-center justify-between text-xs p-2 rounded-lg bg-muted/50"
@@ -684,10 +702,32 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
             progress={flight.progress}
             pathColor={flight.pathColor}
             planeColor={flight.planeColor}
+            onMouseEnter={
+              flight.esDeSolucion
+              ? () => setHoveredFlight(flight)
+              : undefined
+            }
+            onMouseLeave={
+              flight.esDeSolucion
+              ? () => setHoveredFlight((prev) => (prev?.id === flight.id ? null : prev))
+              : undefined
+            }
             onClick={
               // Solo permitir click en vuelos de la solución
               flight.esDeSolucion
-                ? () => setActiveFlight((prev) => (prev?.id === flight.id ? null : flight))
+                ? () => {
+                   setActiveFlight((prev) => (prev?.id === flight.id ? null : flight))
+
+                   // sincroniza con el panel:
+                    const vueloDto = vuelosMap.get(flight.id);
+                    if (vueloDto) {
+                      setSelectedVuelo(vueloDto);
+                      setSelectedAirport(null);
+                      setToolsPanelOpen(true);
+                    }
+                    //Para asegurar que el hover no quede abierto
+                    setHoveredFlight(null);
+                }
                 : undefined
             }
           />
@@ -702,8 +742,14 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
           activeColor={ACTIVE_COLOR}
           hoverColor={HOVER_COLOR}
           onHoverChange={setHoveredAirportId}
-          onClick={(id) =>
-            setSelectedAirport(selectedAirportId === id ? null : id)
+          onClick={(id) => {
+            const newId = selectedAirportId === id ? null : id;
+            setSelectedAirport(newId);
+            if (newId) {
+              setSelectedVuelo(null)
+              setToolsPanelOpen(true);   // 👈 abre el panel asociado
+            }
+            }
           }
           iconSize={16}
         />
