@@ -39,7 +39,7 @@ const CONTENT: Record<string, JSX.Element> = {
 };
 
 export default function TopNav() {
-  const [showContent, setShowContent] = useState(false);
+  //const [showContent, setShowContent] = useState(false);
   const { pathname: currentPage } = useLocation();
 
   const showButton = SHOW_BTN_PAGES.has(currentPage);
@@ -48,7 +48,10 @@ export default function TopNav() {
   //Esto es para la conexión SSE de la solución
 
   //Traemos el contexto
-  const { runId, status, end, setSimNow, setWindow, setAutoReconnect, setPreparing} = useRunSession();
+  const { runId, status, end, setSimNow, setWindow, setAutoReconnect, 
+    setPreparing, toolsPanelOpen, setToolsPanelOpen} = useRunSession();
+
+  const showContent = toolsPanelOpen;
 
   //Para el reloj
   const running = status === "running" && !!runId;
@@ -296,7 +299,7 @@ export default function TopNav() {
         <div className="hidden md:block text-center mt-2">
           {showButton && !showContent && (
             <button
-              onClick={() => setShowContent(true)}
+              onClick={() => setToolsPanelOpen(true)}
               className="text-foreground hover:text-foreground/70 font-medium focus:outline-none ring-border"
             >
               Ver más ↓
@@ -310,7 +313,7 @@ export default function TopNav() {
               </div>
               <div className="mt-1">
                 <button
-                  onClick={() => setShowContent(false)}
+                  onClick={() => setToolsPanelOpen(false)}
                   className="text-foreground hover:text-foreground/70 font-medium focus:outline-none ring-border"
                 >
                   Ocultar ↑

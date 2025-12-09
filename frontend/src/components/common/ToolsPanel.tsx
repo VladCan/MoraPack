@@ -79,15 +79,20 @@ export default function ToolsPanel({
     saturado: false,
   });
 
-  const [vuelo, setVuelo] = useState<VueloDTO | null>(null);
+  //const [vuelo, setVuelo] = useState<VueloDTO | null>(null);
   const [almacen, setAlmacen] = useState<string | null>(null);
 
-  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId, vuelosCancelados, cancelarVuelo, status, selectedPedido, setSelectedPedido } = useRunSession();
+  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId, vuelosCancelados, 
+    cancelarVuelo, status, selectedPedido, setSelectedPedido, selectedVuelo, setSelectedVuelo } = useRunSession();
   
   // Usar el pedido del contexto en lugar de estado local
   const pedido = selectedPedido;
   const setPedido = setSelectedPedido;
   const { data: airportsData } = useAirports();
+
+  // Usar el vuelo del contexto en lugar de estado local
+  const vuelo = selectedVuelo;
+  const setVuelo = setSelectedVuelo;
 
   // Obtener vuelos planificados del día siguiente (Simulación semanal y Colapso comparten la vista)
   // IMPORTANTE: Solo consumir el endpoint si estamos en estos modos para evitar consumo innecesario

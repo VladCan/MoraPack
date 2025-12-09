@@ -26,6 +26,13 @@ interface RunSessionState {
     vuelosCancelados: Set<string>;  // IDs de vuelos cancelados localmente
     preparing: boolean; //Para la ventana de "loading" para la primera planificación
 
+    selectedVuelo: VueloDTO | null;
+    setSelectedVuelo: (vuelo: VueloDTO | null) => void;
+
+    toolsPanelOpen: boolean;
+    setToolsPanelOpen: (open: boolean) => void;
+
+
     //Esto va a usar TopNav:
     begin: (runId: string) => void;
     end: (status?: Extract<RunStatus, "finished" | "failed">) => void
@@ -58,6 +65,9 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
     const [vuelosCancelados, setVuelosCancelados] = useState<Set<string>>(new Set());
     const [preparing, setPreparing] = useState(false);
 
+    const [selectedVuelo, setSelectedVueloState] = useState<VueloDTO | null>(null);
+    const [toolsPanelOpen, setToolsPanelOpenState] = useState(false);
+
     const [autoReconnect, setAutoReconnect] = useState<boolean>(true);
 
     const begin = useCallback((id: string) => {
@@ -69,6 +79,7 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setSelectedAirportId(null);
         setSelectedPedidoState(null);
         setVuelosCancelados(new Set());
+        setSelectedVueloState(null); 
     }, []);
 
     //Esto es para reconectar, o conectar por primera vez desde otro pc
@@ -151,6 +162,7 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setSelectedPedidoState(null);
         setVuelosCancelados(new Set());
         setPreparing(false);
+        setSelectedVueloState(null); 
     }, []);
 
     const cancelarVuelo = useCallback((vueloId: string) => {
@@ -182,6 +194,14 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setSelectedPedidoState(pedido);
     }, []);
 
+    const setSelectedVuelo = useCallback((vuelo: VueloDTO | null) => {
+        setSelectedVueloState(vuelo);
+    }, []);
+
+    const setToolsPanelOpen = useCallback((open: boolean) => {
+        setToolsPanelOpenState(open);
+    }, []);
+
     const value = useMemo<RunSessionState>(() => ({
         runId,
         status,
@@ -192,6 +212,10 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         selectedPedido,
         vuelosCancelados,
         preparing,
+        selectedVuelo,
+        setSelectedVuelo,
+        toolsPanelOpen,
+        setToolsPanelOpen,
         begin,
         end,
         setSimNow,
@@ -203,7 +227,8 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         autoReconnect,
         setAutoReconnect,
         setPreparing
-    }), [runId, status, simNow, lastWindow, windows, selectedAirportId, selectedPedido, vuelosCancelados, begin, end, setSimNow, setWindow, setSelectedAirport, setSelectedPedido, cancelarVuelo, reset, autoReconnect]);
+    }), [runId, status, simNow, lastWindow, windows, selectedAirportId, selectedPedido, vuelosCancelados,preparing,
+        selectedVuelo, toolsPanelOpen, begin, end, setSimNow, setWindow, setSelectedAirport, setSelectedPedido, cancelarVuelo, reset, autoReconnect]);
 
     return (
         <RunSessionContext.Provider value={value}>
