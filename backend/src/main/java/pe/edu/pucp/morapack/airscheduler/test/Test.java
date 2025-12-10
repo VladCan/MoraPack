@@ -12,6 +12,7 @@ import java.util.*;
 
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.VentanaPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.*;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.TEGEventBuilder;
@@ -205,8 +206,8 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             //24x410=9840
             // System.out.println("ALNS");
             // ImpresorSolucion.imprimirEnArchivo(solucionOptima);
-            //ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
-            //ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
+            ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
+            ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
             solucionAnterior = solucionOptima;
             // verificacionTotal(solucionAnterior)
             // System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
