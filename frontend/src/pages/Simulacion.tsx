@@ -469,15 +469,15 @@ export default function Simulacion() {
             <div className="border-t border-border pt-3 mt-3">
               {esSede ? (
                 // Para sedes: solo mostrar Salidas
-                <div className="text-xs">
+                <div className="text-sm">
                   <div>
                     <p className="text-muted-foreground mb-1">Salidas</p>
                     {vuelosFuturos.salidas.length > 0 ? (
                       <div className="space-y-1.5 max-h-32 overflow-y-auto">
                         {vuelosFuturos.salidas.map((v, idx) => (
-                          <div key={idx} className="text-[10px] space-y-0.5">
+                          <div key={idx} className="text-xs space-y-0.5">
                             <div className="flex items-center gap-1">
-                              <span className="font-mono text-muted-foreground text-[9px]">{v.id}</span>
+                              <span className="font-mono text-muted-foreground text-[11px]">{v.id}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-muted-foreground">Destino: {v.destino}</span>
@@ -487,21 +487,21 @@ export default function Simulacion() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-[10px] text-muted-foreground">0 vuelos</p>
+                      <p className="text-xs text-muted-foreground">0 vuelos</p>
                     )}
                   </div>
                 </div>
               ) : (
                 // Para no sedes: mostrar Llegadas y Salidas
-                <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-muted-foreground mb-1">Llegadas</p>
                     {vuelosFuturos.llegadas.length > 0 ? (
                       <div className="space-y-1.5 max-h-32 overflow-y-auto">
                         {vuelosFuturos.llegadas.map((v, idx) => (
-                          <div key={idx} className="text-[10px] space-y-0.5">
+                          <div key={idx} className="text-xs space-y-0.5">
                             <div className="flex items-center gap-1">
-                              <span className="font-mono text-muted-foreground text-[9px]">{v.id}</span>
+                              <span className="font-mono text-muted-foreground text-[11px]">{v.id}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-muted-foreground">Origen: {v.origen}</span>
@@ -511,7 +511,7 @@ export default function Simulacion() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-[10px] text-muted-foreground">0 vuelos</p>
+                      <p className="text-xs text-muted-foreground">0 vuelos</p>
                     )}
                   </div>
                   <div>
