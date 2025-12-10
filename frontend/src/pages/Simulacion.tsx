@@ -92,6 +92,27 @@ export default function Simulacion() {
     disconnect 
   } = useRunSSE(runId || undefined);
 
+  //Cambio para agregar color a los aeropuertos
+  const airportsForRender = useMemo<AirportPoint[]>(() => {
+    return airports.map((a) => {
+      const occ = airportOccupancy[a.id];
+
+      //Si es sede o no hay ocupación, no pasa nada
+      if (!occ || a.isSede) return a;
+
+      let color = COLOR_NORMAL;
+      if (occ.porcentaje > 0.8){
+        color = "#f97316"; //Naranja
+      }
+      else if (occ.porcentaje > 0.5){
+        color = "#facc15"; //Amarillo
+      }
+      
+
+      return { ...a, color };
+    });
+  }, [airports, airportOccupancy])
+
   // Procesar vuelos para renderizar
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
 
@@ -643,7 +664,7 @@ export default function Simulacion() {
 
         {/* Renderizar aeropuertos */}
         <AirportMarkers
-          items={airports}
+          items={airportsForRender}
           activeId={selectedAirportId}
           hoveredId={hoveredAirportId}
           baseColor={COLOR_NORMAL}
