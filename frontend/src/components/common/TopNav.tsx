@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import Logo from "@/assets/Logo-de-AirExpress-Distribution.svg";
 import LogoMark from "@/assets/airexpress2.svg";
-import { useEffect, useState, type JSX } from "react";
+import { useEffect, type JSX } from "react";
 import ToolsPanel, { ColapsoToolsPanel, OperacionDiariaToolsPanel } from "./ToolsPanel";
 import NavClock from "./NavClock";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
