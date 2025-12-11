@@ -12,6 +12,7 @@ import java.util.*;
 
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.VentanaPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.*;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.TEGEventBuilder;
@@ -28,7 +29,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.ssp.SSPGeneradorSeed;
 
 public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
     // Parámetros de simulación (ajustables)
-    private static final long HORAS_VENTANA = 3;
+    private static final long HORAS_VENTANA = 4;
     private static final long HORIZONTE_TEG_H = 48; // cuánto futuro modelar
 
     public  static  void main(String[] args) {
@@ -205,8 +206,8 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             //24x410=9840
             // System.out.println("ALNS");
             // ImpresorSolucion.imprimirEnArchivo(solucionOptima);
-            //ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
-            //ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
+            ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
+            ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
             solucionAnterior = solucionOptima;
             // verificacionTotal(solucionAnterior)
             // System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
