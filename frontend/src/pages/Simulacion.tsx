@@ -4,7 +4,7 @@ import MainMap from "@/components/common/MainMap";
 import AirportMarkers, { type AirportPoint } from "@/components/common/map/AirportMarkers";
 import FlightPath from "@/components/common/FlightPath";
 import { useAirports } from "@/hooks/useAirports";
-import { useRunSSE } from "@/hooks/useRunSSE";
+import { useRunSSE, type VueloDTO} from "@/hooks/useRunSSE";
 import { useRunSession } from "@/lib/runSession";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
@@ -54,6 +54,9 @@ export default function Simulacion() {
   const [hoveredAirportId, setHoveredAirportId] = useState<string | null>(null);
   const [activeFlight, setActiveFlight] = useState<FlightForRender | null>(null);
 
+  //Para que ahora el tooltip se active con hover
+  const [hoveredFlight, setHoveredFlight] = useState<FlightForRender | null>(null);
+
   // Parsear aeropuertos
   const airports: AirportPoint[] = useMemo(() => {
       const parsed = AirportsDtoSchema.safeParse(airportsDtoRaw);
@@ -76,7 +79,8 @@ export default function Simulacion() {
   }, [airports]);
 
   // Conectar al Session Context
-  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows, selectedPedido } = useRunSession();
+  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, 
+    windows, selectedPedido, setSelectedVuelo, setToolsPanelOpen} = useRunSession();
   
   // --- MODIFICACIÓN CLAVE AQUÍ ---
   // Usamos el nuevo hook actualizado con soporte para estados de carga
@@ -91,6 +95,39 @@ export default function Simulacion() {
     wallStartUtc, 
     disconnect 
   } = useRunSSE(runId || undefined);
+
+  const vuelosMap = useMemo(() => {
+    const map = new Map<string, VueloDTO>();
+    windows.forEach(w => {
+      w.vuelos.forEach(v => {
+        if (!map.has(v.id)) {
+          map.set(v.id, v);
+        }
+      });
+    });
+    return map;
+  }, [windows]);
+
+  //Cambio para agregar color a los aeropuertos
+  const airportsForRender = useMemo<AirportPoint[]>(() => {
+    return airports.map((a) => {
+      const occ = airportOccupancy[a.id];
+
+      //Si es sede o no hay ocupación, no pasa nada
+      if (!occ || a.isSede) return a;
+
+      let color = COLOR_NORMAL;
+      if (occ.porcentaje > 0.8){
+        color = "#f97316"; //Naranja
+      }
+      else if (occ.porcentaje > 0.5){
+        color = "#facc15"; //Amarillo
+      }
+      
+
+      return { ...a, color };
+    });
+  }, [airports, airportOccupancy])
 
   // Procesar vuelos para renderizar
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
@@ -448,15 +485,15 @@ export default function Simulacion() {
             <div className="border-t border-border pt-3 mt-3">
               {esSede ? (
                 // Para sedes: solo mostrar Salidas
-                <div className="text-xs">
+                <div className="text-sm">
                   <div>
                     <p className="text-muted-foreground mb-1">Salidas</p>
                     {vuelosFuturos.salidas.length > 0 ? (
                       <div className="space-y-1.5 max-h-32 overflow-y-auto">
                         {vuelosFuturos.salidas.map((v, idx) => (
-                          <div key={idx} className="text-[10px] space-y-0.5">
+                          <div key={idx} className="text-xs space-y-0.5">
                             <div className="flex items-center gap-1">
-                              <span className="font-mono text-muted-foreground text-[9px]">{v.id}</span>
+                              <span className="font-mono text-muted-foreground text-[11px]">{v.id}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-muted-foreground">Destino: {v.destino}</span>
@@ -466,21 +503,21 @@ export default function Simulacion() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-[10px] text-muted-foreground">0 vuelos</p>
+                      <p className="text-xs text-muted-foreground">0 vuelos</p>
                     )}
                   </div>
                 </div>
               ) : (
                 // Para no sedes: mostrar Llegadas y Salidas
-                <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-muted-foreground mb-1">Llegadas</p>
                     {vuelosFuturos.llegadas.length > 0 ? (
                       <div className="space-y-1.5 max-h-32 overflow-y-auto">
                         {vuelosFuturos.llegadas.map((v, idx) => (
-                          <div key={idx} className="text-[10px] space-y-0.5">
+                          <div key={idx} className="text-xs space-y-0.5">
                             <div className="flex items-center gap-1">
-                              <span className="font-mono text-muted-foreground text-[9px]">{v.id}</span>
+                              <span className="font-mono text-muted-foreground text-[11px]">{v.id}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-muted-foreground">Origen: {v.origen}</span>
@@ -490,7 +527,7 @@ export default function Simulacion() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-[10px] text-muted-foreground">0 vuelos</p>
+                      <p className="text-xs text-muted-foreground">0 vuelos</p>
                     )}
                   </div>
                   <div>
@@ -521,20 +558,20 @@ export default function Simulacion() {
       )}
 
       {/* Tooltip de vuelo */}
-      {activeFlight && !selectedAirportId && (
+      {hoveredFlight  && !selectedAirportId && (
         <div className="absolute top-20 right-2 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
           <div className="space-y-3">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border pb-2">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeFlight.planeColor }}></div>
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: hoveredFlight.planeColor }}></div>
                 <h3 className="font-semibold text-lg">
-                  {activeFlight.origenCodigo} → {activeFlight.destinoCodigo}
+                  {hoveredFlight.origenCodigo} → {hoveredFlight.destinoCodigo}
                 </h3>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">
-                  {Math.round(activeFlight.progress * 100)}%
+                  {Math.round(hoveredFlight.progress * 100)}%
                 </span>
                 <button
                   onClick={() => setActiveFlight(null)}
@@ -553,7 +590,7 @@ export default function Simulacion() {
               <div>
                 <p className="text-muted-foreground text-xs">Salida</p>
                 <p className="font-mono text-xs">
-                  {new Date(activeFlight.salidaUtc).toLocaleTimeString('es-PE', {
+                  {new Date(hoveredFlight.salidaUtc).toLocaleTimeString('es-PE', {
                     hour: '2-digit',
                     minute: '2-digit',
                     timeZone: 'UTC'
@@ -563,7 +600,7 @@ export default function Simulacion() {
               <div>
                 <p className="text-muted-foreground text-xs">Llegada</p>
                 <p className="font-mono text-xs">
-                  {new Date(activeFlight.llegadaUtc).toLocaleTimeString('es-PE', {
+                  {new Date(hoveredFlight.llegadaUtc).toLocaleTimeString('es-PE', {
                     hour: '2-digit',
                     minute: '2-digit',
                     timeZone: 'UTC'
@@ -577,28 +614,28 @@ export default function Simulacion() {
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-muted-foreground">Ocupación</span>
                 <span className="font-semibold">
-                  {activeFlight.cantidadAsignada} / {activeFlight.capacidad}
+                  {hoveredFlight.cantidadAsignada} / {hoveredFlight.capacidad}
                 </span>
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div
                   className="h-full transition-all"
                   style={{
-                    width: `${(activeFlight.cantidadAsignada / activeFlight.capacidad) * 100}%`,
-                    backgroundColor: activeFlight.pathColor,
+                    width: `${(hoveredFlight.cantidadAsignada / hoveredFlight.capacidad) * 100}%`,
+                    backgroundColor: hoveredFlight.pathColor,
                   }}
                 />
               </div>
             </div>
 
             {/* Carga */}
-            {activeFlight.carga.length > 0 && (
+            {hoveredFlight.carga.length > 0 && (
               <div>
                 <p className="text-sm font-semibold mb-2">
-                  Carga ({activeFlight.carga.length} {activeFlight.carga.length === 1 ? 'pedido' : 'pedidos'})
+                  Carga ({hoveredFlight.carga.length} {hoveredFlight.carga.length === 1 ? 'pedido' : 'pedidos'})
                 </p>
                 <div className="max-h-40 overflow-y-auto space-y-1">
-                  {activeFlight.carga.map((item, idx) => (
+                  {hoveredFlight.carga.map((item, idx) => (
                     <div
                       key={idx}
                       className="flex items-center justify-between text-xs p-2 rounded-lg bg-muted/50"
@@ -635,23 +672,41 @@ export default function Simulacion() {
             progress={flight.progress}
             pathColor={flight.pathColor}
             planeColor={flight.planeColor}
-            onClick={() =>
+            onMouseEnter={() => setHoveredFlight(flight)}
+            onMouseLeave={() => setHoveredFlight(null)}
+            onClick={() => {
               setActiveFlight((prev) => (prev?.id === flight.id ? null : flight))
+              // sincroniza con el panel:
+              const vueloDto = vuelosMap.get(flight.id);
+              if (vueloDto) {
+                setSelectedVuelo(vueloDto);
+                setSelectedAirport(null);
+                setToolsPanelOpen(true);
+              }
+              //Para asegurar que el hover no quede abierto
+              setHoveredFlight(null);
+            }
             }
           />
         ))}
 
         {/* Renderizar aeropuertos */}
         <AirportMarkers
-          items={airports}
+          items={airportsForRender}
           activeId={selectedAirportId}
           hoveredId={hoveredAirportId}
           baseColor={COLOR_NORMAL}
           activeColor={ACTIVE_COLOR}
           hoverColor={HOVER_COLOR}
           onHoverChange={setHoveredAirportId}
-          onClick={(id) =>
-            setSelectedAirport(selectedAirportId === id ? null : id)
+          onClick={(id) => {
+            const newId = selectedAirportId === id ? null : id;
+            setSelectedAirport(newId);
+            if (newId) {
+              setSelectedVuelo(null)
+              setToolsPanelOpen(true);   // 👈 abre el panel asociado
+            }
+            }
           }
           iconSize={16}
         />
