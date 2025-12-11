@@ -22,29 +22,26 @@ public class ALNS {
     private final List<RepairOperator> repairs;
     private final Instant presenteUTC;
     private final OcupacionPorAeropuerto ocupacionPorAeropuerto;
-    
-    // IMPORTANTE: Asegúrate de pasar esto desde el Test o donde llames al ALNS
     private final AeropuertosMap aeropuertosMap; 
 
     private final Random rnd = new Random();
     
-    private final int maxIter = 2500;          
+    private final int maxIter = 2500;           
     private final double startTemperatureRatio = 0.05; 
     private final int maxStagnation = 200;     
 
-    private static final double PEN_CAPACIDAD_VUELO = 1_000_000_000.0; 
-    private static final double PEN_INCOMPLETO      =   100_000_000.0; 
-    private static final double PEN_CAPACIDAD_BODEGA_BASE = 200_000_000.0; 
-    private static final double PEN_SLA             =    10_000_000.0; 
-
+    // Penalizaciones ajustadas para que el algoritmo priorice completar pedidos
+    // pero NUNCA acepte una solución físicamente imposible.
+    private static final double PEN_INCOMPLETO          = 1_000_000_000.0; 
+    private static final double PEN_SLA                 =    50_000_000.0; 
+    
     private WarehouseSmartRemoval emergencyOperator;
 
     public SolucionProgramacion ejecutar(SolucionProgramacion solucionInicial) {
         System.out.println("=================================================");
-        System.out.println(">>> INICIANDO ALNS (MODO: ANTI-OVERFLOW) <<<");
+        System.out.println(">>> INICIANDO ALNS (MODO: STRICT-CONSTRAINTS) <<<");
         System.out.println("=================================================");
         
-        // Inicializar operador de emergencia con el mapa corregido
         this.emergencyOperator = new WarehouseSmartRemoval(this.aeropuertosMap);
 
         SolucionProgramacion solucionBase = solucionInicial;
@@ -77,17 +74,7 @@ public class ALNS {
             OcupacionPorAeropuerto ocupacionCandidata = ocupacionBase.copiaProfunda();
             Journal journal = new Journal(ocupacionCandidata);
 
-            DestructionOperator destrOp;
-            boolean hayCrisisBodega = ocupacionCandidata.hayExcesoDeCapacidad();
-
-            // Usar operador cirujano si hay crisis
-            if (hayCrisisBodega && rnd.nextDouble() < 0.70) {
-                destrOp = this.emergencyOperator;
-                sb.append("[🚑 EMERG] ");
-            } else {
-                destrOp = destructions.get(rnd.nextInt(destructions.size()));
-            }
-
+            DestructionOperator destrOp = destructions.get(rnd.nextInt(destructions.size()));
             RepairOperator repairOp = repairs.get(rnd.nextInt(repairs.size()));
 
             String opTag = String.format("[%s->%s]", 
@@ -107,58 +94,57 @@ public class ALNS {
 
             double costoCandidato = getCostoTotal(solucionCandidata, ocupacionCandidata);
             
-            boolean esMejorGlobal = costoCandidato < costoMejor;
-            boolean aceptar = false;
-            double delta = costoCandidato - costoActual;
-            String estado = "X";
-
-            if (delta < 0) {
-                aceptar = true;
-                estado = "OK";
+            // Si el costo es infinito, la solución es inválida (rompe reglas físicas) -> Descartar
+            if (Double.isInfinite(costoCandidato)) {
+                sb.append("-> INV (Reglas Violadas)");
+                // No aceptamos ni actualizamos nada
             } else {
-                if (rnd.nextDouble() < Math.exp(-delta / temperatura)) {
+                boolean esMejorGlobal = costoCandidato < costoMejor;
+                boolean aceptar = false;
+                double delta = costoCandidato - costoActual;
+                String estado = "X";
+
+                if (delta < 0) {
                     aceptar = true;
-                    estado = "SA";
+                    estado = "OK";
+                } else {
+                    if (rnd.nextDouble() < Math.exp(-delta / temperatura)) {
+                        aceptar = true;
+                        estado = "SA";
+                    }
                 }
-            }
 
-            if (aceptar) {
-                solucionBase = solucionCandidata;
-                ocupacionBase = ocupacionCandidata; 
-                costoActual = costoCandidato;
-                sb.append(String.format("-> %s (%,.0f)", estado, costoActual));
+                if (aceptar) {
+                    solucionBase = solucionCandidata;
+                    ocupacionBase = ocupacionCandidata; 
+                    costoActual = costoCandidato;
+                    sb.append(String.format("-> %s (%,.0f)", estado, costoActual));
 
-                if (esMejorGlobal) {
-                    mejorSolucion = new SolucionProgramacion(solucionBase);
-                    mejorOcupacion = ocupacionBase.copiaProfunda();
-                    costoMejor = costoCandidato;
-                    iteracionesSinMejora = 0; 
-                    sb.append(" **R**");
+                    if (esMejorGlobal) {
+                        mejorSolucion = new SolucionProgramacion(solucionBase);
+                        mejorOcupacion = ocupacionBase.copiaProfunda();
+                        costoMejor = costoCandidato;
+                        iteracionesSinMejora = 0; 
+                        sb.append(" **R**");
+                    } else {
+                        iteracionesSinMejora++;
+                    }
                 } else {
                     iteracionesSinMejora++;
+                    sb.append(String.format("-> X  (%,.0f)", costoCandidato));
                 }
-            } else {
-                iteracionesSinMejora++;
-                sb.append(String.format("-> X  (%,.0f)", costoCandidato));
             }
             
             temperatura *= 0.95;
 
-            // Reheating para crisis de bodega persistente
             if (iteracionesSinMejora >= maxStagnation) {
-                if (mejorOcupacion.hayExcesoDeCapacidad()) {
-                    iteracionesSinMejora = 0;
-                    temperatura = costoActual * 0.10; 
-                    sb.append(" [REHEAT]");
-                } else {
-                    System.out.println("🛑 EARLY STOP: Convergencia.");
-                    break;
-                }
+                System.out.println("🛑 EARLY STOP: Convergencia.");
+                break;
             }
+            // System.out.println(sb.toString()); 
         }
 
         this.ocupacionPorAeropuerto.copiarDesde(mejorOcupacion);
-        
         sanitizarSolucion(mejorSolucion);
         limpiarMapaGlobal(mejorSolucion);
 
@@ -182,11 +168,9 @@ public class ALNS {
     private double getCostoTotal(SolucionProgramacion sol, OcupacionPorAeropuerto occ) {
         double costo = 0;
 
-        if (!sol.respetaCapacidadesVuelos()) return PEN_CAPACIDAD_VUELO; 
-
-        if (occ.hayExcesoDeCapacidad()) {
-            costo += PEN_CAPACIDAD_BODEGA_BASE;
-        }
+        // HARD CONSTRAINTS: Retornar infinito si se violan
+        if (!sol.respetaCapacidadesVuelos()) return Double.POSITIVE_INFINITY; 
+        if (occ.hayExcesoDeCapacidad()) return Double.POSITIVE_INFINITY;
 
         Collection<PlanPedido> planes = sol.getPlanPorPedido().values();
         for (PlanPedido p : planes) {
@@ -217,6 +201,9 @@ public class ALNS {
 
             Instant deadline = p.getCreadoUtc().plus(Duration.ofHours(46));
             if (ultimaLlegadaGlobal.isAfter(deadline)) {
+                 // Si se quiere que el SLA sea constraint duro, poner return Infinity aquí.
+                 // Como dice "AKA antes de 46h" asumimos que es deseable pero penalizable.
+                 // Si es DURO, descomentar: return Double.POSITIVE_INFINITY;
                  costo += PEN_SLA; 
                  long horasTarde = Duration.between(deadline, ultimaLlegadaGlobal).toHours();
                  costo += (horasTarde * 100_000); 
