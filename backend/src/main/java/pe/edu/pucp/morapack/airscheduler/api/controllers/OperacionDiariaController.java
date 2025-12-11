@@ -5,6 +5,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import pe.edu.pucp.morapack.airscheduler.api.mapper.PedidoMapper;
 import pe.edu.pucp.morapack.airscheduler.api.response.JsonResponse;
 import pe.edu.pucp.morapack.airscheduler.api.response.PedidoResponse;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
@@ -70,13 +71,14 @@ public class OperacionDiariaController {
                             .entity(new JsonResponse("error", "Error al crear pedido", null))
                             .build();
                 }
-                pedidos.leerDatosProfe(sc);
+                    pedidos.leerDatosProfe(sc);
                 System.out.println("[OperacionDiariaController] Pedidos cargados: " + pedidos.getLista().size());
 
             } catch (Exception e) {
                 archivoCargado = false;
                 System.err.println("[OperacionDiariaController] Error procesando archivo de pedidos: " + e.getMessage());
             }
+            PedidoMapper.reasignarIds(pedidos.getLista());
 
             /// 2.2) Anclamos la fecha actual (por ahora, solo dd/mm/aaaa, no las horas)
             runManager.normalizarFechasOD(runId, pedidos.getLista());
