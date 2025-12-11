@@ -58,6 +58,12 @@ const GLASS_SOFT =
   "ring-1 ring-border shadow-sm backdrop-blur-xl backdrop-saturate-150 " +
   "bg-card/70 supports-[backdrop-filter]:bg-card/40";
 
+  const getCargaColor = (ocupacion: number) => {
+    if (ocupacion > 0.8) return "#f97316"; // Naranja (alta ocupación)
+    if (ocupacion > 0.5) return "#facc15"; // Amarillo (media)
+    return "#38bdf8";                      // Azul (baja)
+  };
+
 export default function ToolsPanel({
   variant = "simulacion",
 }: {
@@ -93,6 +99,13 @@ export default function ToolsPanel({
   // Usar el vuelo del contexto en lugar de estado local
   const vuelo = selectedVuelo;
   const setVuelo = setSelectedVuelo;
+
+  const ocupacion = vuelo != null ? (
+    vuelo.capacidad && vuelo.capacidad > 0
+    ? vuelo.cantidadAsignada / vuelo.capacidad
+    : 0
+  ) : 0;
+  
 
   // Obtener vuelos planificados del día siguiente (Simulación semanal y Colapso comparten la vista)
   // IMPORTANTE: Solo consumir el endpoint si estamos en estos modos para evitar consumo innecesario
@@ -506,6 +519,7 @@ export default function ToolsPanel({
                 </p>
               </div>
             </div>
+
             <div>
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-muted-foreground">Carga</span>
@@ -515,11 +529,15 @@ export default function ToolsPanel({
               </div>
               <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div
-                  className="h-full bg-primary transition-all"
-                  style={{ width: `${(vuelo.cantidadAsignada / vuelo.capacidad) * 100}%` }}
-                />
+                className="h-full transition-all"
+                style={{
+                  width: `${ocupacion * 100}%`,
+                  backgroundColor: getCargaColor(ocupacion),
+                }}
+              ></div>
               </div>
             </div>
+
             {vuelo.carga.length > 0 && (
               <div>
                 <p className="text-sm font-semibold mb-2">
