@@ -1,18 +1,16 @@
 
 import { Toaster } from 'react-hot-toast';
 import { Routes, Route, Navigate } from "react-router-dom";
-import TopNav from "@/components/common/TopNav";
 import Simulacion from "@/pages/Simulacion";
 import Operacion from "@/pages/Operacion";
 import Colapso from "./pages/Colapso";
 import Registrar from "./pages/Registrar";
-import { RunSessionProvider } from './lib/runSession';
+//import { RunSessionProvider } from './lib/runSession';
 export default function App() {
 
   return (
     <div className="min-h-screen bg-transparent">
-      <RunSessionProvider>
-        <TopNav />
+      {/*<RunSessionProvider>*/}
         <main>
           <Routes>
             <Route path="/" element={<Navigate to="/operacion" replace />} />
@@ -37,7 +35,7 @@ export default function App() {
             }}
             />
         </main>
-      </RunSessionProvider>
+      {/*</RunSessionProvider>*/}
     </div>
   );
 }

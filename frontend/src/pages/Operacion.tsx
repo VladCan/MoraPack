@@ -1,4 +1,3 @@
-// src/pages/Operacion.tsx
 "use client";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { z } from "zod";
@@ -12,6 +11,14 @@ import { useRunSSE, type VueloDTO } from "@/hooks/useRunSSE";
 import type { AeropuertoDTO } from "@/types/api";
 import { downloadFile } from "@/services/api";
 import SimulationFinishedOverlay from "@/components/common/SimulationFinishedOverlay";
+
+// --- IMPORTS DE LAS CARDS REUTILIZABLES ---
+import AirportCard from "@/components/common/cards/AirportCard";
+import FlightCard, { type FlightCardData } from "@/components/common/cards/FlightCard";
+import OrderCard from "@/components/common/cards/OrderCard";
+
+import { RunSessionProvider } from "@/lib/runSession";
+import TopNav from "@/components/common/TopNav";
 
 const COLOR_SEDE   = "#005097";
 const COLOR_NORMAL = "#38bdf8"; 
@@ -64,12 +71,12 @@ type FlightForRender = {
   esDeSolucion?: boolean; // Flag para distinguir vuelos de la solución
 };
 
-export default function Operacion() {
+export  function OperacionContent() {
   const { data: airportsDtoRaw } = useAirports();
   const [hoveredAirportId, setHoveredAirportId] = useState<string | null>(null);
+  
+  // Estado local para sincronización visual
   const [activeFlight, setActiveFlight] = useState<FlightForRender | null>(null);
-
-  //Para que ahora el tooltip se active con hover
   const [hoveredFlight, setHoveredFlight] = useState<FlightForRender | null>(null);
 
   const airports: AirportPoint[] = useMemo(() => {
@@ -86,17 +93,27 @@ export default function Operacion() {
   }, [airportsDtoRaw]);
 
   // Conectar a la sesión y al SSE
-  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows, selectedPedido,
-    setSelectedVuelo, setToolsPanelOpen} = useRunSession();
-  
-  // --- ACTUALIZACIÓN DEL HOOK useRunSSE ---
+  // Nota: Eliminamos setToolsPanelOpen para no abrir la barra al hacer click
   const { 
-    runState,          // Estado (LOADING, RUNNING, ETC)
-    loadingMessage,    // Mensaje de carga
-    loadingProgress,   // Progreso
+    runId, 
+    selectedAirportId, 
+    setSelectedAirport, 
+    reset, 
+    vuelosCancelados, 
+    windows, 
+    selectedPedido,
+    setSelectedPedido,
+    selectedVuelo,
+    setSelectedVuelo 
+  } = useRunSession();
+  
+  const { 
+    runState,          
+    loadingMessage,    
+    loadingProgress,   
     simNowUtc, 
     airportOccupancy, 
-    finishedReason,    // Reemplaza a 'finished' object
+    finishedReason,    
     simStartUtc, 
     wallStartUtc, 
     disconnect 
@@ -394,8 +411,40 @@ export default function Operacion() {
     reset();
   };
 
-  // Check de finishedReason
   const showFinishedOverlay = !!finishedReason && !!runId && overlayVisible;
+
+  // --- ADAPTADOR DE DATOS PARA FLIGHTCARD ---
+  const flightDataForCard = useMemo(() => {
+    // 1. Prioridad: Vuelo seleccionado por Click (desde Mapa o Panel)
+    if (selectedVuelo) {
+      return {
+        ...selectedVuelo,
+        origenCodigo: selectedVuelo.origen,
+        destinoCodigo: selectedVuelo.destino
+      } as FlightCardData;
+    }
+    // 2. Prioridad: Vuelo en Hover (solo si es de solución)
+    if (hoveredFlight && hoveredFlight.esDeSolucion && !selectedAirportId) {
+        // En Operación, los tipos ya coinciden bastante bien, solo aseguramos el casteo
+        // ya que FlightForRender tiene propiedades opcionales que FlightCardData podría requerir
+        if(hoveredFlight.origenCodigo && hoveredFlight.destinoCodigo && hoveredFlight.salidaUtc && hoveredFlight.llegadaUtc) {
+             return {
+                id: hoveredFlight.id,
+                origen: hoveredFlight.origenCodigo, // Card espera string
+                destino: hoveredFlight.destinoCodigo,
+                salidaUtc: hoveredFlight.salidaUtc,
+                llegadaUtc: hoveredFlight.llegadaUtc,
+                capacidad: hoveredFlight.capacidad || 0,
+                cantidadAsignada: hoveredFlight.cantidadAsignada || 0,
+                carga: hoveredFlight.carga || [],
+                planeColor: hoveredFlight.planeColor,
+                pathColor: hoveredFlight.pathColor,
+                progress: hoveredFlight.progress
+             } as FlightCardData;
+        }
+    }
+    return null;
+  }, [selectedVuelo, hoveredFlight, selectedAirportId]);
 
   return (
     <div className="min-h-screen bg-neutral-50 relative">
@@ -420,287 +469,40 @@ export default function Operacion() {
         </div>
       )}
 
-      {/* Tooltip de aeropuerto */}
+      {/* --- CARDS FLOTANTES --- */}
+
+      {/* 1. AEROPUERTO */}
       {selectedAirportId && activeAirportData && (
-        <div className="absolute top-20 right-2 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
-          <div className="space-y-3">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-border pb-2">
-              <div className="flex items-center gap-2">
-                {!esSede && (
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeAirportData.porcentaje > 0.8 ? "#f97316" : activeAirportData.porcentaje > 0.5 ? "#facc15" : "#38bdf8" }}></div>
-                )}
-                <h3 className="font-semibold text-lg">
-                  {selectedAirportId}
-                </h3>
-              </div>
-              <div className="flex items-center gap-2">
-                {!esSede && (
-                  <span className="text-xs text-muted-foreground">
-                    {Math.round(activeAirportData.porcentaje * 100)}%
-                  </span>
-                )}
-                <button
-                  onClick={() => setSelectedAirport(null)}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Cerrar"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* Capacidad - Solo mostrar si NO es sede */}
-            {!esSede && (
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Ocupación</span>
-                  <span className="font-semibold">
-                    {activeAirportData.capacidadTotal > 0 ? (
-                      `${activeAirportData.ocupacionActual} / ${activeAirportData.capacidadTotal}`
-                    ) : (
-                      <span className="text-muted-foreground text-xs">0 / -</span>
-                    )}
-                  </span>
-                </div>
-                {activeAirportData.capacidadTotal > 0 ? (
-                  <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                    <div
-                      className="h-full transition-all"
-                      style={{
-                        width: `${activeAirportData.porcentaje * 100}%`,
-                        backgroundColor: activeAirportData.porcentaje > 0.8 ? "#f97316" : activeAirportData.porcentaje > 0.5 ? "#facc15" : "#38bdf8",
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                    <div className="h-full bg-muted" style={{ width: "0%" }} />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Disponible - Solo mostrar si NO es sede */}
-            {!esSede && (
-              <div>
-                <p className="text-muted-foreground text-xs">Disponible</p>
-                <p className="font-semibold text-lg">
-                  {activeAirportData.capacidadTotal > 0 ? (
-                    `${activeAirportData.disponible} uds`
-                  ) : (
-                    <span className="text-muted-foreground text-xs">-</span>
-                  )}
-                </p>
-              </div>
-            )}
-
-            {/* Eventos en tiempo real */}
-            {(activeAirportData.cargaLlegando !== undefined && activeAirportData.cargaLlegando > 0) ||
-             (activeAirportData.cargaSaliendo !== undefined && activeAirportData.cargaSaliendo > 0) ? (
-              <div className="border-t border-border pt-3 mt-3">
-                <p className="text-xs font-semibold mb-2 text-muted-foreground">En este momento</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {activeAirportData.cargaLlegando !== undefined && activeAirportData.cargaLlegando > 0 && (
-                    <div className="bg-green-500/10 rounded p-2 border border-green-500/20">
-                      <p className="text-green-600 dark:text-green-400 font-semibold">Llegando</p>
-                      <p className="text-sm font-bold text-green-700 dark:text-green-300">+{activeAirportData.cargaLlegando} uds</p>
-                    </div>
-                  )}
-                  {activeAirportData.cargaSaliendo !== undefined && activeAirportData.cargaSaliendo > 0 && (
-                    <div className="bg-orange-500/10 rounded p-2 border border-orange-500/20">
-                      <p className="text-orange-600 dark:text-orange-400 font-semibold">Saliendo</p>
-                      <p className="text-sm font-bold text-orange-700 dark:text-orange-300">-{activeAirportData.cargaSaliendo} uds</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : null}
-
-            {/* Estadísticas futuras (24h) - Siempre visible */}
-            <div className="border-t border-border pt-3 mt-3">
-              {esSede ? (
-                // Para sedes: solo mostrar Salidas
-                <div className="text-xs">
-                  <div>
-                    <p className="text-muted-foreground mb-1">Salidas</p>
-                    {vuelosFuturos.salidas.length > 0 ? (
-                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                        {vuelosFuturos.salidas.map((v, idx) => (
-                          <div key={idx} className="text-[10px] space-y-0.5">
-                            <div className="flex items-center gap-1">
-                              <span className="font-mono text-muted-foreground text-[9px]">{v.id}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground">Destino: {v.destino}</span>
-                              <span className="font-semibold text-orange-600 dark:text-orange-400">-{v.cantidad}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-[10px] text-muted-foreground">0 vuelos</p>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                // Para no sedes: mostrar Llegadas y Salidas
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div>
-                    <p className="text-muted-foreground mb-1">Llegadas</p>
-                    {vuelosFuturos.llegadas.length > 0 ? (
-                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                        {vuelosFuturos.llegadas.map((v, idx) => (
-                          <div key={idx} className="text-[10px] space-y-0.5">
-                            <div className="flex items-center gap-1">
-                              <span className="font-mono text-muted-foreground text-[9px]">{v.id}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground">Origen: {v.origen}</span>
-                              <span className="font-semibold text-green-600 dark:text-green-400">+{v.cantidad}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-[10px] text-muted-foreground">0 vuelos</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground mb-1">Salidas</p>
-                    {vuelosFuturos.salidas.length > 0 ? (
-                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                        {vuelosFuturos.salidas.map((v, idx) => (
-                          <div key={idx} className="text-[10px] space-y-0.5">
-                            <div className="flex items-center gap-1">
-                              <span className="font-mono text-muted-foreground text-[9px]">{v.id}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-muted-foreground">Destino: {v.destino}</span>
-                              <span className="font-semibold text-orange-600 dark:text-orange-400">-{v.cantidad}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-[10px] text-muted-foreground">0 vuelos</p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <AirportCard
+          airportId={selectedAirportId}
+          data={activeAirportData}
+          isSede={esSede}
+          flights={vuelosFuturos}
+          onClose={() => setSelectedAirport(null)}
+        />
       )}
 
-      {/* Tooltip de vuelo (solo para vuelos de la solución) */}
-      {hoveredFlight && hoveredFlight.esDeSolucion && !selectedAirportId && (
-        <div className="absolute top-20 right-2 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
-          <div className="space-y-3">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-border pb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: hoveredFlight.planeColor }}></div>
-                <h3 className="font-semibold text-lg">
-                  {hoveredFlight.origenCodigo} → {hoveredFlight.destinoCodigo}
-                </h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {Math.round(hoveredFlight.progress * 100)}%
-                </span>
-                <button
-                  onClick={() => setActiveFlight(null)}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Cerrar detalles de vuelo"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
-            </div>
+      {/* 2. VUELO */}
+      {flightDataForCard && !selectedAirportId && (
+        <FlightCard
+          data={flightDataForCard}
+          simNowUtc={simNowUtc}
+          onClose={() => {
+            setSelectedVuelo(null);
+            setHoveredFlight(null);
+          }}
+          isHover={!!hoveredFlight && !selectedVuelo} 
+        />
+      )}
 
-            {/* Tiempos */}
-            {hoveredFlight.salidaUtc && hoveredFlight.llegadaUtc && (
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>
-                  <p className="text-muted-foreground text-xs">Salida</p>
-                  <p className="font-mono text-xs">
-                    {new Date(hoveredFlight.salidaUtc).toLocaleTimeString('es-PE', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      timeZone: 'UTC'
-                    })} UTC
-                  </p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">Llegada</p>
-                  <p className="font-mono text-xs">
-                    {new Date(hoveredFlight.llegadaUtc).toLocaleTimeString('es-PE', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      timeZone: 'UTC'
-                    })} UTC
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Capacidad */}
-            {hoveredFlight.capacidad !== undefined && hoveredFlight.cantidadAsignada !== undefined && (
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Ocupación</span>
-                  <span className="font-semibold">
-                    {hoveredFlight.cantidadAsignada} / {hoveredFlight.capacidad}
-                  </span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                  <div
-                    className="h-full transition-all"
-                    style={{
-                      width: `${(hoveredFlight.cantidadAsignada / hoveredFlight.capacidad) * 100}%`,
-                      backgroundColor: hoveredFlight.pathColor,
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Carga */}
-            {hoveredFlight.carga && hoveredFlight.carga.length > 0 && (
-              <div>
-                <p className="text-sm font-semibold mb-2">
-                  Carga ({hoveredFlight.carga.length} {hoveredFlight.carga.length === 1 ? 'pedido' : 'pedidos'})
-                </p>
-                <div className="max-h-40 overflow-y-auto space-y-1">
-                  {hoveredFlight.carga.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between text-xs p-2 rounded-lg bg-muted/50"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold">#{item.pedidoId}</span>
-                        {item.esConexion && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
-                            Conexión
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{item.cantidad} uds</p>
-                        <p className="text-muted-foreground text-[10px]">→ {item.destinoFinal}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* 3. PEDIDO */}
+      {selectedPedido && !selectedVuelo && !selectedAirportId && (
+        <OrderCard
+          pedido={selectedPedido}
+          simNowUtc={simNowUtc}
+          variant="operacion" 
+          onClose={() => setSelectedPedido(null)}
+        />
       )}
 
       <MainMap>
@@ -731,14 +533,13 @@ export default function Operacion() {
                    setActiveFlight((prev) => (prev?.id === flight.id ? null : flight))
 
                    // sincroniza con el panel:
-                    const vueloDto = vuelosMap.get(flight.id);
-                    if (vueloDto) {
-                      setSelectedVuelo(vueloDto);
-                      setSelectedAirport(null);
-                      setToolsPanelOpen(true);
-                    }
-                    //Para asegurar que el hover no quede abierto
-                    setHoveredFlight(null);
+                   const vueloDto = vuelosMap.get(flight.id);
+                   if (vueloDto) {
+                     setSelectedVuelo(vueloDto);
+                     setSelectedAirport(null);
+                   }
+                   //Para asegurar que el hover no quede abierto
+                   setHoveredFlight(null);
                 }
                 : undefined
             }
@@ -758,11 +559,9 @@ export default function Operacion() {
             const newId = selectedAirportId === id ? null : id;
             setSelectedAirport(newId);
             if (newId) {
-              setSelectedVuelo(null)
-              setToolsPanelOpen(true);   // 👈 abre el panel asociado
+                setSelectedVuelo(null);
             }
-            }
-          }
+          }}
           iconSize={16}
         />
       </MainMap>
@@ -781,5 +580,14 @@ export default function Operacion() {
       )}
 
     </div>
+  );
+}
+
+export default function Operacion() {
+  return (
+    <RunSessionProvider>
+      <TopNav />
+      <OperacionContent />
+    </RunSessionProvider>
   );
 }

@@ -49,7 +49,7 @@ type ApplyPayload = {
 };
 type Variant = "simulacion" | "operacion" | "colapso";
 
-/** ===== utilidades de estilo (mismo lenguaje que tu reloj) ===== */
+/** ===== utilidades de estilo ===== */
 const GLASS =
   "ring-1 ring-border shadow-lg backdrop-blur-2xl backdrop-saturate-150 " +
   "bg-card/80 supports-[backdrop-filter]:bg-card/50";
@@ -57,12 +57,6 @@ const GLASS =
 const GLASS_SOFT =
   "ring-1 ring-border shadow-sm backdrop-blur-xl backdrop-saturate-150 " +
   "bg-card/70 supports-[backdrop-filter]:bg-card/40";
-
-  const getCargaColor = (ocupacion: number) => {
-    if (ocupacion > 0.8) return "#f97316"; // Naranja (alta ocupación)
-    if (ocupacion > 0.5) return "#facc15"; // Amarillo (media)
-    return "#38bdf8";                      // Azul (baja)
-  };
 
 export default function ToolsPanel({
   variant = "simulacion",
@@ -73,7 +67,6 @@ export default function ToolsPanel({
   // Estado principal
   const [inicio, setInicio] = useState<Date | undefined>();
   const [fin, setFin] = useState<Date | undefined>();
-  //const showStart = variant !== "operacion";
 
   //Por los cambios del profesor, todos tienen fecha de inicio.
   const showStart = true;
@@ -85,56 +78,51 @@ export default function ToolsPanel({
     saturado: false,
   });
 
-  //const [vuelo, setVuelo] = useState<VueloDTO | null>(null);
   const [almacen, setAlmacen] = useState<string | null>(null);
 
-  const { begin, simNow: simNowUtc, windows, selectedAirportId, setSelectedAirport, runId: currentRunId, vuelosCancelados, 
-    cancelarVuelo, status, selectedPedido, setSelectedPedido, selectedVuelo, setSelectedVuelo } = useRunSession();
+  // CONEXIÓN CON EL CONTEXTO GLOBAL
+  // Al usar setSelectedVuelo o setSelectedPedido aquí, automáticamente
+  // se disparará el renderizado de la Card en Simulacion.tsx
+  const { 
+    begin, 
+    simNow: simNowUtc, 
+    windows, 
+    selectedAirportId, 
+    setSelectedAirport, 
+    runId: currentRunId, 
+    vuelosCancelados, 
+    cancelarVuelo, 
+    status, 
+    selectedPedido, 
+    setSelectedPedido, 
+    selectedVuelo, 
+    setSelectedVuelo 
+  } = useRunSession();
   
-  // Usar el pedido del contexto en lugar de estado local
+  // Alias para mantener compatibilidad con tu código de subcomponentes
   const pedido = selectedPedido;
   const setPedido = setSelectedPedido;
-  const { data: airportsData } = useAirports();
-
-  // Usar el vuelo del contexto en lugar de estado local
   const vuelo = selectedVuelo;
   const setVuelo = setSelectedVuelo;
 
-  const ocupacion = vuelo != null ? (
-    vuelo.capacidad && vuelo.capacidad > 0
-    ? vuelo.cantidadAsignada / vuelo.capacidad
-    : 0
-  ) : 0;
-  
+  const { data: airportsData } = useAirports();
 
-  // Obtener vuelos planificados del día siguiente (Simulación semanal y Colapso comparten la vista)
-  // IMPORTANTE: Solo consumir el endpoint si estamos en estos modos para evitar consumo innecesario
+  // Obtener vuelos planificados
   const isSimulacionLike = variant === "simulacion" || variant === "colapso";
   const shouldFetchScheduled = isSimulacionLike && !!currentRunId;
   
-  // Construir el endpoint con el runId si está disponible
   const scheduledEndpoint = useMemo(() => {
     if (!shouldFetchScheduled) return null;
-    const endpoint = "vuelos/scheduled/next-day";
-    // Si hay un runId activo, pasarlo como parámetro
-    return `${endpoint}?runId=${currentRunId}`;
+    return `vuelos/scheduled/next-day?runId=${currentRunId}`;
   }, [shouldFetchScheduled, currentRunId]);
   
   const { data: scheduledFlightsRaw } = useFlightsSSE(scheduledEndpoint);
   
-  // Debug desactivado
-  
   const vuelosProgramados = useMemo<VueloDTO[]>(() => {
-    if (!shouldFetchScheduled) {
+    if (!shouldFetchScheduled || !scheduledFlightsRaw || !Array.isArray(scheduledFlightsRaw)) {
       return [];
     }
-    
-    if (!scheduledFlightsRaw || !Array.isArray(scheduledFlightsRaw)) {
-      return [];
-    }
-    
-    // Convertir los datos del endpoint a VueloDTO y filtrar vuelos cancelados
-    const result = scheduledFlightsRaw.map((v: any) => ({
+    return scheduledFlightsRaw.map((v: any) => ({
       id: v.id || "",
       origen: v.origen || "",
       destino: v.destino || "",
@@ -148,8 +136,6 @@ export default function ToolsPanel({
     })).filter((v: VueloDTO) => 
       v.id && v.origen && v.destino && !vuelosCancelados.has(v.id)
     );
-    
-    return result;
   }, [scheduledFlightsRaw, shouldFetchScheduled, vuelosCancelados]);
 
   const warehouseOptions = useMemo(() => {
@@ -168,11 +154,12 @@ export default function ToolsPanel({
     return map;
   }, [warehouseOptions]);
 
+  // Sincronizar almacén seleccionado con el contexto
   useEffect(() => {
     setAlmacen(selectedAirportId ?? null);
   }, [selectedAirportId]);
 
-  // Limpiar vuelo seleccionado si fue cancelado
+  // Limpiar vuelo si se cancela
   useEffect(() => {
     if (vuelo && vuelosCancelados.has(vuelo.id)) {
       setVuelo(null);
@@ -184,7 +171,6 @@ export default function ToolsPanel({
     setSelectedAirport(codigo);
   };
 
-  //Fijar fecha de fin automáticamente al elegir fecha de inicio
   const handleInicio = (value?: Date) => {
     setInicio(value);
     if (value){
@@ -197,17 +183,13 @@ export default function ToolsPanel({
     }
   }
 
-  // Obtener vuelos activos según el modo:
-  // - En "operacion": vuelos EN_VUELO (en el aire) y PROGRAMADOS (aún no han salido)
-  // - En otros modos: solo vuelos EN EL AIRE
+  // Obtener vuelos activos
   const vuelosActivos = useMemo<VueloDTO[]>(() => {
     if (windows.length === 0) return [];
     
-    // Si aún no tenemos TICK (simNowUtc), mostramos los vuelos de la última ventana.
     if (!simNowUtc) {
       const lastWindow = windows[windows.length - 1];
       const vuelos = lastWindow?.vuelos ?? [];
-      // Filtrar vuelos cancelados
       return vuelos.filter(v => !vuelosCancelados.has(v.id));
     }
 
@@ -216,7 +198,6 @@ export default function ToolsPanel({
     
     windows.forEach(window => {
       window.vuelos.forEach(v => {
-        // Excluir vuelos cancelados
         if (vuelosCancelados.has(v.id)) return;
         
         if (!vuelosActivosMap.has(v.id)) {
@@ -224,19 +205,9 @@ export default function ToolsPanel({
           const llegada = new Date(v.llegadaUtc).getTime();
           
           if (variant === "operacion") {
-            // En operación diaria: incluir vuelos EN_VUELO y PROGRAMADOS
-            // Excluir vuelos que ya llegaron (llegada <= now)
-            // EN_VUELO: ya salió y aún no ha llegado (now >= salida && now < llegada)
-            // PROGRAMADO: aún no ha salido pero está planificado (now < salida && llegada > now)
-            // La condición simplificada: llegada > now (el vuelo aún no ha llegado)
-            if (llegada > now) {
-              vuelosActivosMap.set(v.id, v);
-            }
+            if (llegada > now) vuelosActivosMap.set(v.id, v);
           } else {
-            // En otros modos: solo vuelos EN EL AIRE (excluye programados y completados)
-            if (now >= salida && now <= llegada) {
-              vuelosActivosMap.set(v.id, v);
-            }
+            if (now >= salida && now <= llegada) vuelosActivosMap.set(v.id, v);
           }
         }
       });
@@ -246,14 +217,13 @@ export default function ToolsPanel({
     if (resultado.length === 0) {
       const lastWindow = windows[windows.length - 1];
       const vuelos = lastWindow?.vuelos ?? [];
-      // Filtrar vuelos cancelados
       return vuelos.filter(v => !vuelosCancelados.has(v.id));
     }
     
     return resultado;
   }, [windows, simNowUtc, vuelosCancelados, variant]);
 
-  // Construir mapa de pedidos (último estado conocido por id) usando TODAS las ventanas
+  // Mapa de pedidos
   const pedidosPorIdOperacion = useMemo(() => {
     if (variant !== "operacion") return null;
     const map = new Map<number, PedidoDTO>();
@@ -265,150 +235,75 @@ export default function ToolsPanel({
     return map;
   }, [windows, variant]);
 
-  // Obtener pedidos activos según escenario
+  // Pedidos activos
   const pedidosActivos = useMemo<PedidoDTO[]>(() => {
     if (variant === "operacion") {
       const pedidosOperacion = pedidosPorIdOperacion ? Array.from(pedidosPorIdOperacion.values()) : [];
       if (pedidosOperacion.length === 0) return [];
-
-      if (!simNowUtc) {
-        return pedidosOperacion;
-      }
+      if (!simNowUtc) return pedidosOperacion;
 
       const now = new Date(simNowUtc).getTime();
       
-      // Filtrar pedidos completados (todos sus vuelos han llegado)
-      // Usar la misma lógica que calcularEstado para consistencia
       return pedidosOperacion.filter(pedido => {
-        // Si no tiene rutas, mostrarlo (pendiente)
         if (!pedido.rutas || pedido.rutas.length === 0) return true;
-        
-        // Verificar si TODOS los vuelos han llegado (igual que calcularEstado)
-        // Un pedido está completo solo cuando TODOS los vuelos de TODAS sus rutas han llegado
         let todosVuelosLlegaron = true;
         
         pedido.rutas.forEach(ruta => {
           ruta.vuelos.forEach(vuelo => {
             const llegada = new Date(vuelo.llegadaUtc).getTime();
-            
-            // Si algún vuelo aún no ha llegado, el pedido no está completo
-            if (now <= llegada) {
-              todosVuelosLlegaron = false;
-            }
+            if (now <= llegada) todosVuelosLlegaron = false;
           });
         });
-        
-        // Mostrar si NO todos los vuelos han llegado (programado, en vuelo, o parcialmente entregado)
-        // Ocultar solo si todos los vuelos han llegado (COMPLETO)
         return !todosVuelosLlegaron;
       });
     }
 
     if (windows.length === 0) return [];
-
     if (!simNowUtc) {
       const lastWindow = windows[windows.length - 1];
       return lastWindow?.pedidos ?? [];
     }
     
     const now = new Date(simNowUtc).getTime();
-    
-    // Recopilar IDs de pedidos que están en vuelos activos
     const pedidosEnVueloSet = new Set<number>();
+    
     windows.forEach(window => {
       window.vuelos.forEach(vuelo => {
         const salida = new Date(vuelo.salidaUtc).getTime();
         const llegada = new Date(vuelo.llegadaUtc).getTime();
-        // Solo considerar vuelos que están en el aire AHORA
         if (now >= salida && now <= llegada) {
-          // Agregar los IDs de los pedidos en la carga de este vuelo
-          vuelo.carga?.forEach(item => {
-            pedidosEnVueloSet.add(item.pedidoId);
-          });
+          vuelo.carga?.forEach(item => pedidosEnVueloSet.add(item.pedidoId));
         }
       });
     });
     
-    // Filtrar pedidos que están en vuelo AHORA
     const lastWindow = windows[windows.length - 1];
     const resultado = (lastWindow?.pedidos || []).filter(p => pedidosEnVueloSet.has(p.id));
-    if (resultado.length === 0) {
-      return lastWindow?.pedidos ?? [];
-    }
-
-    return resultado;
+    return resultado.length === 0 ? (lastWindow?.pedidos ?? []) : resultado;
   }, [windows, simNowUtc, variant, pedidosPorIdOperacion]);
-
-  // Calcular cantidad EN EL AIRE del pedido seleccionado
-  const cantidadEnVuelo = useMemo(() => {
-    if (!pedido || !pedido.rutas || !simNowUtc) return 0;
-    
-    const now = new Date(simNowUtc).getTime();
-    // Sumar la cantidad de cada vuelo que está actualmente en el aire
-    return pedido.rutas.reduce((sum, ruta) => {
-      const cantidadRutaEnVuelo = ruta.vuelos.reduce((sumVuelos, vuelo) => {
-        const salida = new Date(vuelo.salidaUtc).getTime();
-        const llegada = new Date(vuelo.llegadaUtc).getTime();
-        // Si el vuelo está en el aire ahora, sumar su cantidad
-        if (now >= salida && now <= llegada) {
-          return sumVuelos + vuelo.cantidad;
-        }
-        return sumVuelos;
-      }, 0);
-      return sum + cantidadRutaEnVuelo;
-    }, 0);
-  }, [pedido, simNowUtc]);
 
   const toggleNivel = (k: NivelCarga) =>
     setNiveles((prev) => ({ ...prev, [k]: !prev[k] }));
 
-  const canApply =
-    (showStart ? Boolean(inicio) : true) && (showEnd ? Boolean(fin) : true);
-
-
+  const canApply = (showStart ? Boolean(inicio) : true) && (showEnd ? Boolean(fin) : true);
   const [loading, setLoading] = useState(false);
 
   const handleRun = async () => {
     setLoading(true);
     try {
       const req = buildStartRunRequest(variant, {inicio, fin});
-
-      const [data, error] = await handleApi(
-        postJson<StartRunResponse>("runs", req)
-      )
+      const [data, error] = await handleApi(postJson<StartRunResponse>("runs", req))
 
       if (error) {
-        // aquí tu toast o UI de error
         console.error("❌ [ToolsPanel] Error al iniciar la simulación:", error);
-        //alert(`Error al iniciar simulación: ${error.message}`);
-        toast.custom((t) => (
-          <ToastCustom
-            t={t}
-            message={error+"❗"}
-            type="error"
-          />),
-        { duration: 5000});
-
+        toast.custom((t) => <ToastCustom t={t} message={error+"❗"} type="error" />, { duration: 5000});
       } else if (data) {
-        // éxito
-        toast.custom((t) => (
-          <ToastCustom
-            t={t}
-            message={"¡Simulación iniciada exitosamente!"}
-            type="success"
-          />),
-        { duration: 5000});
-        
-        //Colocamos lo necesario en el hook
+        toast.custom((t) => <ToastCustom t={t} message={"¡Simulación iniciada exitosamente!"} type="success" />, { duration: 5000});
         begin(data.runId);
-
-        //setShowContent(false); //opcional para cerrar el panel
-        //navigate("/simulacion"); 
       }
     } catch (err) {
       console.error("💥 [ToolsPanel] Error inesperado:", err);
-    }
-    finally {
+    } finally {
       setLoading(false);
     }
   }
@@ -427,278 +322,38 @@ export default function ToolsPanel({
 
   const handleForceReplan = async () => {
     if (variant != "operacion") return;
-
     if (!currentRunId || status !== "running") {
-      toast.custom((t) => (
-        <ToastCustom
-          t={t}
-          message={"No hay una simulación de Operación Diaria en ejecución." + "❗"}
-          type="error"
-        />
-      ), { duration: 4000 });
+      toast.custom((t) => <ToastCustom t={t} message={"No hay una simulación de Operación Diaria en ejecución." + "❗"} type="error" />, { duration: 4000 });
       return;
     }
 
     setForcing(true);
-
     try {
       const path = `operacionDiaria/${currentRunId}/force`;
-
-      const [data, error] = await handleApi(
-        postJson<ForceReplanResponse>(path)
-      )
+      const [data, error] = await handleApi(postJson<ForceReplanResponse>(path))
 
       if (error) {
         console.error("[ToolsPanel] Error al forzar replan:", error);
-        toast.custom((t) => (
-          <ToastCustom
-            t={t}
-            message={"Error al forzar planificación." + "❗"}
-            type="error"
-          />
-        ), { duration: 4000 });
+        toast.custom((t) => <ToastCustom t={t} message={"Error al forzar planificación." + "❗"} type="error" />, { duration: 4000 });
+      } else if (data){
+        toast.custom((t) => <ToastCustom t={t} message={"Planificación forzada exitosamente!"} type="success" />, { duration: 4000 });
       }
-      else if (data){
-        toast.custom((t) => (
-            <ToastCustom
-              t={t}
-              message={"Planificación forzada exitosamente!"}
-              type="success"
-            />
-          ), { duration: 4000 });
-      }
-
-
-    }
-    catch (err) {
+    } catch (err) {
       console.error("[ToolsPanel] Error inesperado al forzar replan:", err);
-    }
-    finally {
+    } finally {
       setForcing(false);
     }
-
-
   }
 
   return (
     <section className="mx-auto max-w-6xl px-3 sm:px-4">
-      {/* Tooltips detallados */}
-      {vuelo && (
-        <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto mb-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-border pb-2">
-              <div className="flex items-center gap-2">
-                <Plane className="w-4 h-4 text-primary" />
-                <h3 className="font-semibold text-lg">{vuelo.id}</h3>
-              </div>
-              <button onClick={() => setVuelo(null)} className="text-muted-foreground hover:text-foreground">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">Origen</p>
-                <p className="font-mono text-xs">{vuelo.origen}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Destino</p>
-                <p className="font-mono text-xs">{vuelo.destino}</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">Salida</p>
-                <p className="font-mono text-xs">
-                  {new Date(vuelo.salidaUtc).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} UTC
-                </p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Llegada</p>
-                <p className="font-mono text-xs">
-                  {new Date(vuelo.llegadaUtc).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })} UTC
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-muted-foreground">Carga</span>
-                <span className="font-semibold">
-                  {vuelo.cantidadAsignada} / {vuelo.capacidad}
-                </span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                <div
-                className="h-full transition-all"
-                style={{
-                  width: `${ocupacion * 100}%`,
-                  backgroundColor: getCargaColor(ocupacion),
-                }}
-              ></div>
-              </div>
-            </div>
-
-            {vuelo.carga.length > 0 && (
-              <div>
-                <p className="text-sm font-semibold mb-2">
-                  Carga ({vuelo.carga.length} {vuelo.carga.length === 1 ? 'pedido' : 'pedidos'})
-                </p>
-                <div className="max-h-40 overflow-y-auto space-y-1">
-                  {vuelo.carga.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-lg bg-muted/50">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold">#{item.pedidoId}</span>
-                        {item.esConexion && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
-                            Conexión
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{item.cantidad} uds</p>
-                        <p className="text-muted-foreground text-[10px]">→ {item.destinoFinal}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {pedido && (
-        <div className="absolute top-20 right-4 z-50 w-96 max-h-[80vh] overflow-y-auto p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto mb-4">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-b border-border pb-2 sticky top-0 bg-card/90 backdrop-blur-sm">
-              <div className="flex items-center gap-2">
-                <Package className="w-4 h-4 text-primary" />
-                <h3 className="font-semibold text-lg">PED-{pedido.id}</h3>
-              </div>
-              <button onClick={() => {
-                setPedido(null);
-              }} className="text-muted-foreground hover:text-foreground">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">Cliente</p>
-                <p className="font-mono text-xs">#{pedido.idCliente}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Destino</p>
-                <p className="font-mono text-xs">{pedido.destino}</p>
-              </div>
-            </div>
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-muted-foreground">Estado</span>
-                <span className={`font-semibold ${
-                  cantidadEnVuelo >= pedido.cantidad ? "text-emerald-600" :
-                  cantidadEnVuelo > 0 ? (variant === "operacion" ? "text-purple-600" : "text-amber-600") :
-                  (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) ? "text-blue-600" : "text-rose-600"
-                }`}>
-                  {cantidadEnVuelo >= pedido.cantidad ? "COMPLETO" :
-                   cantidadEnVuelo > 0 ? (variant === "operacion" ? "EN_VUELO" : "PARCIAL") :
-                   (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) ? "PROGRAMADO" : "PENDIENTE"}
-                </span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                <div
-                  className={`h-full transition-all ${
-                    cantidadEnVuelo >= pedido.cantidad ? "bg-emerald-600" :
-                    cantidadEnVuelo > 0 ? (variant === "operacion" ? "bg-purple-600" : "bg-amber-600") :
-                    (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) ? "bg-blue-600" : "bg-rose-600"
-                  }`}
-                  style={{ width: `${(cantidadEnVuelo / pedido.cantidad) * 100}%` }}
-                />
-              </div>
-              <p className="text-center text-xs text-muted-foreground mt-1">
-                {cantidadEnVuelo} / {pedido.cantidad} unidades
-              </p>
-            </div>
-            {pedido.fechaCreacion && (
-              <div className="text-xs text-muted-foreground">
-                <p className="font-semibold">Fecha de creación</p>
-                <p className="font-mono">{new Date(pedido.fechaCreacion).toLocaleString('es-PE', { timeZone: 'UTC' })} UTC</p>
-              </div>
-            )}
-            {/* NUEVO: Desglose de rutas de entrega */}
-            {pedido.rutas && pedido.rutas.length > 0 && (() => {
-              const now = new Date(simNowUtc || Date.now()).getTime();
-              const estadoPedido = cantidadEnVuelo >= pedido.cantidad ? "COMPLETO" :
-                                   cantidadEnVuelo > 0 ? (variant === "operacion" ? "EN_VUELO" : "PARCIAL") : 
-                                   (variant === "operacion" && pedido.rutas.length > 0 ? "PROGRAMADO" : "PENDIENTE");
-              
-              // En operación diaria, si es PROGRAMADO, mostrar todas las rutas
-              // Si es EN_VUELO, mostrar todas las rutas (algunas pueden estar en vuelo, otras programadas)
-              // Si es COMPLETO, no debería mostrarse (el pedido desaparece)
-              const rutasVisibles = (estadoPedido === "PROGRAMADO" || estadoPedido === "EN_VUELO") && variant === "operacion"
-                ? pedido.rutas // Mostrar todas las rutas si es PROGRAMADO o EN_VUELO
-                : pedido.rutas.filter(ruta => {
-                    return ruta.vuelos.some(vuelo => {
-                      const salida = new Date(vuelo.salidaUtc).getTime();
-                      const llegada = new Date(vuelo.llegadaUtc).getTime();
-                      return now >= salida && now <= llegada;
-                    });
-                  });
-              
-              return rutasVisibles.length > 0 && (
-                <div className="border-t border-border pt-2">
-                  <p className="text-sm font-semibold mb-2">
-                    {estadoPedido === "PROGRAMADO" ? "Rutas programadas" : 
-                     estadoPedido === "EN_VUELO" ? "Rutas en vuelo" : 
-                     "Rutas activas"} ({rutasVisibles.length} {rutasVisibles.length === 1 ? 'ruta' : 'rutas'})
-                  </p>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {rutasVisibles.map((ruta, idx) => {
-                      // Si es PROGRAMADO o EN_VUELO en operación diaria, mostrar todos los vuelos
-                      // Si no, solo los activos
-                      const vuelosActivos = (estadoPedido === "PROGRAMADO" || estadoPedido === "EN_VUELO") && variant === "operacion"
-                        ? ruta.vuelos // Mostrar todos los vuelos si es PROGRAMADO o EN_VUELO
-                        : ruta.vuelos.filter(vuelo => {
-                            const salida = new Date(vuelo.salidaUtc).getTime();
-                            const llegada = new Date(vuelo.llegadaUtc).getTime();
-                            return now >= salida && now <= llegada;
-                          });
-                      
-                      return (
-                        <div key={idx} className="p-2 rounded-lg bg-muted/50 border border-border/50">
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-xs">{ruta.cantidad} uds</span>
-                              <span className="text-xs text-muted-foreground">
-                                {ruta.origen} → {ruta.destinoFinal}
-                              </span>
-                            </div>
-                          </div>
-                          {vuelosActivos.length > 0 && (
-                            <div className="ml-2 space-y-1 border-l-2 border-primary/30 pl-2">
-                              {vuelosActivos.map((vuelo, vIdx) => (
-                                <div key={vIdx} className="flex items-center justify-between text-xs bg-card/50 rounded px-2 py-1">
-                                  <div>
-                                    <span className="font-mono">{vuelo.origen}→{vuelo.destino}</span>
-                                  </div>
-                                  <div className="text-muted-foreground">
-                                    {new Date(vuelo.salidaUtc).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
+      {/* NOTA: Se han eliminado las tarjetas flotantes (FlightCard, OrderCard, AirportCard) de aquí.
+          Ahora se renderizan exclusivamente en el componente padre (ej. Simulacion.tsx) 
+          escuchando el contexto global (useRunSession).
+      */}
 
       {/* Selecciones principales (botones) */}
+      {/* Al seleccionar aquí, se actualiza el contexto y el Padre pinta la tarjeta */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 relative">
         <FlightSelectCard
           runId={currentRunId}
@@ -734,9 +389,8 @@ export default function ToolsPanel({
         />
       </div>
 
-      {/* Barra de control con glassmorphism "estilo reloj" */}
+      {/* Barra de control */}
       <div className={`rounded-2xl ${GLASS}`}>
-        {/* encabezado */}
         <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-primary" />
@@ -746,13 +400,10 @@ export default function ToolsPanel({
           </div>
         </div>
 
-        {/* contenido */}
         <div className="p-4 sm:p-5 space-y-4 text-foreground">
           {/* rango de fechas */}
           {(showStart || showEnd) && (
-            <div
-              className={`grid grid-cols-1 ${showStart && showEnd ? "md:grid-cols-2" : ""} gap-3`}
-            >
+            <div className={`grid grid-cols-1 ${showStart && showEnd ? "md:grid-cols-2" : ""} gap-3`}>
               {showStart && (
                 <Field label="Fecha de inicio">
                   <DateTimePicker
@@ -787,24 +438,9 @@ export default function ToolsPanel({
             <span className="text-[11px] font-semibold uppercase tracking-wide mr-1">
               Nivel de carga
             </span>
-            <FilterChip
-              label="Disponible"
-              active={niveles.disponible}
-              color="emerald"
-              onClick={() => toggleNivel("disponible")}
-            />
-            <FilterChip
-              label="Limitado"
-              active={niveles.limitado}
-              color="amber"
-              onClick={() => toggleNivel("limitado")}
-            />
-            <FilterChip
-              label="Saturado"
-              active={niveles.saturado}
-              color="rose"
-              onClick={() => toggleNivel("saturado")}
-            />
+            <FilterChip label="Disponible" active={niveles.disponible} color="emerald" onClick={() => toggleNivel("disponible")} />
+            <FilterChip label="Limitado" active={niveles.limitado} color="amber" onClick={() => toggleNivel("limitado")} />
+            <FilterChip label="Saturado" active={niveles.saturado} color="rose" onClick={() => toggleNivel("saturado")} />
           </div>
 
           {/* acciones */}
@@ -819,41 +455,24 @@ export default function ToolsPanel({
 
             { variant == "operacion" && currentRunId != null && <button
               onClick={handleForceReplan}
-              disabled={
-                forcing ||
-                !currentRunId ||
-                status !== "running" ||
-                variant !== "operacion"
-              }
-              className={`px-3 py-2 text-sm rounded-full inline-flex items-center gap-1
-                ${
+              disabled={forcing || !currentRunId || status !== "running" || variant !== "operacion"}
+              className={`px-3 py-2 text-sm rounded-full inline-flex items-center gap-1 ${
                   forcing || !currentRunId || status !== "running" || variant !== "operacion"
                     ? "bg-rose-300 text-white/70 cursor-not-allowed"
                     : "bg-rose-600 text-white hover:bg-rose-700"
                 }`}
-              title={
-                !currentRunId || status !== "running"
-                  ? "Requiere una simulación de Operación Diaria en ejecución"
-                  : "Forzar una nueva planificación a partir del tiempo actual"
-              }
+              title={!currentRunId || status !== "running" ? "Requiere una simulación de Operación Diaria en ejecución" : "Forzar una nueva planificación"}
             >
               <RefreshCw className="w-4 h-4" />
               {forcing ? "Forzando..." : "Forzar planificación"}
             </button>
             }
 
-
             <button
               onClick={handleRun}
               disabled={!canApply || loading}
-              className={`px-3 py-2 text-sm rounded-full transition inline-flex items-center gap-1
-                ${canApply && !loading ? "bg-primary text-primary-foreground hover:brightness-95" : "bg-primary/50 text-primary-foreground/80 cursor-not-allowed"}
-              `}
-              title={
-                loading ? "Iniciando simulación..." : 
-                canApply ? "Aplicar filtros" : 
-                "Selecciona el rango de fechas"
-              }
+              className={`px-3 py-2 text-sm rounded-full transition inline-flex items-center gap-1 ${canApply && !loading ? "bg-primary text-primary-foreground hover:brightness-95" : "bg-primary/50 text-primary-foreground/80 cursor-not-allowed"}`}
+              title={loading ? "Iniciando simulación..." : canApply ? "Aplicar filtros" : "Selecciona el rango de fechas"}
             >
               <Check className="h-4 w-4" /> 
               {loading ? "Iniciando..." : "Aplicar"}
@@ -862,7 +481,6 @@ export default function ToolsPanel({
         </div>
       </div>
 
-      {/* utilidades de estilo */}
       <style>{`
         .picker-trigger{
           @apply w-full rounded-lg text-foreground ring-1 ring-border
@@ -882,7 +500,18 @@ export default function ToolsPanel({
   );
 }
 
-/* ---------- Subcomponentes ---------- */
+// ... (Subcomponentes WarehouseSelectCard, FlightSelectCard, OrderSelectCard, Field, FilterChip se mantienen IGUAL abajo)
+// Solo asegúrate de copiar y pegar el resto del archivo original que me pasaste para los subcomponentes, 
+// ya que NO necesitan cambios, su lógica de onSelect ya actualiza el estado correctamente.
+
+/* ---------- Subcomponentes (COPIAR Y PEGAR DEL ARCHIVO ORIGINAL ABAJO) ---------- */
+/* ... WarehouseSelectCard ... */
+/* ... FlightSelectCard ... */
+/* ... OrderSelectCard ... */
+/* ... Field ... */
+/* ... FilterChip ... */
+/* ... OperacionDiariaToolsPanel ... */
+/* ... ColapsoToolsPanel ... */
 
 type WarehouseOption = { id: string; label: string; city?: string; country?: string };
 
