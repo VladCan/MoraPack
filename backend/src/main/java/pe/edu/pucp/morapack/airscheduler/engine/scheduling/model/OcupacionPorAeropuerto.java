@@ -277,4 +277,32 @@ public class OcupacionPorAeropuerto {
         }
         return false;
     }
+    /**
+     * Calcula la ocupación máxima histórica registrada para un aeropuerto
+     * iterando sobre todos sus eventos cronológicos.
+     */
+    public int getMaxOcupacionGlobal(String idAeropuerto) {
+        // 1. Obtener los eventos (deltas) del aeropuerto
+        TreeMap<Instant, Integer> evs = eventos.get(idAeropuerto);
+        
+        // Si no hay eventos, la ocupación máxima es 0
+        if (evs == null || evs.isEmpty()) {
+            return 0;
+        }
+
+        int maxOcupacion = 0;
+        int ocupacionActual = 0;
+
+        // 2. Barrido (Sweep Line): Iteramos por los valores ordenados por tiempo
+        for (int delta : evs.values()) {
+            ocupacionActual += delta;
+            
+            // Actualizamos el pico máximo encontrado
+            if (ocupacionActual > maxOcupacion) {
+                maxOcupacion = ocupacionActual;
+            }
+        }
+
+        return maxOcupacion;
+    }
 }
