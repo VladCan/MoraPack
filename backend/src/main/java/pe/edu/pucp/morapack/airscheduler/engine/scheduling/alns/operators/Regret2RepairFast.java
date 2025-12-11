@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class Regret2RepairFast implements RepairOperator { // Renombrado a Fast
+public class Regret2RepairFast implements RepairOperator {
 
     private final IndexVuelos indexVuelos;
     private final List<String> sedesCandidatas;
@@ -21,6 +21,10 @@ public class Regret2RepairFast implements RepairOperator { // Renombrado a Fast
     private static final Set<String> HUBS = Set.of("SPIM", "EBCI", "UBBB");
     private static final long MAX_SLA_HOURS = 46;
     private static final double PENALTY_NO_ROUTE = 99999.0;
+    
+    // Configuración de Poda
+    private static final int MAX_SEARCH_NODES = 600; // Detiene la búsqueda si explora demasiados nodos
+    private static final long MAX_CONNECTION_HOURS = 12; // Nadie espera más de 12h en una escala
 
     public Regret2RepairFast(int k, List<String> sedes, VuelosTEG teg) {
         this.sedesCandidatas = new ArrayList<>(sedes);
@@ -39,79 +43,78 @@ public class Regret2RepairFast implements RepairOperator { // Renombrado a Fast
         CargaPorVuelo cargaPorVuelo = s.getCargaPorVuelo();
         List<CandidateEntry> ranking = new ArrayList<>(unassigned.size());
 
-        // 2. FASE DE CÁLCULO MASIVO (O(N)): Calculamos el regret de todos UNA sola vez
-        // 
+        // 2. FASE DE CÁLCULO MASIVO (Snapshot inicial)
         for (PlanPedido plan : unassigned) {
-            
-            // A. MEJOR RUTA GLOBAL
+            // Buscamos la mejor ruta ignorando pequeñas variaciones de carga momentáneas
             RutaAsignada ruta1 = buscarMejorRutaDesdeCualquierHub(plan, presenteUTC, cargaPorVuelo, null);
-            
-            if (ruta1 == null) continue; // Si es imposible, lo ignoramos por ahora
+            if (ruta1 == null) continue;
 
             double coste1 = calcularDuracion(plan, ruta1);
 
-            // B. SEGUNDA MEJOR RUTA (Banear el primer vuelo)
+            // Calculamos la segunda mejor para el Regret
             VueloProgramadoId vueloABanear = ruta1.getTramos().get(0).getVuelo();
             RutaAsignada ruta2 = buscarMejorRutaDesdeCualquierHub(plan, presenteUTC, cargaPorVuelo, vueloABanear);
 
             double coste2 = (ruta2 == null) ? (coste1 + PENALTY_NO_ROUTE) : calcularDuracion(plan, ruta2);
-
-            // C. CALCULAR REGRET
             double regret = coste2 - coste1;
-            double noise = 0.9 + (0.2 * rnd.nextDouble()); // Menos ruido, más determinista para velocidad
+            double noise = 0.9 + (0.2 * rnd.nextDouble());
 
             ranking.add(new CandidateEntry(plan, ruta1, regret * noise));
         }
 
-        // 3. ORDENAR POR MAYOR ARREPENTIMIENTO (Los más críticos primero)
+        // 3. ORDENAR POR ARREPENTIMIENTO
         ranking.sort((a, b) -> Double.compare(b.regretScore, a.regretScore));
 
-        // 4. FASE DE INSERCIÓN (Greedy)
+        // 4. FASE DE INSERCIÓN CON RESCATE (FALLBACK)
         for (CandidateEntry entry : ranking) {
             PlanPedido plan = entry.plan;
-            RutaAsignada ruta = entry.bestRoute;
+            RutaAsignada rutaIntento = entry.bestRoute;
 
-            // IMPORTANTE: Como insertamos "en masa", la capacidad pudo haber cambiado
-            // desde que calculamos la ruta hace unos milisegundos. Verificamos de nuevo.
-            if (verificarCapacidadReal(s, journal, plan, ruta)) {
+            // INTENTO A: Usar la ruta pre-calculada (Muy rápido)
+            if (verificarCapacidadReal(s, journal, plan, rutaIntento)) {
+                ejecutarReservas(journal, s, plan, rutaIntento);
+                actualizarSolucion(s, plan, rutaIntento);
+            } 
+            else {
+                // 🚨 INTENTO B (FALLBACK): La ruta pre-calculada falló (alguien ocupó el espacio).
+                // Recalculamos una ruta fresca con la carga actualizada.
+                RutaAsignada rutaFresca = buscarMejorRutaDesdeCualquierHub(plan, presenteUTC, s.getCargaPorVuelo(), null);
                 
-                ejecutarReservas(journal, s, plan, ruta);
-
-                List<RutaAsignada> rutaLista = new ArrayList<>();
-                rutaLista.add(ruta);
-
-                PlanPedido nuevoPlan = PlanPedido.builder()
-                        .idPedido(plan.getIdPedido())
-                        .aeropuertoDestino(plan.getAeropuertoDestino())
-                        .creadoUtc(plan.getCreadoUtc())
-                        .demanda(plan.getDemanda())
-                        .rutas(rutaLista)
-                        .build();
-
-                s.getPlanPorPedido().put(nuevoPlan.getIdPedido(), nuevoPlan);
+                if (rutaFresca != null && verificarCapacidadReal(s, journal, plan, rutaFresca)) {
+                    ejecutarReservas(journal, s, plan, rutaFresca);
+                    actualizarSolucion(s, plan, rutaFresca);
+                }
             }
-            // Si falla la verificación (ya no hay sitio), el pedido se queda sin asignar
-            // y será penalizado en la función objetivo, o atrapado en la siguiente iteración.
-            // Esto es mucho más rápido que recalcular.
         }
     }
 
-    // Clase auxiliar para ordenar
+    private void actualizarSolucion(SolucionProgramacion s, PlanPedido plan, RutaAsignada ruta) {
+        List<RutaAsignada> rutaLista = new ArrayList<>();
+        rutaLista.add(ruta);
+        
+        PlanPedido nuevoPlan = PlanPedido.builder()
+                .idPedido(plan.getIdPedido())
+                .aeropuertoDestino(plan.getAeropuertoDestino())
+                .creadoUtc(plan.getCreadoUtc())
+                .demanda(plan.getDemanda())
+                .rutas(rutaLista)
+                .build();
+
+        s.getPlanPorPedido().put(nuevoPlan.getIdPedido(), nuevoPlan);
+    }
+
     private record CandidateEntry(PlanPedido plan, RutaAsignada bestRoute, double regretScore) {}
 
-    // Verifica capacidad "en vivo" contra la solución y el journal
     private boolean verificarCapacidadReal(SolucionProgramacion s, ALNS.Journal journal, PlanPedido plan, RutaAsignada ruta) {
-        // 1. Chequeo rápido de Vuelos (CargaPorVuelo)
         for (TramoAsignado t : ruta.getTramos()) {
              if (s.getCargaPorVuelo().residual(t.getVuelo()) < ruta.getCantidad()) {
                  return false;
              }
         }
-        // 2. Chequeo de Almacenes (Journal)
         return verificarCapacidadAlmacenes(journal, plan, ruta);
     }
 
-    // --- MÉTODOS EXISTENTES (Sin cambios lógicos mayores, solo reutilizados) ---
+    // --- DIJKSTRA OPTIMIZADO CON PODA ---
 
     private RutaAsignada buscarMejorRutaDesdeCualquierHub(PlanPedido plan, Instant presenteUTC, 
                                                           CargaPorVuelo carga, VueloProgramadoId vueloProhibido) {
@@ -119,7 +122,6 @@ public class Regret2RepairFast implements RepairOperator { // Renombrado a Fast
         double mejorTiempo = Double.MAX_VALUE;
 
         for (String origen : sedesCandidatas) {
-            // Pequeña optimización: Si el mejor tiempo actual es muy bajo, no busques en hubs lejanos
             RutaAsignada candidata = DijkstraTimeBased(origen, plan, presenteUTC, carga, vueloProhibido);
             if (candidata != null) {
                 double tiempo = calcularDuracion(plan, candidata);
@@ -146,20 +148,26 @@ public class Regret2RepairFast implements RepairOperator { // Renombrado a Fast
         bestArrival.put(origen, startTime);
 
         Node mejorNodoDestino = null;
+        int nodesExplored = 0; // Contador para evitar bucles infinitos o búsquedas muy largas
 
         while (!pq.isEmpty()) {
             Node current = pq.poll();
+            nodesExplored++;
 
-            // Poda agresiva
+            // ⚡ PODA 1: Límite de exploración (Critical para performance)
+            if (nodesExplored > MAX_SEARCH_NODES) break;
+
+            // ⚡ PODA 2: Si ya llegamos a este nodo antes con mejor tiempo, descartar
             if (current.llegada.isAfter(bestArrival.getOrDefault(current.ap, Instant.MAX))) continue;
-            
-            // Optimización: Si ya encontramos una ruta al destino antes y esta es peor, skip
+
+            // ⚡ PODA 3: Si ya encontramos un camino al destino y este nodo actual
+            // ya llegó más tarde que ese camino final, no tiene sentido seguir por aquí.
             if (mejorNodoDestino != null && current.llegada.isAfter(mejorNodoDestino.llegada)) continue;
 
+            // ⚡ ÉXITO TEMPRANO: En logística masiva, el primer camino válido encontrado por Dijkstra
+            // suele ser el óptimo en tiempo. Cortamos aquí para ahorrar milisegundos.
             if (current.ap.equals(destino)) {
                 mejorNodoDestino = current;
-                // En Dijkstra puro paramos aquí, pero como es grafo con tiempo, 
-                // podría haber otro camino. Sin embargo, para velocidad, paramos en el primero válido.
                 break; 
             }
 
@@ -172,14 +180,19 @@ public class Regret2RepairFast implements RepairOperator { // Renombrado a Fast
                 VueloProgramadoId id = vf.id();
                 
                 if (vueloProhibido != null && id.equals(vueloProhibido)) continue;
-
-                // Chequeo de capacidad RÁPIDO antes de instanciar fechas
+                
+                // ⚡ PODA 4: Capacidad (Pre-check rápido)
                 if (cargaPorVuelo.residual(id) < demanda) continue;
 
                 Instant salidaUtc = id.getSalidaUtc();
+                
+                // ⚡ PODA 5: Tiempo mínimo de conexión (1h)
                 if (salidaUtc.isBefore(current.llegada.plusSeconds(3600))) continue; 
+                
+                // ⚡ PODA 6: Tiempo MÁXIMO de conexión (Evita esperas eternas de >12h)
+                if (salidaUtc.isAfter(current.llegada.plusSeconds(3600 * MAX_CONNECTION_HOURS))) continue;
 
-                // Chequeo SLA
+                // ⚡ PODA 7: SLA Global
                 if (Duration.between(plan.getCreadoUtc(), id.getLlegadaUtc()).toHours() > MAX_SLA_HOURS) continue;
 
                 String nextAp = id.getDestino();

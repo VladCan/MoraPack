@@ -816,11 +816,15 @@ public class RunManager {
                 SolucionProgramacion seed = ssp.generarSeed(teg, pedidosVentana, wStart);
 
                 List<DestructionOperator> destructores = new ArrayList<>();
-                destructores.add(new RandomRemoval(20));
-                destructores.add(new WorstRemoval(20));
+                destructores.add(new RandomRemoval(30));
+                destructores.add(new WorstRemoval(15));
+                destructores.add(new WarehouseCrisisRemoval(15,aeropuertosMap));
+                destructores.add(new SlaBreachRemoval(10));
                 List<RepairOperator> reparadores = new ArrayList<>();
-                reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
+                //reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
                 reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
+                reparadores.add(new Regret2RepairFast(2, new ArrayList<>(sedes), teg));
+                reparadores.add(new UrgencySplitRepair(new ArrayList<>(sedes), teg));
 
                 ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto,aeropuertosMap);
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
@@ -1025,12 +1029,15 @@ public class RunManager {
 
                 /// 5. Ejecutamos ALNS
                 List<DestructionOperator> destructores = new ArrayList<>();
-                destructores.add(new RandomRemoval(20));
-                destructores.add(new WorstRemoval(20));
-
+                destructores.add(new RandomRemoval(30));
+                destructores.add(new WorstRemoval(15));
+                destructores.add(new WarehouseCrisisRemoval(15,aeropuertosMap));
+                destructores.add(new SlaBreachRemoval(10));
                 List<RepairOperator> reparadores = new ArrayList<>();
-                reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
+                //reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
                 reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
+                reparadores.add(new Regret2RepairFast(2, new ArrayList<>(sedes), teg));
+                reparadores.add(new UrgencySplitRepair(new ArrayList<>(sedes), teg));
 
                 ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto,aeropuertosMap);
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);

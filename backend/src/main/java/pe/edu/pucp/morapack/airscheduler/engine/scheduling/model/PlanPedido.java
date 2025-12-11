@@ -15,7 +15,7 @@ import java.util.List;
 /** Plan de un pedido dividido en múltiples rutas (cada ruta agrupa sus tramos y una cantidad). */
 @Getter
 @Setter // Agregado para permitir modificaciones si fuera necesario
-@Builder
+@Builder(toBuilder = true)
 @AllArgsConstructor
 public class PlanPedido {
     private final int idPedido;

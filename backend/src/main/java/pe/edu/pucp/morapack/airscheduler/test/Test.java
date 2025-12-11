@@ -193,6 +193,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
             //ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt",presenteUTC);
             // ALNS
+            /*
             List<DestructionOperator> destructores = new ArrayList<>();
             destructores.add(new RandomRemoval(30));
             destructores.add(new WorstRemoval(15));
@@ -205,25 +206,26 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             reparadores.add(new UrgencySplitRepair(new ArrayList<>(sedes), teg));
             ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC, ocupacionPorAeropuerto,aeropuertosMap);
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
+            */
             //SEQM    410
             //48
             //24x410=9840
             // System.out.println("ALNS");
             // ImpresorSolucion.imprimirEnArchivo(solucionOptima);
-            ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
-            ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
-            solucionAnterior = solucionOptima;
+            //ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
+            //ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
+            //solucionAnterior = solucionOptima;
             // verificacionTotal(solucionAnterior)
             // System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
             // solucionOptima.imprimirFitness(presenteUTC);
             // System.exit(1);
-            // solucionAnterior = seed;
+            solucionAnterior = seed;
             /* 
             solucionOptima.imprimirCapacidadVuelosEnVentana(
                     presenteUTC, finUTC,
                     "out/reporteCapacidadVuelos_" + presenteUTC.toString().replace(':', '-') + ".txt");
             */
-            if(VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46),mapa, aeropuertosMap)){
+            if(VerificadorSLA.assertBasicos(solucionAnterior, Duration.ofHours(46),mapa, aeropuertosMap)){
                 System.out.println("✅ Solución verificada para la ventana actual.");
             } else {
                 System.err.println("❌ La solución tiene violaciones en la ventana actual.");

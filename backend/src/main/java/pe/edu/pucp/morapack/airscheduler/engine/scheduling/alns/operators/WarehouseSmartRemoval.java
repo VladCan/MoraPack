@@ -40,8 +40,8 @@ public class WarehouseSmartRemoval implements DestructionOperator {
             }
         }
 
-        // 3. Eliminar un porcentaje (40%) para aliviar presión
-        int target = Math.max(1, (int) (candidatosAMorir.size() * 0.40));
+        // 3. Eliminar un porcentaje (50% agresivo para asegurar limpieza)
+        int target = Math.max(1, (int) (candidatosAMorir.size() * 0.50));
         
         for (int i = 0; i < target && i < candidatosAMorir.size(); i++) {
             PlanPedido victima = candidatosAMorir.get(i);
@@ -52,10 +52,10 @@ public class WarehouseSmartRemoval implements DestructionOperator {
     private Map<String, Set<Instant>> detectarHotspots(SolucionProgramacion s, OcupacionPorAeropuerto occ) {
         Map<String, Set<Instant>> map = new HashMap<>();
         
-        // CORRECCIÓN AQUÍ: Usamos allIcaos() que SÍ existe en tu clase
+        // Obtenemos la lista real de aeropuertos desde el Mapa de Infraestructura
         for (String ap : aeropuertosMap.allIcaos()) {
             if (IGNORED.contains(ap)) continue;
-            // Solo necesitamos iterar para saber cuáles existen, la lógica real está abajo
+            // Solo necesitamos saber que existe para usarlo como llave si es necesario
         }
         
         // Reconstruimos la línea de tiempo de uso basada en la solución actual
@@ -65,6 +65,8 @@ public class WarehouseSmartRemoval implements DestructionOperator {
             if (p.getRutas() == null) continue;
             for (RutaAsignada r : p.getRutas()) {
                 if (r.getCantidad() <= 0) continue;
+                if (r.getTramos() == null) continue;
+                
                 for (TramoAsignado t : r.getTramos()) {
                     VueloProgramadoId v = t.getVuelo();
                     if (!IGNORED.contains(v.getOrigen())) {
@@ -77,13 +79,15 @@ public class WarehouseSmartRemoval implements DestructionOperator {
             }
         }
 
-        // Consultamos la ocupación real en esos puntos
+        // Consultamos la ocupación real en esos puntos críticos
         for (var entry : timeline.entrySet()) {
             String ap = entry.getKey();
-            // CORRECCIÓN: Usamos getCapBodega() que sí existe en tu clase
+            
+            // Usamos el método correcto para obtener la capacidad
             int cap = aeropuertosMap.getCapBodega(ap);
             
             for (Instant t : entry.getValue().keySet()) {
+                // Consultamos la ocupación acumulada en el Journal
                 if (occ.consultar(ap, t) > cap) {
                     map.computeIfAbsent(ap, k -> new HashSet<>()).add(t);
                 }
@@ -99,6 +103,7 @@ public class WarehouseSmartRemoval implements DestructionOperator {
             if (r.getTramos() == null) continue;
             for (TramoAsignado t : r.getTramos()) {
                 VueloProgramadoId v = t.getVuelo();
+                // Si el pedido pasa por un aeropuerto caliente (origen o destino) es sospechoso
                 if (hotspots.containsKey(v.getOrigen())) return true;
                 if (hotspots.containsKey(v.getDestino())) return true;
             }
@@ -107,13 +112,18 @@ public class WarehouseSmartRemoval implements DestructionOperator {
     }
 
     private void desasignar(PlanPedido plan, SolucionProgramacion s, ALNS.Journal journal) {
+        if (plan.getRutas() == null) return;
+        
         for (RutaAsignada r : plan.getRutas()) {
             if (r.getCantidad() <= 0) continue;
+            if (r.getTramos() == null) continue;
+            
             for (int i = 0; i < r.getTramos().size(); i++) {
                 TramoAsignado t = r.getTramos().get(i);
                 VueloProgramadoId v = t.getVuelo();
                 int q = r.getCantidad();
                 
+                // Liberar Almacenes
                 if (!IGNORED.contains(v.getOrigen())) {
                    Instant ini = (i==0) ? plan.getCreadoUtc() : r.getTramos().get(i-1).getVuelo().getLlegadaUtc();
                    if (ini != null && v.getSalidaUtc().isAfter(ini))
@@ -124,6 +134,8 @@ public class WarehouseSmartRemoval implements DestructionOperator {
                    Instant fin = v.getLlegadaUtc().plus(java.time.Duration.ofHours(2));
                    journal.liberar(v.getDestino(), v.getLlegadaUtc(), fin, q);
                 }
+                
+                // IMPORTANTE: Liberar peso del vuelo también
                 s.getCargaPorVuelo().asignar(v, -q);
             }
         }

@@ -12,7 +12,6 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 public class ALNS {
@@ -111,22 +110,18 @@ public class ALNS {
             repairOp.repair(solucionCandidata, journal, presenteUTC);
             long tEnd = System.nanoTime();
 
-            // Guardar stats
             registrarTiempo(destroyTotalTimeNs, destroyCount, destrOp.getClass().getSimpleName(), tMid - tStart);
             registrarTiempo(repairTotalTimeNs, repairCount, repairOp.getClass().getSimpleName(), tEnd - tMid);
 
             sanitizarSolucion(solucionCandidata);
             
-            // Tiempos para el log (en ms)
             long dMs = (tMid - tStart) / 1_000_000;
             long rMs = (tEnd - tMid) / 1_000_000;
             
-            // Alertar visualmente si algo toma más de 100ms
             String dStr = dMs > 100 ? String.format("\u001B[31mD:%dms\u001B[0m", dMs) : String.format("D:%dms", dMs);
             String rStr = rMs > 100 ? String.format("\u001B[31mR:%dms\u001B[0m", rMs) : String.format("R:%dms", rMs);
             
             sb.append(String.format("%s %s ", dStr, rStr));
-            // -----------------------------
 
             double costoCandidato = getCostoTotal(solucionCandidata, ocupacionCandidata);
 
@@ -165,8 +160,6 @@ public class ALNS {
                 sb.append(String.format("-> X  (%,.0f)", costoCandidato));
             }
 
-            // Solo imprimimos el log si tarda mucho o es una mejora, para no saturar si va rápido
-            // (Opcional: quita el 'if' si quieres ver todo)
             if (dMs + rMs > 50 || esMejorGlobal) {
                 System.out.println(sb.toString());
             }
@@ -186,15 +179,33 @@ public class ALNS {
         }
 
         // =========================================================================
-        // 🛡️ FASE DE LEGALIZACIÓN FORZOSA (RF3 - FINAL CHECK)
+        // 🛡️ FASE DE LEGALIZACIÓN FORZOSA (RF3 - FINAL CHECK - ITERATIVO)
         // =========================================================================
-        if (mejorOcupacion.hayExcesoDeCapacidad()) {
-            System.out.println("⚠️ ALERTA: La mejor solución viola capacidad de bodegas. Ejecutando limpieza forzosa...");
+        // 
+        int intentos = 0;
+        int maxIntentosLegalizacion = 50;
+
+        while (mejorOcupacion.hayExcesoDeCapacidad() && intentos < maxIntentosLegalizacion) {
+            intentos++;
+            System.out.println("⚠️ ALERTA DE CRISIS (" + intentos + "/" + maxIntentosLegalizacion + "): " +
+                    "Limpiando almacenes desbordados de forma agresiva...");
+
             Journal finalJournal = new Journal(mejorOcupacion);
+            
+            // Eliminamos carga quirúrgicamente
             this.emergencyOperator.destroy(mejorSolucion, finalJournal, presenteUTC);
+            
+            // IMPORTANTE: Recalcular costo para reflejar los pedidos eliminados (penalización)
             costoMejor = getCostoTotal(mejorSolucion, mejorOcupacion);
-            System.out.println("✅ Solución legalizada. Nuevo costo: " + String.format("%,.0f", costoMejor));
         }
+
+        if (mejorOcupacion.hayExcesoDeCapacidad()) {
+             System.out.println("💀 ERROR CRÍTICO: No se pudo legalizar el almacén tras " + maxIntentosLegalizacion + " intentos. La solución será inválida.");
+        } else if (intentos > 0) {
+             System.out.println("✅ Solución legalizada exitosamente tras " + intentos + " rondas de limpieza.");
+             System.out.println("💰 Nuevo Costo Legal (Alto por penalizaciones): " + String.format("%,.0f", costoMejor));
+        }
+        // =========================================================================
 
         this.ocupacionPorAeropuerto.copiarDesde(mejorOcupacion);
         sanitizarSolucion(mejorSolucion);
@@ -202,7 +213,6 @@ public class ALNS {
 
         long tTotal = (System.nanoTime() - tInicioGlobal) / 1_000_000;
         
-        // IMPRIMIR REPORTE DE TIEMPOS
         imprimirReporteTiempos();
 
         System.out.println(">>> FIN. Tiempo: " + tTotal + "ms. Mejor Costo: " + String.format("%,.0f", costoMejor));
@@ -223,7 +233,6 @@ public class ALNS {
         
         Map<String, Double> promedios = new HashMap<>();
         
-        // Unir ambos mapas para el reporte
         Set<String> allOps = new HashSet<>(destroyTotalTimeNs.keySet());
         allOps.addAll(repairTotalTimeNs.keySet());
 
@@ -234,7 +243,7 @@ public class ALNS {
         }
 
         promedios.entrySet().stream()
-            .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue())) // Ordenar descendente por promedio
+            .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
             .limit(10)
             .forEach(e -> {
                 String op = e.getKey();
@@ -245,7 +254,6 @@ public class ALNS {
             });
         System.out.println("----------------------------------------------------------------\n");
     }
-    // ----------------------------
 
     private void sanitizarSolucion(SolucionProgramacion sol) {
         for (PlanPedido plan : sol.getPlanPorPedido().values()) {
