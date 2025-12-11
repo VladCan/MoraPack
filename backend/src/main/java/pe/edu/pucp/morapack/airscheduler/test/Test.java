@@ -195,15 +195,18 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             // ALNS
             
             List<DestructionOperator> destructores = new ArrayList<>();
-            destructores.add(new RandomRemoval(30));
-            destructores.add(new WorstRemoval(15));
-            destructores.add(new WarehouseCrisisRemoval(15,aeropuertosMap));
-            destructores.add(new SlaBreachRemoval(10));
+            destructores.add(new RandomRemoval(25));
+            destructores.add(new RandomRemoval(60));
+            //destructores.add(new WorstRemoval(15));
+            destructores.add(new WarehouseCrisisRemoval(15, aeropuertosMap)); 
+            destructores.add(new WarehouseCrisisRemoval(40, aeropuertosMap)); // Versión agresiva
+            destructores.add(new SlaBreachRemoval(20));
             List<RepairOperator> reparadores = new ArrayList<>();
             //reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
-            reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
+            //reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
             reparadores.add(new Regret2RepairFast(new ArrayList<>(sedes), teg));
-            reparadores.add(new UrgencySplitRepair(new ArrayList<>(sedes), teg));
+            reparadores.add(new GreedyUrgencyRepair(new ArrayList<>(sedes), teg));
+            //reparadores.add(new UrgencySplitRepair(new ArrayList<>(sedes), teg));
             ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC, ocupacionPorAeropuerto,aeropuertosMap);
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
             

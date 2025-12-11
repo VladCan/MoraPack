@@ -6,7 +6,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosTEG;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.operators.DestructionOperator;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.operators.RepairOperator;
-import pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.operators.WarehouseSmartRemoval;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.alns.operators.WarehouseCrisisRemoval; // Asegúrate de importar esto si lo usas como emergencyOperator
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.*;
 
 import java.time.Duration;
@@ -27,7 +27,7 @@ public class ALNS {
     private final Random rnd = new Random();
 
     private final int maxIter = 2500;
-    private final double startTemperatureRatio = 0.05;
+    private final double startTemperatureRatio = 0.35;
     private final int maxStagnation = 200;
 
     private static final double PEN_INCOMPLETO          = 1_000_000_000_000.0;
@@ -35,7 +35,8 @@ public class ALNS {
     private static final double PEN_SLA                 =    50_000_000_000.0;
     private static final double PEN_CAPACIDAD_BODEGA_BASE =   1_000_000.0;
 
-    private WarehouseSmartRemoval emergencyOperator;
+    // Operador de emergencia (ahora será WarehouseCrisisRemoval)
+    private WarehouseCrisisRemoval emergencyOperator;
 
     // --- 📊 PROFILING MAPS ---
     private final Map<String, Long> destroyTotalTimeNs = new HashMap<>();
@@ -44,12 +45,22 @@ public class ALNS {
     private final Map<String, Integer> repairCount = new HashMap<>();
     // -------------------------
 
-    public SolucionProgramacion ejecutar(SolucionProgramacion solucionInicial) {
-        System.out.println("=================================================");
-        System.out.println(">>> INICIANDO ALNS (MODO: PROFILING ACTIVADO) <<<");
-        System.out.println("=================================================");
+    // Colores para logs (opcional, si la consola no soporta ANSI se verán caracteres raros, se puede quitar)
+    private static final String RESET = "\u001B[0m";
+    private static final String RED = "\u001B[31m";
+    private static final String GREEN = "\u001B[32m";
+    private static final String YELLOW = "\u001B[33m";
+    private static final String BLUE = "\u001B[34m";
+    private static final String PURPLE = "\u001B[35m";
+    private static final String CYAN = "\u001B[36m";
 
-        this.emergencyOperator = new WarehouseSmartRemoval(this.aeropuertosMap);
+    public SolucionProgramacion ejecutar(SolucionProgramacion solucionInicial) {
+        System.out.println(CYAN + "=================================================" + RESET);
+        System.out.println(CYAN + ">>> INICIANDO ALNS (MODO: PROFILING ACTIVADO) <<<" + RESET);
+        System.out.println(CYAN + "=================================================" + RESET);
+
+        // Inicializamos el operador de emergencia con una cantidad fija a borrar (ej. 20)
+        this.emergencyOperator = new WarehouseCrisisRemoval(20, this.aeropuertosMap);
 
         // Reset stats
         destroyTotalTimeNs.clear(); destroyCount.clear();
@@ -68,14 +79,19 @@ public class ALNS {
         double costoMejor = costoActual;
         double temperatura = costoActual * startTemperatureRatio;
 
+        // --- LOG DEL COSTO INICIAL (SEED) ---
+        System.out.println(YELLOW + "💰 Costo Inicial (Seed): " + String.format("%,.0f", costoActual) + RESET);
+        System.out.println(CYAN + "-------------------------------------------------" + RESET);
+
         int iteracionesSinMejora = 0;
         long tInicioGlobal = System.nanoTime();
-        long tiempoLimiteNs = 29L * 1_000_000_000L;
+        // Límite de tiempo: 29 segundos (para respetar timeouts típicos de 30s)
+        long tiempoLimiteNs = 29L * 1_000_000_000L; 
 
         for (int iter = 0; iter < maxIter; iter++) {
 
             if ((System.nanoTime() - tInicioGlobal) > tiempoLimiteNs) {
-                System.out.println("🛑 EARLY STOP: Tiempo límite (29s).");
+                System.out.println(RED + "🛑 EARLY STOP: Tiempo límite (29s)." + RESET);
                 break;
             }
 
@@ -89,19 +105,23 @@ public class ALNS {
             DestructionOperator destrOp;
             boolean hayCrisisBodega = ocupacionCandidata.hayExcesoDeCapacidad();
 
+            // Si hay crisis de bodega, alta probabilidad de usar el operador de emergencia
             if (hayCrisisBodega && rnd.nextDouble() < 0.80) {
                 destrOp = this.emergencyOperator;
-                sb.append("[🚑 WAREHOUSE FIX] ");
+                sb.append(PURPLE + "[🚑 WAREHOUSE FIX] " + RESET);
             } else {
                 destrOp = destructions.get(rnd.nextInt(destructions.size()));
             }
 
             RepairOperator repairOp = repairs.get(rnd.nextInt(repairs.size()));
 
+            String dName = destrOp.getClass().getSimpleName();
+            String rName = repairOp.getClass().getSimpleName();
+            // Acortar nombres para el log
             String opTag = String.format("[%s->%s]",
-                destrOp.getClass().getSimpleName().substring(0, 4),
-                repairOp.getClass().getSimpleName().substring(0, 4));
-            sb.append(String.format("%-12s ", opTag));
+                dName.length() > 6 ? dName.substring(0, 6) : dName,
+                rName.length() > 6 ? rName.substring(0, 6) : rName);
+            sb.append(String.format("%-16s ", opTag));
 
             // --- ⏱️ MEDICIÓN GRANULAR ---
             long tStart = System.nanoTime();
@@ -110,16 +130,17 @@ public class ALNS {
             repairOp.repair(solucionCandidata, journal, presenteUTC);
             long tEnd = System.nanoTime();
 
-            registrarTiempo(destroyTotalTimeNs, destroyCount, destrOp.getClass().getSimpleName(), tMid - tStart);
-            registrarTiempo(repairTotalTimeNs, repairCount, repairOp.getClass().getSimpleName(), tEnd - tMid);
+            registrarTiempo(destroyTotalTimeNs, destroyCount, dName, tMid - tStart);
+            registrarTiempo(repairTotalTimeNs, repairCount, rName, tEnd - tMid);
 
             sanitizarSolucion(solucionCandidata);
             
             long dMs = (tMid - tStart) / 1_000_000;
             long rMs = (tEnd - tMid) / 1_000_000;
             
-            String dStr = dMs > 100 ? String.format("\u001B[31mD:%dms\u001B[0m", dMs) : String.format("D:%dms", dMs);
-            String rStr = rMs > 100 ? String.format("\u001B[31mR:%dms\u001B[0m", rMs) : String.format("R:%dms", rMs);
+            // Colorear tiempos lentos (> 100ms) en rojo
+            String dStr = dMs > 100 ? RED + "D:" + dMs + "ms" + RESET : "D:" + dMs + "ms";
+            String rStr = rMs > 100 ? RED + "R:" + rMs + "ms" + RESET : "R:" + rMs + "ms";
             
             sb.append(String.format("%s %s ", dStr, rStr));
 
@@ -128,15 +149,15 @@ public class ALNS {
             boolean esMejorGlobal = costoCandidato < costoMejor;
             boolean aceptar = false;
             double delta = costoCandidato - costoActual;
-            String estado = "X";
+            String estado = RED + "X " + RESET; // X en rojo por defecto
 
             if (delta < 0) {
                 aceptar = true;
-                estado = "OK";
+                estado = GREEN + "OK" + RESET; // Mejora local
             } else {
                 if (rnd.nextDouble() < Math.exp(-delta / temperatura)) {
                     aceptar = true;
-                    estado = "SA";
+                    estado = YELLOW + "SA" + RESET; // Aceptado por Simulated Annealing (empeora pero explora)
                 }
             }
 
@@ -151,17 +172,19 @@ public class ALNS {
                     mejorOcupacion = ocupacionBase.copiaProfunda();
                     costoMejor = costoCandidato;
                     iteracionesSinMejora = 0;
-                    sb.append(" **R**");
+                    sb.append(GREEN + " **RÉCORD**" + RESET); // Nuevo récord global
                 } else {
                     iteracionesSinMejora++;
                 }
             } else {
                 iteracionesSinMejora++;
-                sb.append(String.format("-> X  (%,.0f)", costoCandidato));
+                sb.append(String.format("-> %s (%,.0f)", estado, costoCandidato));
             }
 
-            if (dMs + rMs > 50 || esMejorGlobal) {
-                System.out.println(sb.toString());
+            // Imprimir solo si es relevante (lento o mejora) para no saturar consola
+            // O imprimir cada N iteraciones para heartbeat
+            if (dMs + rMs > 50 || esMejorGlobal || iter % 100 == 0) {
+                //System.out.println(sb.toString());
             }
 
             temperatura *= 0.95;
@@ -169,10 +192,10 @@ public class ALNS {
             if (iteracionesSinMejora >= maxStagnation) {
                 if (mejorOcupacion.hayExcesoDeCapacidad()) {
                     iteracionesSinMejora = 0;
-                    temperatura = costoActual * 0.20;
-                    System.out.println(sb.toString() + " [REHEAT-CRISIS]");
+                    temperatura = costoActual * 0.20; // Re-calentamiento agresivo si estamos en crisis
+                    System.out.println(sb.toString() + RED + " [REHEAT-CRISIS]" + RESET);
                 } else {
-                    System.out.println("🛑 EARLY STOP: Convergencia.");
+                    System.out.println(GREEN + "🛑 EARLY STOP: Convergencia lograda." + RESET);
                     break;
                 }
             }
@@ -181,29 +204,29 @@ public class ALNS {
         // =========================================================================
         // 🛡️ FASE DE LEGALIZACIÓN FORZOSA (RF3 - FINAL CHECK - ITERATIVO)
         // =========================================================================
-        // 
+        // Intentamos limpiar cualquier violación residual de almacén al final
         int intentos = 0;
         int maxIntentosLegalizacion = 50;
 
         while (mejorOcupacion.hayExcesoDeCapacidad() && intentos < maxIntentosLegalizacion) {
             intentos++;
-            System.out.println("⚠️ ALERTA DE CRISIS (" + intentos + "/" + maxIntentosLegalizacion + "): " +
-                    "Limpiando almacenes desbordados de forma agresiva...");
+            System.out.println(YELLOW + "⚠️ ALERTA DE CRISIS (" + intentos + "/" + maxIntentosLegalizacion + "): " +
+                    "Limpiando almacenes desbordados de forma agresiva..." + RESET);
 
             Journal finalJournal = new Journal(mejorOcupacion);
             
-            // Eliminamos carga quirúrgicamente
+            // Eliminamos carga quirúrgicamente usando el operador de emergencia
             this.emergencyOperator.destroy(mejorSolucion, finalJournal, presenteUTC);
             
-            // IMPORTANTE: Recalcular costo para reflejar los pedidos eliminados (penalización)
+            // Recalcular costo para reflejar los pedidos eliminados (penalización alta)
             costoMejor = getCostoTotal(mejorSolucion, mejorOcupacion);
         }
 
         if (mejorOcupacion.hayExcesoDeCapacidad()) {
-             System.out.println("💀 ERROR CRÍTICO: No se pudo legalizar el almacén tras " + maxIntentosLegalizacion + " intentos. La solución será inválida.");
+             System.out.println(RED + "💀 ERROR CRÍTICO: No se pudo legalizar el almacén tras " + maxIntentosLegalizacion + " intentos. La solución será inválida." + RESET);
         } else if (intentos > 0) {
-             System.out.println("✅ Solución legalizada exitosamente tras " + intentos + " rondas de limpieza.");
-             System.out.println("💰 Nuevo Costo Legal (Alto por penalizaciones): " + String.format("%,.0f", costoMejor));
+             System.out.println(GREEN + "✅ Solución legalizada exitosamente tras " + intentos + " rondas de limpieza." + RESET);
+             System.out.println(YELLOW + "💰 Nuevo Costo Legal (Alto por penalizaciones): " + String.format("%,.0f", costoMejor) + RESET);
         }
         // =========================================================================
 
@@ -215,7 +238,7 @@ public class ALNS {
         
         imprimirReporteTiempos();
 
-        System.out.println(">>> FIN. Tiempo: " + tTotal + "ms. Mejor Costo: " + String.format("%,.0f", costoMejor));
+        System.out.println(CYAN + ">>> FIN. Tiempo: " + tTotal + "ms. Mejor Costo: " + String.format("%,.0f", costoMejor) + RESET);
         return mejorSolucion;
     }
 
@@ -226,7 +249,7 @@ public class ALNS {
     }
 
     private void imprimirReporteTiempos() {
-        System.out.println("\n📊 REPORTE DE RENDIMIENTO (TOP LENTOS) 📊");
+        System.out.println(BLUE + "\n📊 REPORTE DE RENDIMIENTO (TOP LENTOS) 📊" + RESET);
         System.out.println("----------------------------------------------------------------");
         System.out.println(String.format("%-30s | %-6s | %-10s | %-10s", "Operador", "Calls", "Total(ms)", "Avg(ms)"));
         System.out.println("----------------------------------------------------------------");
@@ -243,7 +266,7 @@ public class ALNS {
         }
 
         promedios.entrySet().stream()
-            .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue()))
+            .sorted((e1, e2) -> e2.getValue().compareTo(e1.getValue())) // Ordenar por promedio descendente (más lentos primero)
             .limit(10)
             .forEach(e -> {
                 String op = e.getKey();

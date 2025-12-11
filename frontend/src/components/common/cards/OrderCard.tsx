@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { Package, X } from "lucide-react";
 import type { PedidoDTO } from "@/hooks/useRunSSE";
 

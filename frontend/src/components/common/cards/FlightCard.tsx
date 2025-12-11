@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { Plane, X } from "lucide-react";
 
 // Interfaz unificada para lo que la tarjeta necesita mostrar

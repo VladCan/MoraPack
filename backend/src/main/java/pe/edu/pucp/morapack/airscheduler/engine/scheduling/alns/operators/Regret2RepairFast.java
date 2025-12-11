@@ -24,8 +24,6 @@ public class Regret2RepairFast implements RepairOperator {
     private static final Set<String> HUBS = Set.of("SPIM", "EBCI", "UBBB"); // RF5: Sedes infinitas
     private static final long MAX_SLA_HOURS = 46; // RF1
     
-    // 🔥 CAMBIO CLAVE PARA RF6: Reducimos drásticamente la ventana de conexión
-    // Antes 12h, ahora 4h. Esto obliga a liberar almacenes rápido.
     private static final long MIN_CONNECTION_HOURS = 1;
     private static final long MAX_CONNECTION_HOURS = 6; 
     
@@ -44,7 +42,6 @@ public class Regret2RepairFast implements RepairOperator {
 
         if (unassigned.isEmpty()) return;
 
-        // Estrategia: Atender primero los pedidos más grandes para asegurar espacio
         unassigned.sort((a, b) -> Integer.compare(b.getDemanda(), a.getDemanda()));
 
         Map<VueloProgramadoId, Integer> localFlightLoad = new HashMap<>();
@@ -61,19 +58,16 @@ public class Regret2RepairFast implements RepairOperator {
         List<RutaAsignada> nuevasRutas = new ArrayList<>();
         int intentos = 0;
 
-        while (demandaRestante > 0 && intentos < 10) { // Aumenté intentos ligeramente para split granular
+        while (demandaRestante > 0 && intentos < 10) {
             intentos++;
 
             RutaCandidata mejorCandidata = null;
-            // Usamos un costo compuesto (tiempo + penalización por espera)
             double mejorCosto = Double.MAX_VALUE;
 
             for (String origen : sedesCandidatas) {
-                // Buscamos ruta considerando restricciones de espacio (RF3, RF4)
                 RutaCandidata candidata = dijkstraSplit(origen, plan, presenteUTC, s.getCargaPorVuelo(), localFlightLoad, journal);
                 
                 if (candidata != null) {
-                    // El "Costo" ahora incluye penalización por usar almacén en conexiones
                     if (candidata.costoPonderado < mejorCosto) {
                         mejorCosto = candidata.costoPonderado;
                         mejorCandidata = candidata;
@@ -83,7 +77,6 @@ public class Regret2RepairFast implements RepairOperator {
 
             if (mejorCandidata == null) break; 
 
-            // Verificar capacidad real en todo el trayecto (RF3 y RF4)
             int capacidadRuta = calcularCapacidadReal(mejorCandidata.tramosIds, s, journal, localFlightLoad);
             int aEnviar = Math.min(demandaRestante, capacidadRuta);
             
@@ -95,7 +88,6 @@ public class Regret2RepairFast implements RepairOperator {
                 localFlightLoad.merge(vid, aEnviar, Integer::sum);
             }
             
-            // RF2 y RF3: Reservar espacio en aeropuertos (Destino final y Conexiones)
             ejecutarReservas(journal, plan, tramosFinales, aEnviar);
             
             for (VueloProgramadoId vid : mejorCandidata.tramosIds) {
@@ -113,7 +105,7 @@ public class Regret2RepairFast implements RepairOperator {
 
     private RutaCandidata dijkstraSplit(String origen, PlanPedido plan, Instant presenteUTC, 
                                         CargaPorVuelo cargaGlobal, Map<VueloProgramadoId, Integer> cargaLocal,
-                                        ALNS.Journal journal) { // Pasamos Journal para pre-chequeo rápido
+                                        ALNS.Journal journal) {
         String destino = plan.getAeropuertoDestino();
         if (origen.equals(destino)) return null;
 
@@ -122,7 +114,6 @@ public class Regret2RepairFast implements RepairOperator {
 
         Instant startTime = plan.getCreadoUtc().isAfter(presenteUTC) ? plan.getCreadoUtc() : presenteUTC;
         
-        // Costo inicial 0
         pq.add(new Node(origen, null, null, 0, startTime, 0.0));
         bestCost.put(origen, 0.0);
 
@@ -134,7 +125,6 @@ public class Regret2RepairFast implements RepairOperator {
             nodes++;
             if (nodes > MAX_DIJKSTRA_NODES) break;
 
-            // Poda por costo
             if (current.costoAcumulado > bestCost.getOrDefault(current.ap, Double.MAX_VALUE)) continue;
 
             if (current.ap.equals(destino)) {
@@ -144,39 +134,35 @@ public class Regret2RepairFast implements RepairOperator {
 
             if (current.hops >= MAX_HOPS) continue;
 
-            List<VueloFicha> salidas = indexVuelos.porOrigen(current.ap);
-            if (salidas == null) continue;
-
-            for (VueloFicha vf : salidas) {
+            // --- CORRECCIÓN DE CONCURRENCIA ---
+            List<VueloFicha> rawSalidas = indexVuelos.porOrigen(current.ap);
+            if (rawSalidas == null || rawSalidas.isEmpty()) continue;
+            
+            // NO necesitamos ordenar aquí porque Dijkstra explora nodos, no lista de aristas ordenada.
+            // Pero si necesitamos iterar sin miedo a modificaciones externas (aunque IndexVuelos suele ser read-only).
+            // Para seguridad extrema, iteramos sobre la lista directa si es inmutable, o copia si hay riesgo.
+            // Dado que IndexVuelos es estático, iteramos directamente PERO sin ordenar.
+            
+            for (VueloFicha vf : rawSalidas) {
                 VueloProgramadoId id = vf.id();
                 
-                // 1. RF4: Chequeo rápido de capacidad de vuelo
                 int ocupadoGlobal = cargaGlobal.asignado(id);
                 int ocupadoLocal = cargaLocal.getOrDefault(id, 0);
                 if ((cargaGlobal.capacidad(id) - (ocupadoGlobal + ocupadoLocal)) < 1) continue;
 
-                // 2. Tiempos y Conexiones (RF6)
                 Instant salidaUtc = id.getSalidaUtc();
-                
-                // Tiempo de espera en este aeropuerto
                 long waitSeconds = Duration.between(current.llegada, salidaUtc).getSeconds();
                 
-                // Reglas de conexión
-                if (waitSeconds < MIN_CONNECTION_HOURS * 3600) continue; // Mínimo 1h
-                if (waitSeconds > MAX_CONNECTION_HOURS * 3600) continue; // Máximo 6h (Estricto para ahorrar almacén)
+                if (waitSeconds < MIN_CONNECTION_HOURS * 3600) continue; 
+                if (waitSeconds > MAX_CONNECTION_HOURS * 3600) continue; 
                 
-                // RF1: SLA Global
                 if (Duration.between(plan.getCreadoUtc(), id.getLlegadaUtc()).toHours() > MAX_SLA_HOURS) continue;
 
-                // RF5: Hubs no pueden ser puntos intermedios (ya filtrado por tu lógica anterior, reforzado aquí)
                 String nextAp = id.getDestino();
                 if (HUBS.contains(nextAp) && !nextAp.equals(destino)) continue;
 
-                // --- COSTO INTELIGENTE ---
-                // Costo = Tiempo de vuelo + (Tiempo de espera * PENALIZACIÓN)
-                // Penalizamos fuertemente dejar paquetes en tierra.
                 double flightDuration = Duration.between(salidaUtc, id.getLlegadaUtc()).toMinutes();
-                double waitPenalty = (waitSeconds / 60.0) * 2.5; // Cada minuto en tierra duele 2.5 veces más que en aire
+                double waitPenalty = (waitSeconds / 60.0) * 2.5; 
                 double nuevoCosto = current.costoAcumulado + flightDuration + waitPenalty;
 
                 if (nuevoCosto < bestCost.getOrDefault(nextAp, Double.MAX_VALUE)) {
@@ -202,43 +188,31 @@ public class Regret2RepairFast implements RepairOperator {
                                       ALNS.Journal journal, Map<VueloProgramadoId, Integer> localFlightLoad) {
         int minCap = Integer.MAX_VALUE;
 
-        // 1. Capacidad de Aviones (RF4)
         for (VueloProgramadoId vid : rutaIds) {
             int cap = s.getCargaPorVuelo().capacidad(vid);
             int ocupado = s.getCargaPorVuelo().asignado(vid) + localFlightLoad.getOrDefault(vid, 0);
             minCap = Math.min(minCap, cap - ocupado);
         }
 
-        // 2. Capacidad de Almacenes (RF3) - Verificación Integral
         for (int i = 0; i < rutaIds.size(); i++) {
             VueloProgramadoId v = rutaIds.get(i);
             
-            // A. Aeropuerto de Origen (Espera inicial)
-            // Si no es un Hub infinito (RF5), verificamos espacio
             if (!HUBS.contains(v.getOrigen())) {
-                // Verificamos el espacio justo antes de salir.
-                // Si la carga llega mucho antes, ocupará espacio.
                 Instant checkTime = v.getSalidaUtc().minusSeconds(60); 
                 int capAlmacen = journal.getOcc().disponible(v.getOrigen(), checkTime);
                 minCap = Math.min(minCap, capAlmacen);
             }
             
-            // B. Aeropuerto de Conexión (Tránsito)
-            // Si llego a un aeropuerto que NO es destino final y NO es Hub, ocupo espacio mientras espero
             if (i < rutaIds.size() - 1) { 
                 String airportConexion = v.getDestino();
                 if (!HUBS.contains(airportConexion)) {
                     VueloProgramadoId nextV = rutaIds.get(i+1);
-                    // Verificamos el "peor momento" en el intervalo de espera
-                    // (Simplificación: chequeamos a la mitad de la espera o al llegar)
                     int capAlmacen = journal.getOcc().maxReservable(airportConexion, v.getLlegadaUtc(), nextV.getSalidaUtc());
                     minCap = Math.min(minCap, capAlmacen);
                 }
             } else {
-                // C. Destino Final (RF2)
-                // Deben quedarse 2 horas. Verificamos si hay espacio para esa estadía.
                 String destinoFinal = v.getDestino();
-                if (!HUBS.contains(destinoFinal)) { // Solo si no es Hub
+                if (!HUBS.contains(destinoFinal)) {
                     Instant finEstadia = v.getLlegadaUtc().plus(Duration.ofHours(2));
                     int capAlmacen = journal.getOcc().maxReservable(destinoFinal, v.getLlegadaUtc(), finEstadia);
                     minCap = Math.min(minCap, capAlmacen);
@@ -254,27 +228,17 @@ public class Regret2RepairFast implements RepairOperator {
             TramoAsignado t = tramos.get(i);
             VueloProgramadoId v = t.getVuelo();
 
-            // 1. Reserva en Origen (si no es Hub)
             if (!HUBS.contains(v.getOrigen())) {
                 Instant ini = (i == 0) ? plan.getCreadoUtc() : tramos.get(i - 1).getVuelo().getLlegadaUtc();
-                
-                // Corrección: El pedido existe desde 'ini', pero quizás el vuelo sale mucho después.
-                // Reservamos desde que el producto está disponible en el aeropuerto hasta que sale el vuelo.
                 if (ini != null && v.getSalidaUtc().isAfter(ini)) {
                     journal.reservar(v.getOrigen(), ini, v.getSalidaUtc(), q);
                 }
             }
 
-            // 2. Reserva en Destino Final (RF2)
-            // Si es el último tramo y no es Hub, reservamos 2 horas obligatorias.
             if (i == tramos.size() - 1 && !HUBS.contains(v.getDestino())) {
                 Instant fin = v.getLlegadaUtc().plus(Duration.ofHours(2));
                 journal.reservar(v.getDestino(), v.getLlegadaUtc(), fin, q);
             }
-            
-            // Nota: La reserva de "Conexión" está implícita en el punto 1 del siguiente tramo.
-            // Si el tramo i llega a 'B' a las 10:00, y el tramo i+1 sale de 'B' a las 14:00,
-            // el bucle i+1 ejecutará la reserva en 'B' de 10:00 a 14:00.
         }
     }
 
@@ -293,10 +257,8 @@ public class Regret2RepairFast implements RepairOperator {
         return p.getRutas() == null || p.getRutas().isEmpty();
     }
 
-    // Helper classes
     private record RutaCandidata(List<VueloProgramadoId> tramosIds, Instant llegadaFinal, double costoPonderado) {}
     
-    // Node ahora comparable por Costo Ponderado, no solo llegada
     private record Node(String ap, VueloProgramadoId ultimoVuelo, Node padre, int hops, Instant llegada, double costoAcumulado) implements Comparable<Node> {
         @Override public int compareTo(Node o) { 
             return Double.compare(this.costoAcumulado, o.costoAcumulado); 
