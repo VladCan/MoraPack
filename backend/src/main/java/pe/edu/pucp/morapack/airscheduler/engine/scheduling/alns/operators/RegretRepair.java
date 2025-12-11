@@ -19,6 +19,11 @@ public class RegretRepair implements RepairOperator {
     private static final int MAX_HOPS = 3; 
     private static final int MAX_CAPACIDAD_AVION = 6000;
     
+    // RF5: Sedes con stock infinito que NO pueden ser conexiones
+    private static final Set<String> HUBS = Set.of("SPIM", "EBCI", "UBBB");
+    // RF1: SLA Máximo (46 horas)
+    private static final long MAX_SLA_HOURS = 46;
+    
     public RegretRepair(int k, List<String> sedes, VuelosTEG teg) {
         this.sedesCandidatas = new ArrayList<>(sedes);
         this.indexVuelos = new IndexVuelos(teg);
@@ -33,7 +38,7 @@ public class RegretRepair implements RepairOperator {
         for (PlanPedido plan : planos) {
             
             if (plan.getDemanda() <= 0) continue;
-            // No rutear si excede capacidad física de un avión (debería ir a split)
+            // RF4 (Parcial): Si el pedido es gigante, no cabe en ningún avión simple, skip.
             if (plan.getDemanda() > MAX_CAPACIDAD_AVION) continue;
 
             if (esInvalido(plan)) {
@@ -44,11 +49,11 @@ public class RegretRepair implements RepairOperator {
                 Collections.shuffle(sedesCandidatas, rnd);
 
                 for (String sedeOrigen : sedesCandidatas) {
+                    // El Dijkstra ya filtra por RF1, RF4 y RF5
                     RutaAsignada ruta = DijkstraTimeBased(sedeOrigen, plan, presenteUTC, cargaPorVuelo);
                     
                     if (ruta != null) {
                         double duracion = calcularDuracion(plan, ruta);
-                        // Factor de ruido para diversificación
                         double ruido = 0.90 + (0.2 * rnd.nextDouble());
                         double duracionConRuido = duracion * ruido;
 
@@ -61,19 +66,22 @@ public class RegretRepair implements RepairOperator {
 
                 if (mejorRutaGlobal != null && mejorRutaGlobal.getCantidad() > 0) {
                     
-                    // CORRECCIÓN: Usar lista mutable, nunca SingletonList
-                    List<RutaAsignada> rutaLista = new ArrayList<>();
-                    rutaLista.add(mejorRutaGlobal);
-                    
-                    boolean reservaExitosa = reservarRecursos(journal, s, plan, mejorRutaGlobal);
+                    // RF3: Verificación estricta de capacidad en almacenes ANTES de escribir
+                    boolean esFactible = verificarCapacidadAlmacenes(journal, plan, mejorRutaGlobal);
 
-                    if (reservaExitosa) {
+                    if (esFactible) {
+                        // Si es factible, procedemos a escribir (Commit)
+                        ejecutarReservas(journal, s, plan, mejorRutaGlobal);
+
+                        List<RutaAsignada> rutaLista = new ArrayList<>();
+                        rutaLista.add(mejorRutaGlobal);
+
                         PlanPedido nuevoPlan = PlanPedido.builder()
                                 .idPedido(plan.getIdPedido())
                                 .aeropuertoDestino(plan.getAeropuertoDestino())
                                 .creadoUtc(plan.getCreadoUtc())
                                 .demanda(plan.getDemanda())
-                                .rutas(rutaLista) // <--- Lista mutable
+                                .rutas(rutaLista)
                                 .build();
 
                         s.getPlanPorPedido().put(nuevoPlan.getIdPedido(), nuevoPlan);
@@ -85,7 +93,6 @@ public class RegretRepair implements RepairOperator {
 
     private boolean esInvalido(PlanPedido p) {
         if (p.getRutas() == null || p.getRutas().isEmpty()) return true;
-        // Si tiene rutas, verificamos que no sean fantasmas (sin tramos)
         return p.getRutas().stream().anyMatch(r -> r.getTramos() == null || r.getTramos().isEmpty());
     }
 
@@ -101,22 +108,35 @@ public class RegretRepair implements RepairOperator {
         PriorityQueue<Node> pq = new PriorityQueue<>();
         Map<String, Instant> bestArrival = new HashMap<>();
 
-        pq.add(new Node(origen, null, null, 0, presenteUTC));
-        bestArrival.put(origen, presenteUTC);
+        // El tiempo de inicio es el mayor entre (Creación del Pedido) y (Ahora Simulado)
+        Instant startTime = plan.getCreadoUtc().isAfter(presenteUTC) ? plan.getCreadoUtc() : presenteUTC;
+
+        pq.add(new Node(origen, null, null, 0, startTime));
+        bestArrival.put(origen, startTime);
 
         Node mejorNodoDestino = null;
 
         while (!pq.isEmpty()) {
             Node current = pq.poll();
 
+            // Poda si llegamos tarde
             if (current.llegada.isAfter(bestArrival.getOrDefault(current.ap, Instant.MAX))) continue;
             
+            // RF1 Check: Si supera 46h desde la creación del pedido, descartamos esta rama
+            long horasTranscurridas = Duration.between(plan.getCreadoUtc(), current.llegada).toHours();
+            if (horasTranscurridas > MAX_SLA_HOURS) continue;
+
             if (current.ap.equals(destino)) {
                 mejorNodoDestino = current;
-                break; 
+                break; // Encontramos el destino (Time-based Dijkstra greedy)
             }
 
             if (current.hops >= MAX_HOPS) continue;
+
+            // RF5 Check: Si estamos en un HUB y NO es el origen, es una conexión ilegal.
+            if (HUBS.contains(current.ap) && !current.ap.equals(origen)) {
+                continue;
+            }
 
             List<VueloFicha> salidas = indexVuelos.porOrigen(current.ap);
             if (salidas == null) continue;
@@ -126,9 +146,10 @@ public class RegretRepair implements RepairOperator {
                 Instant salidaUtc = id.getSalidaUtc();
                 Instant llegadaUtc = id.getLlegadaUtc();
 
-                if (salidaUtc.isBefore(current.llegada.plusSeconds(60))) continue;
+                // Tiempo mínimo de conexión (ej. 1h) o validación de causalidad
+                if (salidaUtc.isBefore(current.llegada.plusSeconds(3600))) continue; 
 
-                // Validación de capacidad de vuelo
+                // RF4 Check: ¿Cabe en el avión?
                 if (cargaPorVuelo.residual(id) < demanda) continue; 
 
                 if (llegadaUtc.isBefore(bestArrival.getOrDefault(id.getDestino(), Instant.MAX))) {
@@ -153,43 +174,78 @@ public class RegretRepair implements RepairOperator {
         return new RutaAsignada(demanda, tramos);
     }
 
-    private boolean reservarRecursos(ALNS.Journal journal, SolucionProgramacion s, PlanPedido plan, RutaAsignada ruta) {
+    /**
+     * RF3: Verifica si hay espacio en los almacenes para TODA la ruta.
+     * NO realiza modificaciones, solo consulta (Check-Then-Act).
+     */
+    private boolean verificarCapacidadAlmacenes(ALNS.Journal journal, PlanPedido plan, RutaAsignada ruta) {
         int q = ruta.getCantidad();
-        if (q <= 0) return false; 
-
         List<TramoAsignado> tramos = ruta.getTramos();
-        if (tramos == null || tramos.isEmpty()) return false;
+        OcupacionPorAeropuerto occ = journal.getOcc(); // Accedemos al objeto real para consultar
 
-        // Pre-verificación de Vuelos
-        for (TramoAsignado t : tramos) {
-             if (s.getCargaPorVuelo().residual(t.getVuelo()) < q) return false;
-        }
-
-        // Escritura
         for (int i = 0; i < tramos.size(); i++) {
             TramoAsignado t = tramos.get(i);
             VueloProgramadoId v = t.getVuelo();
 
-            Instant iniOri = (i == 0) ? plan.getCreadoUtc() : tramos.get(i - 1).getVuelo().getLlegadaUtc();
-            if (iniOri != null && v.getSalidaUtc() != null && v.getSalidaUtc().isAfter(iniOri)) {
-                journal.reservar(v.getOrigen(), iniOri, v.getSalidaUtc(), q);
+            // 1. Verificar Origen (si no es HUB)
+            if (!HUBS.contains(v.getOrigen())) {
+                Instant iniOri = (i == 0) ? plan.getCreadoUtc() : tramos.get(i - 1).getVuelo().getLlegadaUtc();
                 
-                // MEJORA: Si al reservar saturamos el almacén, esto es una mala señal.
-                // En un sistema ideal aquí retornaríamos false si excede capacidad crítica,
-                // pero por ahora dejamos que el ALNS penalice.
+                // Si hay intervalo de espera en origen
+                if (iniOri != null && v.getSalidaUtc().isAfter(iniOri)) {
+                    int disponible = occ.maxReservable(v.getOrigen(), iniOri, v.getSalidaUtc());
+                    if (disponible < q) return false; // RF3 Violado
+                }
             }
 
-            Instant finDst = (i + 1 < tramos.size()) 
-                ? tramos.get(i + 1).getVuelo().getSalidaUtc() 
-                : v.getLlegadaUtc().plus(Duration.ofHours(2));
-            
-            if (v.getLlegadaUtc() != null && finDst != null && finDst.isAfter(v.getLlegadaUtc())) {
-                journal.reservar(v.getDestino(), v.getLlegadaUtc(), finDst, q);
+            // 2. Verificar Destino (si no es HUB)
+            if (!HUBS.contains(v.getDestino())) {
+                Instant finDst = (i + 1 < tramos.size()) 
+                    ? tramos.get(i + 1).getVuelo().getSalidaUtc() // Conexión
+                    : v.getLlegadaUtc().plus(Duration.ofHours(2)); // Destino final (RF2)
+                
+                if (finDst.isAfter(v.getLlegadaUtc())) {
+                    int disponible = occ.maxReservable(v.getDestino(), v.getLlegadaUtc(), finDst);
+                    if (disponible < q) return false; // RF3 Violado
+                }
             }
-
-            s.getCargaPorVuelo().asignar(v, q);
         }
         return true;
+    }
+
+    /**
+     * Ejecuta las reservas. Se asume que verificarCapacidadAlmacenes ya dio luz verde.
+     */
+    private void ejecutarReservas(ALNS.Journal journal, SolucionProgramacion s, PlanPedido plan, RutaAsignada ruta) {
+        int q = ruta.getCantidad();
+        List<TramoAsignado> tramos = ruta.getTramos();
+
+        for (int i = 0; i < tramos.size(); i++) {
+            TramoAsignado t = tramos.get(i);
+            VueloProgramadoId v = t.getVuelo();
+
+            // Reservar Origen
+            if (!HUBS.contains(v.getOrigen())) {
+                Instant iniOri = (i == 0) ? plan.getCreadoUtc() : tramos.get(i - 1).getVuelo().getLlegadaUtc();
+                if (iniOri != null && v.getSalidaUtc().isAfter(iniOri)) {
+                    journal.reservar(v.getOrigen(), iniOri, v.getSalidaUtc(), q);
+                }
+            }
+
+            // Reservar Destino
+            if (!HUBS.contains(v.getDestino())) {
+                Instant finDst = (i + 1 < tramos.size()) 
+                    ? tramos.get(i + 1).getVuelo().getSalidaUtc() 
+                    : v.getLlegadaUtc().plus(Duration.ofHours(2));
+                
+                if (finDst.isAfter(v.getLlegadaUtc())) {
+                    journal.reservar(v.getDestino(), v.getLlegadaUtc(), finDst, q);
+                }
+            }
+
+            // Asignar al avión (RF4 ya validado en Dijkstra, pero se aplica aquí)
+            s.getCargaPorVuelo().asignar(v, q);
+        }
     }
 
     private double calcularDuracion(PlanPedido p, RutaAsignada r) {

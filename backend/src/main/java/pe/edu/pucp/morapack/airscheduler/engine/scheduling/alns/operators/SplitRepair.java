@@ -19,7 +19,12 @@ public class SplitRepair implements RepairOperator {
     private static final Duration PICKUP_FINAL = Duration.ofHours(2);
     private static final int MAX_NODES_IN_PATH = 4;
     private static final int MAX_SPLITS_PER_ORDER = 10;
-    private static final int MAX_CAPACIDAD_SEGURA = 100000; 
+    private static final int MAX_CAPACIDAD_SEGURA = 100000;
+    
+    // RF5: Sedes que NO pueden ser conexiones
+    private static final Set<String> HUBS = Set.of("SPIM", "EBCI", "UBBB");
+    // RF1: Tiempo máximo de entrega
+    private static final long MAX_SLA_HOURS = 46;
 
     public SplitRepair(List<String> sedes, VuelosTEG teg) {
         this.sedes = sedes;
@@ -34,35 +39,44 @@ public class SplitRepair implements RepairOperator {
         for (PlanPedido plan : planes) {
             
             if (plan.getDemanda() <= 0) continue; 
+            // RF4: Filtro macro de capacidad
             if (plan.getDemanda() > MAX_CAPACIDAD_SEGURA) continue; 
             
             if (plan.estaCompleto()) continue;
 
             Map<VueloProgramadoId, Integer> prevByFlight = contribucionPorVuelo(plan);
             
+            // Genera una lista de rutas propuestas
             List<RutaAsignada> nuevas = buildPackingMax(plan, s, prevByFlight);
             
-            // Fusión y limpieza de rutas con 0kg
             if (nuevas.isEmpty()) continue;
             nuevas = combinarRutasIguales(nuevas);
-            nuevas.removeIf(r -> r.getCantidad() <= 0); // Seguridad extra final
+            nuevas.removeIf(r -> r.getCantidad() <= 0);
 
             if (nuevas.isEmpty()) continue;
 
-            aplicarDeltasCargaPorVuelo(s, prevByFlight, contribucionPorVuelo(nuevas));
-            reservarBodegasDeRutas(journal, plan.getCreadoUtc(), plan.getAeropuertoDestino(), nuevas);
+            // =========================================================================
+            // RF3 CHECK: Verificar capacidad de almacenes ANTES de asignar nada
+            // =========================================================================
+            boolean bodegasOk = verificarCapacidadAlmacenes(journal, plan, nuevas);
 
-            // BLINDAJE: Crear ArrayList mutable explícitamente
-            List<RutaAsignada> listaFinal = new ArrayList<>(nuevas);
+            if (bodegasOk) {
+                // ACT: Si las bodegas aguantan, asignamos los vuelos y escribimos las reservas
+                aplicarDeltasCargaPorVuelo(s, prevByFlight, contribucionPorVuelo(nuevas));
+                reservarBodegasDeRutas(journal, plan.getCreadoUtc(), plan.getAeropuertoDestino(), nuevas);
 
-            PlanPedido nuevoPlan = PlanPedido.builder()
-                    .idPedido(plan.getIdPedido())
-                    .aeropuertoDestino(plan.getAeropuertoDestino())
-                    .creadoUtc(plan.getCreadoUtc())
-                    .demanda(plan.getDemanda())
-                    .rutas(listaFinal)
-                    .build();
-            s.getPlanPorPedido().put(nuevoPlan.getIdPedido(), nuevoPlan);
+                List<RutaAsignada> listaFinal = new ArrayList<>(nuevas);
+
+                PlanPedido nuevoPlan = PlanPedido.builder()
+                        .idPedido(plan.getIdPedido())
+                        .aeropuertoDestino(plan.getAeropuertoDestino())
+                        .creadoUtc(plan.getCreadoUtc())
+                        .demanda(plan.getDemanda())
+                        .rutas(listaFinal)
+                        .build();
+                s.getPlanPorPedido().put(nuevoPlan.getIdPedido(), nuevoPlan);
+            }
+            // Si no ok, simplemente ignoramos este split y el ALNS probará otro camino
         }
     }
 
@@ -87,6 +101,7 @@ public class SplitRepair implements RepairOperator {
 
             int cuello = Integer.MAX_VALUE;
             for (VueloProgramadoId id : pathIds) {
+                // RF4: Check de capacidad residual del vuelo
                 cuello = Math.min(cuello, residualAjustado(id, s, prevByFlight, addedNow));
             }
 
@@ -168,9 +183,18 @@ public class SplitRepair implements RepairOperator {
 
             if (current.llegada.isAfter(bestArrival.getOrDefault(u, Instant.MAX))) continue;
             
+            // RF1 Check: Si supera 46h desde la creación del pedido, descartamos esta rama
+            long horasTranscurridas = Duration.between(refCreacion, current.llegada).toHours();
+            if (horasTranscurridas > MAX_SLA_HOURS) continue;
+
             if (u.equals(destino)) break; 
 
             if (d >= MAX_NODES_IN_PATH) continue;
+
+            // RF5 Check: Si estamos en un HUB y NO es el origen, es una conexión ilegal.
+            if (HUBS.contains(u) && !u.equals(origen)) {
+                continue;
+            }
 
             List<VueloFicha> salidas = indexVuelos.porOrigen(u);
             if (salidas == null) continue;
@@ -180,8 +204,9 @@ public class SplitRepair implements RepairOperator {
                 Instant salidaUtc = id.getSalidaUtc();
                 Instant llegadaUtc = id.getLlegadaUtc();
 
-                if (salidaUtc.isBefore(current.llegada.plusSeconds(60))) continue;
+                if (salidaUtc.isBefore(current.llegada.plusSeconds(3600))) continue; // Min 1h transbordo
                 
+                // RF4 Check: Capacidad vuelo
                 if (residualAjustado(id, s, prevByFlight, addedNow) <= 0) continue;
 
                 if (llegadaUtc.isBefore(bestArrival.getOrDefault(id.getDestino(), Instant.MAX))) {
@@ -274,28 +299,78 @@ public class SplitRepair implements RepairOperator {
         });
     }
 
+    // ==========================================
+    // RF3: VERIFICACIÓN Y RESERVA
+    // ==========================================
+
+    /**
+     * Verifica si hay capacidad en almacenes para TODAS las rutas del split.
+     * Retorna true si es factible, false si viola RF3.
+     */
+    private boolean verificarCapacidadAlmacenes(ALNS.Journal journal, PlanPedido plan, List<RutaAsignada> rutas) {
+        OcupacionPorAeropuerto occ = journal.getOcc(); // Acceso directo para consulta
+
+        for (RutaAsignada r : rutas) {
+            int q = r.getCantidad();
+            List<TramoAsignado> tramos = r.getTramos();
+            if (tramos == null || tramos.isEmpty()) continue;
+
+            for (int i = 0; i < tramos.size(); i++) {
+                TramoAsignado t = tramos.get(i); 
+                VueloProgramadoId v = t.getVuelo(); 
+
+                // --- 1. Origen del tramo (Destino Parcial o Inicio) ---
+                if (!HUBS.contains(v.getOrigen())) {
+                    Instant iniOri = (i == 0) ? plan.getCreadoUtc() : tramos.get(i - 1).getVuelo().getLlegadaUtc();
+                    if (iniOri != null && v.getSalidaUtc() != null && v.getSalidaUtc().isAfter(iniOri)) {
+                        int disponible = occ.maxReservable(v.getOrigen(), iniOri, v.getSalidaUtc());
+                        if (disponible < q) return false; // RF3 Violado
+                    }
+                }
+
+                // --- 2. Destino del tramo (Destino Parcial o Final) ---
+                if (!HUBS.contains(v.getDestino())) {
+                    // RF2: Si es el último tramo, +2 horas (Processing). Si no, hasta salida siguiente.
+                    Instant finDst = (i + 1 < tramos.size()) 
+                        ? tramos.get(i + 1).getVuelo().getSalidaUtc() 
+                        : v.getLlegadaUtc().plus(PICKUP_FINAL);
+                    
+                    if (v.getLlegadaUtc() != null && finDst != null && finDst.isAfter(v.getLlegadaUtc())) {
+                        int disponible = occ.maxReservable(v.getDestino(), v.getLlegadaUtc(), finDst);
+                        if (disponible < q) return false; // RF3 Violado
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Ejecuta las reservas en el journal.
+     * Se debe llamar SOLO después de verificarCapacidadAlmacenes = true.
+     */
     private void reservarBodegasDeRutas(ALNS.Journal journal, Instant cr, String dst, List<RutaAsignada> rutas) {
         if (journal == null || rutas == null) return;
         
         for (RutaAsignada r : rutas) {
             List<TramoAsignado> tr = r.getTramos();
-            if (tr == null || tr.isEmpty()) continue;
-            
             int q = r.getCantidad();
-            if (q <= 0) continue; // SEGURIDAD EXTRA
+            if (q <= 0) continue;
 
             for (int i = 0; i < tr.size(); i++) {
                 TramoAsignado t = tr.get(i); 
                 VueloProgramadoId v = t.getVuelo(); 
 
-                if (!sedes.contains(v.getOrigen())) {
+                // Reserva Origen
+                if (!HUBS.contains(v.getOrigen())) {
                     Instant ini = (i == 0) ? cr : tr.get(i - 1).getVuelo().getLlegadaUtc();
                     if (ini != null && v.getSalidaUtc() != null && v.getSalidaUtc().isAfter(ini)) {
                         journal.reservar(v.getOrigen(), ini, v.getSalidaUtc(), q);
                     }
                 }
 
-                if (!sedes.contains(v.getDestino())) {
+                // Reserva Destino
+                if (!HUBS.contains(v.getDestino())) {
                     Instant fin = (i + 1 < tr.size()) ? tr.get(i + 1).getVuelo().getSalidaUtc() : v.getLlegadaUtc().plus(PICKUP_FINAL);
                     if (v.getLlegadaUtc() != null && fin != null && fin.isAfter(v.getLlegadaUtc())) {
                         journal.reservar(v.getDestino(), v.getLlegadaUtc(), fin, q);
