@@ -193,7 +193,7 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
             //ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt",presenteUTC);
             // ALNS
-            /*
+            
             List<DestructionOperator> destructores = new ArrayList<>();
             destructores.add(new RandomRemoval(30));
             destructores.add(new WorstRemoval(15));
@@ -202,24 +202,24 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             List<RepairOperator> reparadores = new ArrayList<>();
             //reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
             reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
-            reparadores.add(new Regret2RepairFast(2, new ArrayList<>(sedes), teg));
+            reparadores.add(new Regret2RepairFast(new ArrayList<>(sedes), teg));
             reparadores.add(new UrgencySplitRepair(new ArrayList<>(sedes), teg));
             ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC, ocupacionPorAeropuerto,aeropuertosMap);
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
-            */
+            
             //SEQM    410
             //48
             //24x410=9840
             // System.out.println("ALNS");
             // ImpresorSolucion.imprimirEnArchivo(solucionOptima);
-            //ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
-            //ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
-            //solucionAnterior = solucionOptima;
+            ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
+            ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
+            solucionAnterior = solucionOptima;
             // verificacionTotal(solucionAnterior)
             // System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
             // solucionOptima.imprimirFitness(presenteUTC);
             // System.exit(1);
-            solucionAnterior = seed;
+            //solucionAnterior = seed;
             /* 
             solucionOptima.imprimirCapacidadVuelosEnVentana(
                     presenteUTC, finUTC,
