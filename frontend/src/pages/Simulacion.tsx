@@ -11,12 +11,13 @@ import { z } from "zod";
 import SimulationFinishedOverlay from "@/components/common/SimulationFinishedOverlay";
 import { downloadFile } from "@/services/api";
 
-// Importamos las nuevas Cards
+// Importamos las Cards
 import AirportCard from "@/components/common/cards/AirportCard";
 import FlightCard, { type FlightCardData } from "@/components/common/cards/FlightCard";
 import OrderCard from "@/components/common/cards/OrderCard";
 import { RunSessionProvider } from "@/lib/runSession";
 import TopNav from "@/components/common/TopNav";
+
 const COLOR_SEDE = "#005097";
 const COLOR_NORMAL = "#38bdf8";
 const HOVER_COLOR = "#ef4444";
@@ -32,7 +33,6 @@ const AirportDtoSchema = z.object({
 });
 const AirportsDtoSchema = z.array(AirportDtoSchema);
 
-// Reuse FlightForRender logic but adapt for cleaner usage
 type FlightForRender = FlightCardData & {
   origin: { lat: number; lon: number };
   dest: { lat: number; lon: number };
@@ -114,7 +114,6 @@ export function SimulacionContent() {
 
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
 
-  // ... (lógica de vuelosRelacionadosAlPedido igual que antes) ...
   const vuelosRelacionadosAlPedido = useMemo<Set<string>>(() => {
     if (!selectedPedido || !selectedPedido.rutas) return new Set();
     const vuelosIds = new Set<string>();
@@ -184,7 +183,6 @@ export function SimulacionContent() {
         progress,
         pathColor,
         planeColor,
-        // Datos para la Card unificada
         origen: vuelo.origen,
         destino: vuelo.destino,
         salidaUtc: vuelo.salidaUtc,
@@ -224,17 +222,23 @@ export function SimulacionContent() {
     ? ["SPIM", "EBCI", "UBBB"].includes(selectedAirportId)
     : false;
 
-  // Cálculos de vuelos futuros para aeropuerto
+  const activeAirportStaticData = useMemo(() => {
+    return airports.find((a) => a.id === selectedAirportId);
+  }, [airports, selectedAirportId]);
+
+  // Cálculos de vuelos y RECOJOS futuros
   const vuelosFuturos = useMemo(() => {
-    if (!selectedAirportId || !simNowUtc || windows.length === 0)
+    if (!selectedAirportId || !simNowUtc)
       return { llegadas: [], salidas: [] };
 
     const now = new Date(simNowUtc).getTime();
     const next24h = now + 24 * 60 * 60 * 1000;
-    const llegadas: Array<{ id: string; origen: string; cantidad: number }> = [];
-    const salidas: Array<{ id: string; destino: string; cantidad: number }> = [];
+    
+    const llegadas: Array<{ id: string; origen: string; cantidad: number; salidaUtc: string; llegadaUtc: string; isPickup?: boolean }> = [];
+    const salidas: Array<{ id: string; destino: string; cantidad: number; salidaUtc: string; llegadaUtc: string; isPickup?: boolean }> = [];
+    
+    // 1. PROCESAR VUELOS
     const vuelosUnicos = new Map<string, typeof windows[0]["vuelos"][0]>();
-
     windows.forEach((window) => {
       window.vuelos.forEach((vuelo) => {
         if (!vuelosCancelados.has(vuelo.id) && !vuelosUnicos.has(vuelo.id)) {
@@ -248,19 +252,63 @@ export function SimulacionContent() {
       const llegadaTime = new Date(vuelo.llegadaUtc).getTime();
 
       if (vuelo.destino === selectedAirportId && llegadaTime > now && llegadaTime <= next24h) {
-        llegadas.push({ id: vuelo.id, origen: vuelo.origen, cantidad: vuelo.cantidadAsignada });
+        llegadas.push({ 
+          id: vuelo.id, 
+          origen: vuelo.origen, 
+          cantidad: vuelo.cantidadAsignada,
+          salidaUtc: vuelo.salidaUtc,
+          llegadaUtc: vuelo.llegadaUtc
+        });
       }
       if (vuelo.origen === selectedAirportId && salidaTime <= next24h && llegadaTime > now) {
-        salidas.push({ id: vuelo.id, destino: vuelo.destino, cantidad: vuelo.cantidadAsignada });
+        salidas.push({ 
+          id: vuelo.id, 
+          destino: vuelo.destino, 
+          cantidad: vuelo.cantidadAsignada,
+          salidaUtc: vuelo.salidaUtc,
+          llegadaUtc: vuelo.llegadaUtc
+        });
       }
     });
 
-    salidas.sort((a, b) => {
-      const vA = vuelosUnicos.get(a.id);
-      const vB = vuelosUnicos.get(b.id);
-      if (!vA || !vB) return 0;
-      return new Date(vB.salidaUtc).getTime() - new Date(vA.salidaUtc).getTime();
+    // 2. PROCESAR RECOJOS DE CLIENTES
+    // Iteramos los pedidos únicos de todas las ventanas
+    const pedidosUnicos = new Map<number, typeof windows[0]["pedidos"][0]>();
+    windows.forEach(w => {
+        if(w.pedidos) w.pedidos.forEach(p => pedidosUnicos.set(p.id, p));
     });
+
+    pedidosUnicos.forEach(pedido => {
+        // Solo si el destino es este aeropuerto y tiene recojos
+        if (pedido.destino === selectedAirportId && pedido.recojos) {
+            
+            pedido.recojos.forEach((recojo, idx) => {
+                const inicioEspera = new Date(recojo.inicioRecojo).getTime();
+                const finEspera = new Date(recojo.finRecojo).getTime();
+
+                // Lógica de visualización:
+                // Mostrar si el recojo (inicio) está en las próximas 24h
+                // O si estamos ACTUALMENTE en el periodo de espera (entre inicio y fin)
+                const esFuturoCercano = (inicioEspera > now && inicioEspera <= next24h);
+                const estaOcurriendo = (now >= inicioEspera && now <= finEspera);
+
+                if (esFuturoCercano || estaOcurriendo) {
+                    salidas.push({
+                        id: `PICKUP-${pedido.id}-${idx}`, // ID único visual
+                        destino: `Cliente ${pedido.idCliente}`, // Se verá en la Card
+                        cantidad: recojo.cantidad,
+                        salidaUtc: recojo.inicioRecojo, // Usamos inicio como "Salida" visual
+                        llegadaUtc: recojo.finRecojo,   // Usamos fin como "Llegada" visual
+                        isPickup: true // Flag importante
+                    });
+                }
+            });
+        }
+    });
+
+    // Ordenar cronológicamente
+    llegadas.sort((a, b) => new Date(a.llegadaUtc).getTime() - new Date(b.llegadaUtc).getTime());
+    salidas.sort((a, b) => new Date(a.salidaUtc).getTime() - new Date(b.salidaUtc).getTime());
 
     return { llegadas, salidas };
   }, [selectedAirportId, simNowUtc, windows, vuelosCancelados]);
@@ -271,7 +319,6 @@ export function SimulacionContent() {
 
   useEffect(() => {
     if (finishedReason) {
-      console.log("🔚 [Simulación] Terminó:", finishedReason);
       setOverlayVisible(true);
     }
   }, [finishedReason]);
@@ -287,7 +334,7 @@ export function SimulacionContent() {
   const handleDownloadReports = async () => {
     if (!runId) return;
     await downloadFile(`reportes/downloadReporteSimulacion`, "reporteSimulacion.txt");
-    await downloadFile(`reportes/downloadUltimaPlan`, "ultimaPlanificacion.txt");
+    await downloadFile(`reportes/downloadUltimaPlanificacion`, "ultimaPlanificacion.txt");
   };
 
   const handleCloseOverlay = () => {
@@ -298,11 +345,8 @@ export function SimulacionContent() {
 
   const showFinishedOverlay = !!finishedReason && !!runId && overlayVisible;
 
-  // Normalización para FlightCard: ¿Usamos el seleccionado o el hover?
-  // Prioridad: Seleccionado (click) > Hover
   const flightDataForCard = useMemo(() => {
     if (selectedVuelo) {
-      // Mapear DTO a la estructura de la Card (si faltan campos visuales se calculan dentro)
       return {
         ...selectedVuelo,
         origenCodigo: selectedVuelo.origen,
@@ -310,7 +354,6 @@ export function SimulacionContent() {
       } as FlightCardData; 
     }
     if (hoveredFlight && !selectedAirportId) {
-      // hoveredFlight ya tiene la estructura correcta
       return hoveredFlight;
     }
     return null;
@@ -342,6 +385,7 @@ export function SimulacionContent() {
       {activeAirportData && selectedAirportId && (
         <AirportCard
           airportId={selectedAirportId}
+          airportName={activeAirportStaticData?.name || selectedAirportId}
           data={activeAirportData}
           isSede={esSede}
           flights={vuelosFuturos}
@@ -349,14 +393,14 @@ export function SimulacionContent() {
         />
       )}
 
-      {/* 2. TARJETA DE VUELO (Unificada: Click y Hover) */}
+      {/* 2. TARJETA DE VUELO */}
       {flightDataForCard && !activeAirportData && (
         <FlightCard
           data={flightDataForCard}
           simNowUtc={simNowUtc}
           onClose={() => {
             setSelectedVuelo(null);
-            setHoveredFlight(null); // Asegurar que se quite el hover también si se cierra explícitamente
+            setHoveredFlight(null);
           }}
           isHover={!!hoveredFlight && !selectedVuelo} 
         />
@@ -367,7 +411,7 @@ export function SimulacionContent() {
         <OrderCard
           pedido={selectedPedido}
           simNowUtc={simNowUtc}
-          variant="simulacion" // Ojo: pasa la variante correcta si tienes acceso a ella en el context o props
+          variant="simulacion"
           onClose={() => setSelectedPedido(null)}
         />
       )}

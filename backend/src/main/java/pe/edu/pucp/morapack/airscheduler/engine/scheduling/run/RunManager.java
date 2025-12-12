@@ -3,7 +3,6 @@ package pe.edu.pucp.morapack.airscheduler.engine.scheduling.run;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,10 +20,8 @@ import java.util.stream.Collectors;
 
 import pe.edu.pucp.morapack.airscheduler.api.service.ReportesService;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoManager;
-// Imports para la lógica de planificación
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos.VentanaPedidos;
-
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ImpresorSolucion;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.LectorPedidoMultiArchivo;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.*;
@@ -59,6 +56,9 @@ public class RunManager {
     private static final String VUELOS_CANCELADOS_FILENAME = "cancelaciones.txt";
 
     private static final Duration PLANNING_LATENCY = Duration.ofSeconds(30);
+    // DIARIO MAESTRO: Mapea ID_PEDIDO -> Su Último Plan Confirmado.
+    // Esto evita duplicar carga si el algoritmo re-planifica el mismo pedido.
+    private final Map<String, Map<Integer, PlanPedido>> masterPlanPorRun = new ConcurrentHashMap<>();
 
     @Inject
     ReportesService reportesService;
@@ -563,6 +563,7 @@ public class RunManager {
         operacionRunId.set(null);
 
         slaBroken.remove(id);
+        masterPlanPorRun.remove(id);
     }
 
     private boolean isCancelled(String id){
@@ -832,7 +833,7 @@ public class RunManager {
                 if (isCancelled(id)) break;
 
                 // 6. Guardar solución
-                actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
+                actualizarOcupacionDesdeSolucion(id, solucionOptima, solucionAnterior, reservas, enVuelo, wStart);
                 solucionesAnteriores.put(id, solucionOptima);
 
                 boolean SlaOk = VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46), vuelosMap, aeropuertosMap);
@@ -850,8 +851,17 @@ public class RunManager {
                 // Ahora es wEmit. Emitimos los resultados.
                 final Instant wStartFinal = wStart;
                 final Instant wEndFinal = wEmit;
+                
+                // En operación diaria, incluir vuelos que salen dentro del horizonte completo (24 horas)
+                // porque las ventanas son de 1 minuto pero los vuelos se planifican hasta 24h adelante
+                final Instant finExtraccion = config.scenario() == RunConfig.Scenario.OPERACION 
+                    ? wStart.plus(config.horizon())  // wStart + 24 horas
+                    : wEndFinal;                      // Para otros escenarios, usar wEnd normal
 
-                List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStartFinal, wEndFinal);
+                List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStartFinal, finExtraccion);
+
+                // IMPORTANTE: Enviar TODOS los pedidos procesados (incluye parciales de ventanas anteriores)
+                // para que el frontend vea el estado actualizado de cada pedido
                 List<Object> pedidosVentanaDTO = convertirPedidosADTO(pedidosVentana, solucionOptima);
 
                 ventanasEnviadasRun.add(windowIdISO);
@@ -1043,7 +1053,7 @@ public class RunManager {
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
                 /// 6. Guardar solución para la siguiente ventana y sincronizar ocupación
-                actualizarOcupacionDesdeSolucion(id, solucionOptima, reservas, enVuelo);
+                actualizarOcupacionDesdeSolucion(id, solucionOptima, solucionAnterior, reservas, enVuelo, wStart);
                 solucionesAnteriores.put(id, solucionOptima);
 
                 /// 7. Extraer vuelos y pedidos de la ventana actual para broadcasting
@@ -1263,7 +1273,7 @@ public class RunManager {
                     // 3) CARGA EN VUELOS: revertir asignaciones por tramo
                     /// Igual sospecho que esto es innecesario, ya que el vuelo se va a cancelar xd
                     for (TramoAsignado t : tr) {
-                        int qTramo = t.getCantidad();                       // usa la cantidad efectiva del tramo
+                        int qTramo = t.getCantidad();                        // usa la cantidad efectiva del tramo
                         if (qTramo != 0) {
                             solucionAnterior.getCargaPorVuelo().asignar(t.getVuelo(), -qTramo);
                         }
@@ -1289,8 +1299,8 @@ public class RunManager {
                 solucionAnterior.getPlanPorPedido().put(nuevo.getIdPedido(), nuevo);
 
 
-                System.out.println("[Cancel]   Pedido " + plan.getIdPedido()
-                        + " → rutas después de cancelar: " + rutasFiltradas.size());
+                System.out.println("[Cancel]    Pedido " + plan.getIdPedido()
+                        + " -> rutas después de cancelar: " + rutasFiltradas.size());
 
                 int cantidadPendiente = plan.getDemanda();
 
@@ -1298,8 +1308,8 @@ public class RunManager {
                     cantidadPendiente -= r.getCantidad();  // restar rutas sobrevivientes
                 }
                 if (cantidadPendiente > 0) {
-                    System.out.println("[Cancel]   Pedido " + plan.getIdPedido()
-                            + " → vuelve a cola con cantidad=" + cantidadPendiente);
+                    System.out.println("[Cancel]    Pedido " + plan.getIdPedido()
+                            + " -> vuelve a cola con cantidad=" + cantidadPendiente);
 
                     pedidosCargados.reinsertarParcial(
                             plan.getIdPedido(),
@@ -1409,151 +1419,160 @@ public class RunManager {
         return result;
     }
     
+    // =====================================================================
+    // CORRECCIÓN DEFINITIVA V2: SIN DUPLICIDAD
+    // =====================================================================
     private void actualizarOcupacionDesdeSolucion(String runId,
-                                                                  SolucionProgramacion solucionOptima,
-                                                                  List<OcupacionAlmacen> reservasPrevias,
-                                                                  Map<String, List<ArriboExogeno>> arribosEnVuelo) {
-        OcupacionPorAeropuerto nuevaOcupacion = construirOcupacionDesdeSolucion(solucionOptima);
-        if (reservasPrevias != null && !reservasPrevias.isEmpty()) {
-            for (OcupacionAlmacen reserva : reservasPrevias) {
-                if (reserva == null || reserva.cantidad() <= 0) continue;
-                Instant inicio = reserva.desde();
-                Instant fin = reserva.hasta();
-                if (inicio != null && fin != null && inicio.isBefore(fin)) {
-                    nuevaOcupacion.reservar(reserva.aeropuerto(), inicio, fin, reserva.cantidad());
-                }
+                                                  SolucionProgramacion solucionOptima,
+                                                  SolucionProgramacion solucionAnterior,
+                                                  List<OcupacionAlmacen> reservasPrevias,
+                                                  Map<String, List<ArriboExogeno>> arribosEnVuelo,
+                                                  Instant corteTiempo) {
+        
+        // 1. SINCRONIZAR EL MASTER PLAN
+        // Obtenemos el mapa maestro de este run
+        Map<Integer, PlanPedido> masterPlan = masterPlanPorRun.computeIfAbsent(runId, k -> new ConcurrentHashMap<>());
+        
+        // Actualizamos con los nuevos planes de esta ventana
+        if (solucionOptima != null && solucionOptima.getPlanPorPedido() != null) {
+            for (PlanPedido nuevoPlan : solucionOptima.getPlanPorPedido().values()) {
+                masterPlan.put(nuevoPlan.getIdPedido(), nuevoPlan);
             }
-        }
-        if (arribosEnVuelo != null && !arribosEnVuelo.isEmpty()) {
-            for (Map.Entry<String, List<ArriboExogeno>> entry : arribosEnVuelo.entrySet()) {
-                String aeropuerto = entry.getKey();
-                if (aeropuerto == null) continue;
-                List<ArriboExogeno> llegadas = entry.getValue();
-                if (llegadas == null) continue;
-                for (ArriboExogeno arribo : llegadas) {
-                    if (arribo == null || arribo.cantidad() <= 0) continue;
-                    Instant llegada = arribo.arriboUtc();
-                    if (llegada == null) continue;
-                    Instant fin = llegada.plus(PICKUP_WAIT);
-                    nuevaOcupacion.reservar(aeropuerto, llegada, fin, arribo.cantidad());
-                }
-            }
-        }
-        ocupacionesPorRun.put(runId, nuevaOcupacion);
-    }
-
-    private OcupacionPorAeropuerto construirOcupacionDesdeSolucion(SolucionProgramacion solucionOptima) {
-        OcupacionPorAeropuerto nueva = new OcupacionPorAeropuerto(aeropuertosMap);
-        if (solucionOptima == null || solucionOptima.getPlanPorPedido() == null) {
-            return nueva;
         }
 
-        for (PlanPedido plan : solucionOptima.getPlanPorPedido().values()) {
-            if (plan == null || plan.getRutas() == null) {
-                continue;
-            }
+        // 2. Instancia base vacía
+        OcupacionPorAeropuerto nuevaOcupacion = new OcupacionPorAeropuerto(aeropuertosMap);
+
+        // 3. RECONSTRUIR OCUPACIÓN DESDE EL MASTER PLAN
+        // Esta es la ÚNICA fuente de verdad. Al recorrer la ruta completa, cubrimos:
+        // - Lo que ya llegó y está esperando (antes cubierto por reservasPrevias).
+        // - Lo que está volando y va a llegar (antes cubierto por arribosEnVuelo).
+        // - Lo que se acaba de planificar.
+        
+        for (PlanPedido plan : masterPlan.values()) {
+            if (plan.getRutas() == null) continue;
 
             for (RutaAsignada ruta : plan.getRutas()) {
-                if (ruta == null) continue;
+                if (ruta.getTramos() == null || ruta.getTramos().isEmpty()) continue;
+                
                 int cantidad = ruta.getCantidad();
                 if (cantidad <= 0) continue;
 
                 List<TramoAsignado> tramos = ruta.getTramos();
-                if (tramos == null || tramos.isEmpty()) {
-                    continue;
-                }
 
-                for (int i = 0; i < tramos.size() - 1; i++) {
-                    TramoAsignado actual = tramos.get(i);
-                    TramoAsignado siguiente = tramos.get(i + 1);
-                    if (actual == null || siguiente == null) continue;
-                    VueloProgramadoId vueloActual = actual.getVuelo();
-                    VueloProgramadoId vueloSiguiente = siguiente.getVuelo();
-                    if (vueloActual == null || vueloSiguiente == null) continue;
+                // Analizamos la ruta completa para calcular intervalos precisos
+                for (int i = 0; i < tramos.size(); i++) {
+                    TramoAsignado tramoActual = tramos.get(i);
+                    VueloProgramadoId vuelo = tramoActual.getVuelo();
+                    
+                    if (vuelo == null) continue;
 
-                    Instant inicio = vueloActual.getLlegadaUtc();
-                    Instant fin = vueloSiguiente.getSalidaUtc();
-                    if (inicio != null && fin != null && inicio.isBefore(fin)) {
-                        nueva.reservar(vueloActual.getDestino(), inicio, fin, cantidad);
+                    Instant momentoLlegada = vuelo.getLlegadaUtc();
+                    Instant momentoSalidaODesocupacion;
+
+                    // CASO 1: Es una ESCALA (hay un tramo siguiente)
+                    if (i < tramos.size() - 1) {
+                        TramoAsignado tramoSiguiente = tramos.get(i + 1);
+                        if (tramoSiguiente.getVuelo() != null) {
+                            // La carga ocupa espacio desde que llega hasta que SALE el siguiente vuelo
+                            momentoSalidaODesocupacion = tramoSiguiente.getVuelo().getSalidaUtc();
+                        } else {
+                            // Fallback
+                            momentoSalidaODesocupacion = momentoLlegada.plus(PICKUP_WAIT);
+                        }
+                    } 
+                    // CASO 2: Es el DESTINO FINAL
+                    else {
+                        // La carga ocupa espacio desde que llega hasta que el cliente la recoge (2h)
+                        momentoSalidaODesocupacion = momentoLlegada.plus(PICKUP_WAIT);
                     }
-                }
 
-                TramoAsignado ultimo = tramos.get(tramos.size() - 1);
-                if (ultimo != null && ultimo.getVuelo() != null) {
-                    Instant llegadaFinal = ultimo.getVuelo().getLlegadaUtc();
-                    if (llegadaFinal != null) {
-                        Instant fin = llegadaFinal.plus(PICKUP_WAIT);
-                        nueva.reservar(ultimo.getVuelo().getDestino(), llegadaFinal, fin, cantidad);
+                    // Registramos la reserva
+                    if (momentoLlegada != null && momentoSalidaODesocupacion != null && 
+                        momentoLlegada.isBefore(momentoSalidaODesocupacion)) {
+                        
+                        nuevaOcupacion.reservar(vuelo.getDestino(), momentoLlegada, momentoSalidaODesocupacion, cantidad);
                     }
                 }
             }
         }
 
-        return nueva;
-    }
+        // 4. ELIMINADO: Agregar reservas históricas previas
+        // CAUSA DE DUPLICIDAD: El MasterPlan ya incluye estos pedidos y sus tiempos de llegada originales.
+        // Si los agregamos de nuevo aquí, sumamos doble.
+        /*
+        if (reservasPrevias != null && !reservasPrevias.isEmpty()) {
+             ... ELIMINADO ...
+        }
+        */
 
+        // 5. ELIMINADO: Agregar arribos en vuelo
+        // CAUSA DE DUPLICIDAD: El MasterPlan ya tiene estos vuelos programados con sus fechas futuras.
+        /*
+        if (arribosEnVuelo != null && !arribosEnVuelo.isEmpty()) {
+             ... ELIMINADO ...
+        }
+        */
+
+        // Guardamos la ocupación definitiva
+        ocupacionesPorRun.put(runId, nuevaOcupacion);
+    }
     private static void sleepQuietly(Duration d) {
         try { Thread.sleep(d.toMillis()); } catch (InterruptedException ignored) {}
     }
     
-    /**
-     * Calcula carga que está llegando y saliendo EN ESTE MOMENTO (ventana de ±5 minutos)
-     */
     private Map<String, Object> calcularEventosActuales(String runId, String codigoAeropuerto, Instant simNow) {
         Map<String, Object> eventos = new HashMap<>();
         int cargaLlegando = 0;
         int cargaSaliendo = 0;
         
         try {
-            // Ventana de tiempo para considerar "ahora mismo" (±5 minutos)
             Duration ventana = Duration.ofMinutes(5);
             Instant simNowMinus = simNow.minus(ventana);
             Instant simNowPlus = simNow.plus(ventana);
             
-            // Obtener la solución actual
-            SolucionProgramacion solucion = solucionesAnteriores.get(runId);
-            if (solucion == null || solucion.getCargaPorVuelo() == null) {
-                eventos.put("cargaLlegando", 0);
-                eventos.put("cargaSaliendo", 0);
-                return eventos;
-            }
+            // Usamos el mapa maestro para ver eventos reales, no solo la solución parcial
+            // Convertimos los planes en tramos para iterar (similar a la lógica anterior)
+            Map<Integer, PlanPedido> masterPlan = masterPlanPorRun.get(runId);
             
-            CargaPorVuelo cargaPorVuelo = solucion.getCargaPorVuelo();
-            
-            // Iterar sobre todos los vuelos asignados en la solución
-            for (java.util.Map.Entry<VueloProgramadoId, Integer> entry : cargaPorVuelo.getAsignado().entrySet()) {
-                VueloProgramadoId vueloId = entry.getKey();
-                int cantidadAsignada = entry.getValue();
-                
-                if (cantidadAsignada > 0 && vueloId.getSalidaUtc() != null && vueloId.getLlegadaUtc() != null) {
-                    // Vuelos que están saliendo AHORA desde este aeropuerto
-                    if (codigoAeropuerto.equals(vueloId.getOrigen()) &&
-                        !vueloId.getSalidaUtc().isBefore(simNowMinus) &&
-                        !vueloId.getSalidaUtc().isAfter(simNowPlus)) {
-                        cargaSaliendo += cantidadAsignada;
-                    }
-                    
-                    // Vuelos que están llegando AHORA a este aeropuerto
-                    if (codigoAeropuerto.equals(vueloId.getDestino()) &&
-                        !vueloId.getLlegadaUtc().isBefore(simNowMinus) &&
-                        !vueloId.getLlegadaUtc().isAfter(simNowPlus)) {
-                        cargaLlegando += cantidadAsignada;
+            if (masterPlan != null) {
+                for (PlanPedido plan : masterPlan.values()) {
+                    if (plan.getRutas() == null) continue;
+                    for (RutaAsignada ruta : plan.getRutas()) {
+                        if (ruta.getTramos() == null) continue;
+                        
+                        // Iteramos sobre tramos para detectar vuelos activos
+                        for (TramoAsignado tramo : ruta.getTramos()) {
+                            VueloProgramadoId vuelo = tramo.getVuelo();
+                            if (vuelo == null) continue;
+                            int cantidad = tramo.getCantidad();
+                            
+                            // Salidas AHORA
+                            if (codigoAeropuerto.equals(vuelo.getOrigen()) && 
+                                !vuelo.getSalidaUtc().isBefore(simNowMinus) && 
+                                !vuelo.getSalidaUtc().isAfter(simNowPlus)) {
+                                cargaSaliendo += cantidad;
+                            }
+                            
+                            // Llegadas AHORA
+                            if (codigoAeropuerto.equals(vuelo.getDestino()) && 
+                                !vuelo.getLlegadaUtc().isBefore(simNowMinus) && 
+                                !vuelo.getLlegadaUtc().isAfter(simNowPlus)) {
+                                cargaLlegando += cantidad;
+                            }
+                        }
                     }
                 }
             }
         } catch (Exception e) {
-            System.err.println("[RunManager] Error calculando eventos actuales para " + codigoAeropuerto + ": " + e.getMessage());
+            System.err.println("[RunManager] Error calculando eventos actuales: " + e.getMessage());
         }
         
         eventos.put("cargaLlegando", cargaLlegando);
         eventos.put("cargaSaliendo", cargaSaliendo);
-        
         return eventos;
     }
     
-    /**
-     * Calcula estadísticas de vuelos futuros para un aeropuerto específico
-     */
     private Map<String, Object> calcularEstadisticasFuturas(String runId, String codigoAeropuerto, Instant simNow, Instant simNow24h) {
         Map<String, Object> stats = new HashMap<>();
         int llegadasPrevistas = 0;
@@ -1562,126 +1581,91 @@ public class RunManager {
         int cargaSaliente = 0;
         
         try {
-            // Obtener la solución actual
-            SolucionProgramacion solucion = solucionesAnteriores.get(runId);
-            if (solucion == null || solucion.getCargaPorVuelo() == null) {
-                stats.put("llegadasPrevistas", 0);
-                stats.put("salidasPrevistas", 0);
-                stats.put("cargaEntrante", 0);
-                stats.put("cargaSaliente", 0);
-                return stats;
-            }
+            // Usamos el master plan para ver el futuro real
+            Map<Integer, PlanPedido> masterPlan = masterPlanPorRun.get(runId);
             
-            CargaPorVuelo cargaPorVuelo = solucion.getCargaPorVuelo();
-            
-            // Iterar sobre todos los vuelos asignados en la solución
-            for (java.util.Map.Entry<VueloProgramadoId, Integer> entry : cargaPorVuelo.getAsignado().entrySet()) {
-                VueloProgramadoId vueloId = entry.getKey();
-                int cantidadAsignada = entry.getValue();
-                
-                // Solo contar vuelos con carga asignada que están en el futuro
-                if (cantidadAsignada > 0 && vueloId.getSalidaUtc() != null && vueloId.getLlegadaUtc() != null) {
-                    // Contar salidas futuras desde este aeropuerto
-                    if (codigoAeropuerto.equals(vueloId.getOrigen()) && 
-                        !vueloId.getSalidaUtc().isBefore(simNow) && 
-                        !vueloId.getSalidaUtc().isAfter(simNow24h)) {
-                        salidasPrevistas++;
-                        cargaSaliente += cantidadAsignada;
-                    }
-                    
-                    // Contar llegadas futuras a este aeropuerto
-                    if (codigoAeropuerto.equals(vueloId.getDestino()) && 
-                        !vueloId.getLlegadaUtc().isBefore(simNow) && 
-                        !vueloId.getLlegadaUtc().isAfter(simNow24h)) {
-                        llegadasPrevistas++;
-                        cargaEntrante += cantidadAsignada;
+            if (masterPlan != null) {
+                for (PlanPedido plan : masterPlan.values()) {
+                    if (plan.getRutas() == null) continue;
+                    for (RutaAsignada ruta : plan.getRutas()) {
+                        if (ruta.getTramos() == null) continue;
+                        
+                        for (TramoAsignado tramo : ruta.getTramos()) {
+                            VueloProgramadoId vuelo = tramo.getVuelo();
+                            if (vuelo == null) continue;
+                            int cantidad = tramo.getCantidad();
+                            
+                            // Salidas Futuras
+                            if (codigoAeropuerto.equals(vuelo.getOrigen()) && 
+                                !vuelo.getSalidaUtc().isBefore(simNow) && 
+                                !vuelo.getSalidaUtc().isAfter(simNow24h)) {
+                                salidasPrevistas++;
+                                cargaSaliente += cantidad;
+                            }
+                            
+                            // Llegadas Futuras
+                            if (codigoAeropuerto.equals(vuelo.getDestino()) && 
+                                !vuelo.getLlegadaUtc().isBefore(simNow) && 
+                                !vuelo.getLlegadaUtc().isAfter(simNow24h)) {
+                                llegadasPrevistas++;
+                                cargaEntrante += cantidad;
+                            }
+                        }
                     }
                 }
             }
         } catch (Exception e) {
-            System.err.println("[RunManager] Error calculando estadísticas futuras para " + codigoAeropuerto + ": " + e.getMessage());
+            System.err.println("[RunManager] Error stats futuras: " + e.getMessage());
         }
         
         stats.put("llegadasPrevistas", llegadasPrevistas);
         stats.put("salidasPrevistas", salidasPrevistas);
         stats.put("cargaEntrante", cargaEntrante);
         stats.put("cargaSaliente", cargaSaliente);
-        
         return stats;
     }
     
-    /**
-     * Extrae los vuelos que caen dentro de la ventana temporal especificada,
-     * incluyendo el manifiesto de carga (qué pedidos van en cada vuelo)
-     */
-
-
     private List<Object> extraerVuelosDeVentana(SolucionProgramacion solucion, Instant wStart, Instant wEnd) {
         List<Object> vuelosVentana = new ArrayList<>();
-
-        if (solucion == null || solucion.getCargaPorVuelo() == null) {
-            return vuelosVentana;
-        }
+        if (solucion == null || solucion.getCargaPorVuelo() == null) return vuelosVentana;
 
         CargaPorVuelo cargaPorVuelo = solucion.getCargaPorVuelo();
-
-        // Usamos un set para no repetir vuelos
         Set<VueloProgramadoId> vuelosSeleccionados = new LinkedHashSet<>();
 
-        // 1) Vuelos que salen dentro de la ventana (lo que ya hacías)
         for (Map.Entry<VueloProgramadoId, Integer> entry : cargaPorVuelo.getAsignado().entrySet()) {
             VueloProgramadoId vueloId = entry.getKey();
             Instant salida = vueloId.getSalidaUtc();
-
-            if (salida != null &&
-                    !salida.isBefore(wStart) &&
-                    salida.isBefore(wEnd)) {
+            if (salida != null && !salida.isBefore(wStart) && salida.isBefore(wEnd)) {
                 vuelosSeleccionados.add(vueloId);
             }
         }
-
-        // 2) Para cada ruta cuyo PRIMER TRAMO despega en la ventana,
-        //    agregamos TODOS los tramos (toda la cadena de conexiones)
+        
+        // Lógica original de extracción de rutas...
         Map<Integer, PlanPedido> planPorPedido = solucion.getPlanPorPedido();
         if (planPorPedido != null) {
             for (PlanPedido plan : planPorPedido.values()) {
                 if (plan == null || plan.getRutas() == null) continue;
-
                 for (RutaAsignada ruta : plan.getRutas()) {
-                    List<TramoAsignado> tramos = ruta.getTramos();
-                    if (tramos == null || tramos.isEmpty()) continue;
-
-                    VueloProgramadoId primerVuelo = tramos.get(0).getVuelo();
+                    if (ruta.getTramos() == null) continue;
+                    VueloProgramadoId primerVuelo = ruta.getTramos().get(0).getVuelo();
                     Instant salidaPrimera = primerVuelo != null ? primerVuelo.getSalidaUtc() : null;
-
-                    // La ruta "nace" en esta ventana
-                    if (salidaPrimera != null &&
-                            !salidaPrimera.isBefore(wStart) &&
-                            salidaPrimera.isBefore(wEnd)) {
-
-                        for (TramoAsignado tramo : tramos) {
-                            if (tramo.getCantidad() <= 0) continue;
-                            VueloProgramadoId vRuta = tramo.getVuelo();
-                            if (vRuta != null) {
-                                vuelosSeleccionados.add(vRuta);
-                            }
-                        }
+                    
+                    if (salidaPrimera != null && !salidaPrimera.isBefore(wStart) && salidaPrimera.isBefore(wEnd)) {
+                         for (TramoAsignado tramo : ruta.getTramos()) {
+                             if (tramo.getCantidad() > 0 && tramo.getVuelo() != null) {
+                                 vuelosSeleccionados.add(tramo.getVuelo());
+                             }
+                         }
                     }
                 }
             }
         }
 
-        // 3) Construir DTO para cada vuelo seleccionado
         for (VueloProgramadoId vueloId : vuelosSeleccionados) {
-            int cantidadAsignada = cargaPorVuelo
-                    .getAsignado()
-                    .getOrDefault(vueloId, 0);
+            int cantidadAsignada = cargaPorVuelo.getAsignado().getOrDefault(vueloId, 0);
             if (cantidadAsignada <= 0) continue;
 
-            String vueloIdStr = vueloId.getOrigen() + "-" +
-                    vueloId.getDestino() + "-" +
-                    vueloId.getSalidaUtc().toString().replace(":", "");
-
+            String vueloIdStr = vueloId.getOrigen() + "-" + vueloId.getDestino() + "-" + vueloId.getSalidaUtc().toString().replace(":", "");
             Map<String, Object> vueloDTO = new HashMap<>();
             vueloDTO.put("id", vueloIdStr);
             vueloDTO.put("origen", vueloId.getOrigen());
@@ -1692,137 +1676,109 @@ public class RunManager {
             vueloDTO.put("capacidad", cargaPorVuelo.capacidad(vueloId));
             vueloDTO.put("residual", cargaPorVuelo.residual(vueloId));
             vueloDTO.put("costo", vueloId.getCosto());
-
-            // Manifiesto de carga (ya lo tienes implementado)
-            List<Map<String, Object>> carga = extraerCargaDelVuelo(solucion, vueloId);
-            vueloDTO.put("carga", carga);
+            vueloDTO.put("carga", extraerCargaDelVuelo(solucion, vueloId));
 
             vuelosVentana.add(vueloDTO);
         }
-
         return vuelosVentana;
     }
     
-    /**
-     * Extrae el manifiesto de carga de un vuelo específico:
-     * qué pedidos van en ese vuelo y cuánta cantidad de cada uno
-     */
     private List<Map<String, Object>> extraerCargaDelVuelo(SolucionProgramacion solucion, VueloProgramadoId vuelo) {
         List<Map<String, Object>> carga = new ArrayList<>();
-        
-        if (solucion == null || solucion.getPlanPorPedido() == null) {
-            return carga;
-        }
-        
-        // Iterar sobre todos los planes de pedidos
+        if (solucion == null || solucion.getPlanPorPedido() == null) return carga;
+
         for (Map.Entry<Integer, PlanPedido> entry : solucion.getPlanPorPedido().entrySet()) {
             PlanPedido plan = entry.getValue();
-            
-            if (plan == null || plan.getRutas() == null) {
-                continue;
-            }
-            
-            // Para cada ruta del pedido
+            if (plan == null || plan.getRutas() == null) continue;
+
             for (RutaAsignada ruta : plan.getRutas()) {
-                if (ruta.getTramos() == null) {
-                    continue;
-                }
-                
-                // Buscar si algún tramo de esta ruta usa este vuelo
+                if (ruta.getTramos() == null) continue;
                 for (int i = 0; i < ruta.getTramos().size(); i++) {
                     TramoAsignado tramo = ruta.getTramos().get(i);
-                    
-                    // Comparar si este tramo corresponde al vuelo actual
                     if (esElMismoVuelo(tramo.getVuelo(), vuelo)) {
-                        
-                        // Determinar si es una conexión o el destino final
                         boolean esConexion = i < ruta.getTramos().size() - 1;
-                        
-                        // Crear entrada de carga
                         Map<String, Object> itemCarga = new HashMap<>();
                         itemCarga.put("pedidoId", plan.getIdPedido());
                         itemCarga.put("cantidad", tramo.getCantidad());
                         itemCarga.put("destinoFinal", plan.getAeropuertoDestino());
                         itemCarga.put("esConexion", esConexion);
-                        
-                        // Información adicional útil para el frontend
                         itemCarga.put("creadoUtc", plan.getCreadoUtc() != null ? plan.getCreadoUtc().toString() : null);
-                        
                         carga.add(itemCarga);
-                        break; // Un tramo por ruta en este vuelo
+                        break; 
                     }
                 }
             }
         }
-        
         return carga;
     }
-    
-    /**
-     * Compara dos vuelos para ver si son el mismo
-     */
+
     private boolean esElMismoVuelo(VueloProgramadoId v1, VueloProgramadoId v2) {
         if (v1 == null || v2 == null) return false;
-        
-        // Comparar origen, destino y hora de salida
         return Objects.equals(v1.getOrigen(), v2.getOrigen()) &&
                Objects.equals(v1.getDestino(), v2.getDestino()) &&
                Objects.equals(v1.getSalidaUtc(), v2.getSalidaUtc());
     }
-    
-    /**
-     * Convierte los pedidos a DTOs para el frontend, incluyendo información de orígenes desde la solución
-     */
+
     private List<Object> convertirPedidosADTO(List<Pedido> pedidos, SolucionProgramacion solucion) {
         List<Object> pedidosDTO = new ArrayList<>();
-        
+        Duration TIEMPO_ESPERA_CLIENTE = Duration.ofHours(2); 
+
         for (Pedido pedido : pedidos) {
             Map<String, Object> pedidoDTO = new HashMap<>();
             pedidoDTO.put("id", pedido.getIdPedido());
             pedidoDTO.put("idCliente", pedido.getIdCliente());
             pedidoDTO.put("destino", pedido.getDestino());
             
-            // Extraer orígenes desde la solución (un pedido puede tener múltiples orígenes si se divide)
+            List<Map<String, Object>> listaRecojos = new ArrayList<>();
             List<String> origenes = new ArrayList<>();
             int cantidadAsignada = 0;
-            List<Map<String, Object>> rutasDetalle = new ArrayList<>(); // NUEVO: desglose de rutas
-            int cantidadTotal = pedido.getCantidad(); // por defecto, usar cantidad del pedido
+            List<Map<String, Object>> rutasDetalle = new ArrayList<>();
+            int cantidadTotal = pedido.getCantidad(); 
             
             if (solucion != null) {
                 var plan = solucion.planDe(pedido.getIdPedido());
                 if (plan != null) {
-                    // Si hay un plan, usar la demanda ORIGINAL del PlanPedido
                     cantidadTotal = plan.getDemanda();
                     if (plan.getRutas() != null) {
                         for (var ruta : plan.getRutas()) {
                             if (ruta.getTramos() != null && !ruta.getTramos().isEmpty()) {
-                                // El primer tramo de cada ruta contiene el origen (sede)
                                 var primerTramo = ruta.getTramos().get(0);
                                 String origen = primerTramo.getVuelo().getOrigen();
-                                if (origen != null && !origenes.contains(origen)) {
-                                    origenes.add(origen);
-                                }
+                                if (origen != null && !origenes.contains(origen)) origenes.add(origen);
                                 cantidadAsignada += ruta.getCantidad();
+
+                                var ultimoTramo = ruta.getTramos().get(ruta.getTramos().size() - 1);
+                                var vueloFinal = ultimoTramo.getVuelo();
                                 
-                                // NUEVO: Construir detalle de la ruta
+                                if (vueloFinal != null && 
+                                    vueloFinal.getDestino().equals(pedido.getDestino()) && 
+                                    vueloFinal.getLlegadaUtc() != null) {
+                                    
+                                    Instant llegadaReal = vueloFinal.getLlegadaUtc();
+                                    Map<String, Object> recojoInfo = new HashMap<>();
+                                    recojoInfo.put("cantidad", ruta.getCantidad()); 
+                                    recojoInfo.put("inicioRecojo", llegadaReal.toString()); 
+                                    recojoInfo.put("finRecojo", llegadaReal.plus(TIEMPO_ESPERA_CLIENTE).toString());
+                                    listaRecojos.add(recojoInfo);
+                                }
+                                
                                 Map<String, Object> rutaDetalle = new HashMap<>();
                                 rutaDetalle.put("cantidad", ruta.getCantidad());
                                 rutaDetalle.put("origen", origen);
                                 rutaDetalle.put("destinoFinal", pedido.getDestino());
                                 
-                                // Extraer vuelos de la ruta
                                 List<Map<String, Object>> vuelosRuta = new ArrayList<>();
                                 for (var tramo : ruta.getTramos()) {
                                     Map<String, Object> vueloRuta = new HashMap<>();
                                     vueloRuta.put("id", tramo.getVuelo().getOrigen() + "-" + 
-                                                  tramo.getVuelo().getDestino() + "-" + 
-                                                  tramo.getVuelo().getSalidaUtc().toString().replace(":", ""));
+                                                      tramo.getVuelo().getDestino() + "-" + 
+                                                      tramo.getVuelo().getSalidaUtc().toString().replace(":", ""));
                                     vueloRuta.put("origen", tramo.getVuelo().getOrigen());
                                     vueloRuta.put("destino", tramo.getVuelo().getDestino());
                                     vueloRuta.put("salidaUtc", tramo.getVuelo().getSalidaUtc().toString());
                                     vueloRuta.put("llegadaUtc", tramo.getVuelo().getLlegadaUtc() != null ? 
-                                                  tramo.getVuelo().getLlegadaUtc().toString() : null);
-                                    vueloRuta.put("cantidad", ruta.getCantidad()); // Misma cantidad para todo el tramo
+                                                      tramo.getVuelo().getLlegadaUtc().toString() : null);
+                                    vueloRuta.put("cantidad", ruta.getCantidad()); 
                                     vuelosRuta.add(vueloRuta);
                                 }
                                 rutaDetalle.put("vuelos", vuelosRuta);
@@ -1833,91 +1789,82 @@ public class RunManager {
                 }
             }
             
-            // Agregar campos faltantes al DTO
+            pedidoDTO.put("recojos", listaRecojos);
             pedidoDTO.put("cantidad", cantidadTotal);
             pedidoDTO.put("fechaCreacion", pedido.getCreatedAtUtc() != null ? pedido.getCreatedAtUtc().toString() : null);
             pedidoDTO.put("fechaLocal", pedido.getFecha() != null ? pedido.getFecha().toString() : null);
             
-            // Calcular continenteDestino si no está establecido
             String continenteDestino = pedido.getContinenteDestino();
             if (continenteDestino == null && aeropuertosMap != null) {
                 var aeropuerto = aeropuertosMap.obtener(pedido.getDestino());
-                if (aeropuerto != null) {
-                    continenteDestino = aeropuerto.getContinente();
-                }
+                if (aeropuerto != null) continenteDestino = aeropuerto.getContinente();
             }
             pedidoDTO.put("continenteDestino", continenteDestino);
             
-            // Si hay un solo origen, ponerlo como string; si hay múltiples, como array
-            if (origenes.isEmpty()) {
-                pedidoDTO.put("origen", null);
-            } else if (origenes.size() == 1) {
-                pedidoDTO.put("origen", origenes.get(0));
-            } else {
-                pedidoDTO.put("origen", origenes); // Múltiples sedes
-            }
+            if (origenes.isEmpty()) pedidoDTO.put("origen", null);
+            else if (origenes.size() == 1) pedidoDTO.put("origen", origenes.get(0));
+            else pedidoDTO.put("origen", origenes);
             
-            // Información adicional útil
             pedidoDTO.put("cantidadAsignada", cantidadAsignada);
             pedidoDTO.put("estadoAsignacion", cantidadAsignada >= cantidadTotal ? "COMPLETO" : 
                                               cantidadAsignada > 0 ? "PARCIAL" : "PENDIENTE");
-            pedidoDTO.put("rutas", rutasDetalle); // NUEVO: desglose de rutas
+            pedidoDTO.put("rutas", rutasDetalle);
             
             pedidosDTO.add(pedidoDTO);
         }
-        
         return pedidosDTO;
     }
 
+    public List<VueloCancelado> transformar(Set<VueloProgramadoId> vuelosCancelados) {
+        List<VueloCancelado> resultado = new ArrayList<>();
+        ZoneId zone = ZoneOffset.UTC;
+        for (VueloProgramadoId v : vuelosCancelados) {
+            Instant salidaUtc = v.getSalidaUtc();
+            if (salidaUtc == null) continue;
+            String origen  = v.getOrigen();
+            String destino = v.getDestino();
+            LocalDate fecha = salidaUtc.atZone(zone).toLocalDate();
+            LocalTime hora  = salidaUtc.atZone(zone).toLocalTime();
+            resultado.add(new VueloCancelado(origen, destino, fecha, hora, salidaUtc));
+        }
+        return resultado;
+    }
+    
     /**
-     * Obtiene todos los vuelos planificados del día siguiente desde el tiempo actual de simulación.
-     * Incluye vuelos planificados incluso si ya despegaron o no, siempre que su salida esté
-     * dentro de las próximas 24 horas desde el tiempo actual.
-     * * @param runId ID del run para obtener la solución y el tiempo actual
-     * @return Lista de vuelos planificados (DTOs) sin límite de cantidad
+     * RESTAURADO: Obtiene todos los vuelos planificados del día siguiente.
+     * Necesario para VuelosSseController.
      */
     public List<Map<String, Object>> getScheduledFlightsNextDay(String runId) {
         List<Map<String, Object>> vuelosPlanificados = new ArrayList<>();
         
         try {
-            System.out.println("[RunManager] getScheduledFlightsNextDay - runId: " + runId);
-            
             // Obtener el tiempo actual de simulación
             Instant simNow = currentSimNow(runId);
-            System.out.println("[RunManager] simNow: " + simNow);
             
             // Calcular el límite del día siguiente (simNow + 24 horas)
             Instant simNowNextDay = simNow.plus(Duration.ofHours(24));
-            System.out.println("[RunManager] simNowNextDay: " + simNowNextDay);
             
             // Obtener la solución actual
             SolucionProgramacion solucion = solucionesAnteriores.get(runId);
             if (solucion == null || solucion.getCargaPorVuelo() == null) {
-                System.out.println("[RunManager] No hay solución para runId: " + runId);
-                return vuelosPlanificados; // Retornar lista vacía si no hay solución
+                return vuelosPlanificados; 
             }
             
             CargaPorVuelo cargaPorVuelo = solucion.getCargaPorVuelo();
-            System.out.println("[RunManager] Total vuelos en solución: " + cargaPorVuelo.getAsignado().size());
             
-            // Iterar sobre todos los vuelos planificados (incluso sin carga asignada para mostrar todos)
-            // Pero para simplificar, solo incluimos vuelos con carga asignada (vuelos realmente usados)
+            // Iterar sobre todos los vuelos asignados en la solución
             for (Map.Entry<VueloProgramadoId, Integer> entry : cargaPorVuelo.getAsignado().entrySet()) {
                 VueloProgramadoId vueloId = entry.getKey();
+                int cantidadAsignada = entry.getValue(); // Cantidad total en el vuelo
                 
                 // Incluir vuelos planificados del día siguiente
-                // Solo incluimos vuelos cuya salida está en el futuro desde simNow hasta simNow + 24 horas
-                // Esto permite cancelar vuelos antes de que despeguen
-                // Nota: Si un vuelo ya despegó (salida < simNow), no tiene sentido mostrarlo para cancelarlo
                 if (vueloId.getSalidaUtc() != null) {
                     Instant salida = vueloId.getSalidaUtc();
                     
-                    // Incluir vuelos planificados del día siguiente (desde simNow hasta simNow + 24 horas)
-                    // Solo vuelos futuros que aún no han despegado
                     // IMPORTANTE: Solo incluir vuelos cuya salida está en el futuro (>= simNow)
                     // y dentro de las próximas 24 horas (<= simNow + 24h)
                     if (!salida.isBefore(simNow) && !salida.isAfter(simNowNextDay)) {
-                        // Generar ID único para el vuelo
+                        
                         String vueloIdStr = vueloId.getOrigen() + "-" + 
                                            vueloId.getDestino() + "-" + 
                                            vueloId.getSalidaUtc().toString().replace(":", "");
@@ -1929,21 +1876,18 @@ public class RunManager {
                         vueloDTO.put("destino", vueloId.getDestino());
                         vueloDTO.put("salidaUtc", vueloId.getSalidaUtc().toString());
                         vueloDTO.put("llegadaUtc", vueloId.getLlegadaUtc() != null ? vueloId.getLlegadaUtc().toString() : null);
-                        vueloDTO.put("cantidadAsignada", entry.getValue());
+                        vueloDTO.put("cantidadAsignada", cantidadAsignada);
                         vueloDTO.put("capacidad", cargaPorVuelo.capacidad(vueloId));
                         vueloDTO.put("residual", cargaPorVuelo.residual(vueloId));
                         vueloDTO.put("costo", vueloId.getCosto());
                         
-                        // Extraer manifiesto de carga (qué pedidos van en este vuelo)
-                        List<Map<String, Object>> carga = extraerCargaDelVuelo(solucion, vueloId);
-                        vueloDTO.put("carga", carga);
+                        // Reutilizamos el método existente para extraer la carga
+                        vueloDTO.put("carga", extraerCargaDelVuelo(solucion, vueloId));
                         
                         vuelosPlanificados.add(vueloDTO);
                     }
                 }
             }
-            
-            System.out.println("[RunManager] Vuelos planificados del día siguiente encontrados: " + vuelosPlanificados.size());
             
             // Ordenar por hora de salida
             vuelosPlanificados.sort((a, b) -> {
@@ -1954,40 +1898,10 @@ public class RunManager {
             });
             
         } catch (Exception e) {
-            System.err.println("[RunManager] Error obteniendo vuelos planificados del día siguiente para runId " + runId + ": " + e.getMessage());
+            System.err.println("[RunManager] Error obteniendo vuelos planificados: " + e.getMessage());
             e.printStackTrace();
         }
         
         return vuelosPlanificados;
-    }
-
-    public List<VueloCancelado> transformar(Set<VueloProgramadoId> vuelosCancelados) {
-        List<VueloCancelado> resultado = new ArrayList<>();
-
-        ZoneId zone = ZoneOffset.UTC;
-
-        for (VueloProgramadoId v : vuelosCancelados) {
-
-            Instant salidaUtc = v.getSalidaUtc();
-            if (salidaUtc == null) continue;
-
-            String origen  = v.getOrigen();
-            String destino = v.getDestino();
-
-            // Convertir Instant → LocalDate y LocalTime
-            LocalDate fecha = salidaUtc.atZone(zone).toLocalDate();
-            LocalTime hora  = salidaUtc.atZone(zone).toLocalTime();
-
-            // Crear objeto VueloCancelado
-            resultado.add(new VueloCancelado(
-                    origen,
-                    destino,
-                    fecha,
-                    hora,
-                    salidaUtc
-            ));
-        }
-
-        return resultado;
     }
 }

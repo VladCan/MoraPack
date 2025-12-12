@@ -1,15 +1,19 @@
-import { X, Calendar, Clock, Plane } from "lucide-react";
+import { X, Plane, Package, ArrowDown, ArrowUp } from "lucide-react";
 
-// --- Esquemas Zod ---
+// --- Tipos ---
 type FlightType = {
   id: string;
   cantidad: number;
   origen?: string;
   destino?: string;
+  salidaUtc: string;
+  llegadaUtc: string;
+  isPickup?: boolean;
 };
 
 interface AirportCardProps {
   airportId: string;
+  airportName: string;
   data: {
     porcentaje: number;
     ocupacionActual: number;
@@ -27,243 +31,229 @@ interface AirportCardProps {
 }
 
 export default function AirportCard({
-  airportId,
+  airportName,
   data,
   isSede,
   flights,
   onClose,
 }: AirportCardProps) {
 
-  // Función simplificada: Extrae la hora literal sin conversión de zona horaria
-  const formatFlightInfo = (idString: string) => {
+  // --- Separación de Datos ---
+  // Filtramos las salidas para separar Vuelos de Recojos
+  const flightDepartures = flights.salidas.filter(f => !f.isPickup);
+  const clientPickups = flights.salidas.filter(f => f.isPickup);
+  const flightArrivals = flights.llegadas;
+
+  // --- Helpers de Formato ---
+  const formatTime = (isoString: string) => {
     try {
-      const parts = idString.split("-");
-      // idString esperado: "SBBR-SUAA-2025-12-10T082500Z"
-      
-      if (parts.length < 5) return { date: "N/A", time: "N/A" };
-
-      //const year = parts[2];
-      const month = parts[3];
-      // parts[4] es "10T082500Z"
-      const [day, timeRaw] = parts[4].split("T"); 
-
-      // timeRaw es "082500Z". Extraemos los caracteres directamente.
-      // Esto asegura que si el ID dice "08", mostremos "08" (UTC).
-      const hour = timeRaw.substring(0, 2);
-      const minute = timeRaw.substring(2, 4);
-
-      return {
-        date: `${day}/${month}`,     // Ejemplo: 10/12
-        time: `${hour}:${minute}`,   // Ejemplo: 08:25
-      };
-
+      if (!isoString) return "??:??";
+      const d = new Date(isoString);
+      const hh = String(d.getUTCHours()).padStart(2, "0");
+      const mm = String(d.getUTCMinutes()).padStart(2, "0");
+      return `${hh}:${mm}`;
     } catch {
-      return { date: "Invalid", time: "Invalid" };
+      return "??:??";
     }
   };
 
-  const color =
-    data.porcentaje > 0.8
-      ? "#f97316"
-      : data.porcentaje > 0.5
-      ? "#facc15"
-      : "#38bdf8";
+  const formatDateShort = (isoString: string) => {
+    try {
+      if (!isoString) return "";
+      const d = new Date(isoString);
+      const day = String(d.getUTCDate()).padStart(2, "0");
+      const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+      return `${day}/${month}`;
+    } catch {
+      return "";
+    }
+  };
 
-  const FlightRow = ({
-    flight,
-    type,
-  }: {
-    flight: FlightType;
-    type: "llegada" | "salida";
-  }) => {
-    const { date, time } = formatFlightInfo(flight.id);
-    const isLlegada = type === "llegada";
+  const color = data.porcentaje > 0.8 ? "#ef4444" : data.porcentaje > 0.5 ? "#f97316" : "#3b82f6";
+
+  // --- Componente de Fila Unificado ---
+  const FlightItem = ({ flight, type }: { flight: FlightType; type: "arrival" | "departure" | "pickup" }) => {
+    const timeStart = formatTime(flight.salidaUtc);
+    const timeEnd = formatTime(flight.llegadaUtc);
+    const dateStr = formatDateShort(flight.salidaUtc);
+
+    let icon, badgeClass, textClass, label, cantidadPrefix;
+
+    switch (type) {
+      case "arrival":
+        // LLEGADAS: Verde
+        icon = <Plane className="w-4 h-4 text-emerald-500 rotate-90" />;
+        badgeClass = "bg-emerald-100 text-emerald-700 border-emerald-200";
+        textClass = "text-emerald-900 dark:text-emerald-100";
+        label = flight.origen || "Origen";
+        cantidadPrefix = "+";
+        break;
+      case "departure":
+        // SALIDAS VUELO: Rojo (como pediste)
+        icon = <Plane className="w-4 h-4 text-red-500 -rotate-45" />;
+        badgeClass = "bg-red-100 text-red-700 border-red-200";
+        textClass = "text-red-900 dark:text-red-100";
+        label = flight.destino || "Destino";
+        cantidadPrefix = "-";
+        break;
+      case "pickup":
+        // RECOJOS: Índigo/Violeta
+        icon = <Package className="w-4 h-4 text-indigo-500" />;
+        badgeClass = "bg-indigo-100 text-indigo-700 border-indigo-200";
+        textClass = "text-indigo-900 dark:text-indigo-100";
+        label = flight.destino || "Cliente"; // "Cliente 123"
+        cantidadPrefix = "-";
+        break;
+    }
 
     return (
-      <div className="bg-muted/30 rounded-md p-2 border border-border/50">
-        {/* Fila superior: Fecha y Hora */}
-        <div className="flex items-center gap-3 text-[10px] text-muted-foreground mb-1.5 border-b border-border/40 pb-1">
-          <div className="flex items-center gap-1">
-            <Calendar className="w-3 h-3" />
-            <span>{date}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            <span className="font-mono">{time}</span>
-            {/* Indicador UTC explícito */}
-            <span className="bg-blue-500/10 text-blue-600 dark:text-blue-400 px-1 rounded text-[9px] font-semibold border border-blue-500/20">
-              UTC
-            </span>
-          </div>
+      <div className="py-2 px-3 border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+        {/* Fila 1: Hora y Fecha (Más pequeño y gris) */}
+        <div className="flex justify-between items-center mb-1">
+           <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
+              <span className="font-semibold text-slate-500">{dateStr}</span>
+              <span>•</span>
+              <span>{timeStart} <span className="text-slate-300">→</span> {timeEnd}</span>
+           </div>
+           {type !== 'pickup' && (
+             <span className="text-[9px] font-bold text-slate-300 bg-slate-50 px-1 rounded border border-slate-100">UTC</span>
+           )}
         </div>
 
-        {/* Fila inferior: Ruta y Cantidad */}
-        <div className="flex justify-between items-center text-xs">
-          <div className="flex items-center gap-1.5">
-            <Plane
-              className={`w-3 h-3 ${isLlegada ? "rotate-90" : "-rotate-45"}`}
-            />
-            <span className="text-foreground/80">
-              {isLlegada ? `De: ${flight.origen || "?"}` : `A: ${flight.destino || "?"}`}
-            </span>
-          </div>
-          <span
-            className={`font-bold ${
-              isLlegada
-                ? "text-green-600 dark:text-green-400"
-                : "text-orange-600 dark:text-orange-400"
-            }`}
-          >
-            {isLlegada ? "+" : "-"}
-            {flight.cantidad}
-          </span>
+        {/* Fila 2: Ruta y Cantidad (Grande y claro) */}
+        <div className="flex justify-between items-center">
+           <div className="flex items-center gap-2">
+              {icon}
+              <span className={`text-xs font-bold ${textClass} truncate max-w-[110px]`} title={label}>
+                {label}
+              </span>
+           </div>
+           <div className={`text-xs font-bold px-1.5 py-0.5 rounded border ${badgeClass} min-w-[36px] text-center`}>
+              {cantidadPrefix}{flight.cantidad}
+           </div>
         </div>
       </div>
     );
   };
 
+  // --- Render Principal ---
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-96 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto animate-in slide-in-from-bottom-2 fade-in duration-300">
-      <div className="space-y-3">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border pb-2">
-          <div className="flex items-center gap-2">
-            {!isSede && (
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: color }}
-              ></div>
-            )}
-            <h3 className="font-semibold text-lg">{airportId}</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            {!isSede && (
-              <span className="text-xs text-muted-foreground">
-                {Math.round(data.porcentaje * 100)}%
-              </span>
-            )}
-            <button
-              onClick={onClose}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+    <div className="fixed bottom-6 right-6 z-50 w-[500px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl animate-in slide-in-from-bottom-4 fade-in duration-300 overflow-hidden font-sans ring-1 ring-black/5">
+      
+      {/* HEADER: Nombre y Stats */}
+      <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+         <div className="flex justify-between items-start mb-3">
+            <div>
+               <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2 leading-tight">
+                  {airportName}
+                  {isSede && <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider shadow-sm shadow-blue-200">Sede</span>}
+               </h2>
+            </div>
+            <button 
+              onClick={onClose} 
+              className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 p-1.5 rounded-full transition-colors"
             >
-              <X className="h-5 w-5" />
+              <X className="w-5 h-5" />
             </button>
-          </div>
-        </div>
+         </div>
 
-        {/* Capacidad */}
-        {!isSede && (
-          <div>
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-muted-foreground">Ocupación</span>
-              <span className="font-semibold">
-                {data.ocupacionActual} / {data.capacidadTotal}
-              </span>
-            </div>
-            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-              <div
-                className="h-full transition-all"
-                style={{
-                  width: `${data.porcentaje * 100}%`,
-                  backgroundColor: color,
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Disponible */}
-        {!isSede && (
-          <div>
-            <p className="text-muted-foreground text-xs">Disponible</p>
-            <p className="font-semibold text-lg">{data.disponible} uds</p>
-          </div>
-        )}
-
-        {/* Eventos en tiempo real */}
-        {((data.cargaLlegando && data.cargaLlegando > 0) ||
-          (data.cargaSaliendo && data.cargaSaliendo > 0)) && (
-          <div className="border-t border-border pt-3 mt-3">
-            <p className="text-xs font-semibold mb-2 text-muted-foreground">
-              En este momento
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {data.cargaLlegando !== undefined && data.cargaLlegando > 0 && (
-                <div className="bg-green-500/10 rounded p-2 border border-green-500/20">
-                  <p className="text-green-600 dark:text-green-400 font-semibold">
-                    Llegando
-                  </p>
-                  <p className="text-sm font-bold text-green-700 dark:text-green-300">
-                    +{data.cargaLlegando} uds
-                  </p>
-                </div>
-              )}
-              {data.cargaSaliendo !== undefined && data.cargaSaliendo > 0 && (
-                <div className="bg-orange-500/10 rounded p-2 border border-orange-500/20">
-                  <p className="text-orange-600 dark:text-orange-400 font-semibold">
-                    Saliendo
-                  </p>
-                  <p className="text-sm font-bold text-orange-700 dark:text-orange-300">
-                    -{data.cargaSaliendo} uds
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Estadísticas futuras (24h) */}
-        <div className="border-t border-border pt-3 mt-3">
-          {isSede ? (
-            <div className="text-sm">
-              <p className="text-muted-foreground mb-2 font-medium">
-                Próximas Salidas
-              </p>
-              {flights.salidas.length > 0 ? (
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {flights.salidas.map((v, idx) => (
-                    <FlightRow key={idx} flight={v} type="salida" />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  0 vuelos programados
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div>
-                <p className="text-muted-foreground mb-2 font-medium text-xs uppercase tracking-wider">
-                  Llegadas
-                </p>
-                {flights.llegadas.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {flights.llegadas.map((v, idx) => (
-                      <FlightRow key={idx} flight={v} type="llegada" />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">0 vuelos</p>
-                )}
+         {!isSede && (
+           <div className="space-y-3">
+              <div className="flex justify-between items-end">
+                 <div className="flex gap-6">
+                    <div>
+                       <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Ocupación</span>
+                       <span className="text-xl font-bold text-slate-700 dark:text-slate-200">
+                          {data.ocupacionActual}<span className="text-sm text-slate-400 font-normal">/{data.capacidadTotal}</span>
+                       </span>
+                    </div>
+                    <div>
+                       <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Disponible</span>
+                       <span className="text-xl font-bold text-slate-700 dark:text-slate-200">{data.disponible}</span>
+                    </div>
+                 </div>
+                 <span className="text-sm font-bold bg-slate-50 px-2 py-1 rounded border border-slate-100" style={{ color }}>
+                    {(data.porcentaje * 100).toFixed(0)}%
+                 </span>
               </div>
-              <div>
-                <p className="text-muted-foreground mb-2 font-medium text-xs uppercase tracking-wider">
-                  Salidas
-                </p>
-                {flights.salidas.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                    {flights.salidas.map((v, idx) => (
-                      <FlightRow key={idx} flight={v} type="salida" />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-[10px] text-muted-foreground">0 vuelos</p>
-                )}
+              
+              <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                 <div 
+                    className="h-full transition-all duration-500 rounded-full"
+                    style={{ width: `${Math.min(data.porcentaje * 100, 100)}%`, backgroundColor: color }}
+                 />
               </div>
+           </div>
+         )}
+      </div>
+
+      {/* BODY: Dos Columnas Claras */}
+      <div className="grid grid-cols-2 h-[350px] divide-x divide-slate-100 dark:divide-slate-800 bg-slate-50/50 dark:bg-slate-900/50">
+         
+         {/* COLUMNA IZQUIERDA: VUELOS (Llegadas y Salidas) */}
+         <div className="flex flex-col h-full overflow-hidden bg-white/50 dark:bg-slate-900/50">
+            
+            {/* Sección Llegadas (Mitad Superior) */}
+            <div className="flex-1 flex flex-col min-h-0 border-b border-slate-100 dark:border-slate-800">
+                <div className="px-3 py-2 bg-emerald-50/50 dark:bg-emerald-900/10 border-b border-emerald-100/50 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm">
+                    <div className="flex items-center gap-1.5">
+                        <ArrowDown className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-200 uppercase tracking-wide">Llegadas</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-600 bg-white px-1.5 rounded-full border border-emerald-100 shadow-sm">{flightArrivals.length}</span>
+                </div>
+                <div className="overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
+                    {flightArrivals.length > 0 ? (
+                        flightArrivals.map((v) => <FlightItem key={v.id} flight={v} type="arrival" />)
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-slate-300 text-xs italic p-4">Sin llegadas</div>
+                    )}
+                </div>
             </div>
-          )}
-        </div>
+
+            {/* Sección Salidas (Mitad Inferior) */}
+            <div className="flex-1 flex flex-col min-h-0">
+                <div className="px-3 py-2 bg-red-50/50 dark:bg-red-900/10 border-b border-red-100/50 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm">
+                    <div className="flex items-center gap-1.5">
+                        <ArrowUp className="w-3.5 h-3.5 text-red-600" />
+                        <span className="text-[11px] font-bold text-red-800 dark:text-red-200 uppercase tracking-wide">Salidas</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-red-600 bg-white px-1.5 rounded-full border border-red-100 shadow-sm">{flightDepartures.length}</span>
+                </div>
+                <div className="overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
+                    {flightDepartures.length > 0 ? (
+                        flightDepartures.map((v) => <FlightItem key={v.id} flight={v} type="departure" />)
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-slate-300 text-xs italic p-4">Sin salidas aéreas</div>
+                    )}
+                </div>
+            </div>
+         </div>
+
+         {/* COLUMNA DERECHA: RECOJOS (Columna Completa) */}
+         <div className="flex flex-col h-full overflow-hidden bg-indigo-50/30 dark:bg-indigo-900/10">
+            <div className="px-3 py-2 bg-indigo-50/80 dark:bg-indigo-900/20 border-b border-indigo-100/50 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm">
+                <div className="flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-indigo-600" />
+                    <span className="text-[11px] font-bold text-indigo-800 dark:text-indigo-200 uppercase tracking-wide">Recojos</span>
+                </div>
+                <span className="text-[10px] font-bold text-indigo-600 bg-white px-1.5 rounded-full border border-indigo-100 shadow-sm">{clientPickups.length}</span>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-indigo-100 hover:scrollbar-thumb-indigo-200 p-1">
+                {clientPickups.length > 0 ? (
+                    <div className="space-y-1">
+                        {clientPickups.map((v) => <FlightItem key={v.id} flight={v} type="pickup" />)}
+                    </div>
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-indigo-300/60 p-4">
+                        <Package className="w-8 h-8 mb-2 opacity-50" />
+                        <span className="text-xs italic text-center">No hay clientes<br/>recogiendo carga</span>
+                    </div>
+                )}
+            </div>
+         </div>
+
       </div>
     </div>
   );

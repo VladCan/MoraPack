@@ -54,11 +54,20 @@ const VueloDTOSchema = z.object({
   carga: z.array(CargaItemSchema),
 });
 
+// --- NUEVO: Schema para el detalle del recojo del cliente ---
+const RecojoSchema = z.object({
+  cantidad: z.number(),
+  inicioRecojo: z.string(), // ISO 8601
+  finRecojo: z.string(),    // ISO 8601
+});
+
 const PedidoDTOSchema = z.object({
   id: z.number(),
   idCliente: z.number(),
   destino: z.string(),
   cantidad: z.number(),
+  // Por si acaso el backend manda numPaquetes en otro contexto
+  numPaquetes: z.number().optional(), 
   origen: z.union([z.string(), z.array(z.string()), z.null()]),
   cantidadAsignada: z.number(),
   estadoAsignacion: z.enum(["COMPLETO", "PARCIAL", "PENDIENTE"]),
@@ -66,6 +75,9 @@ const PedidoDTOSchema = z.object({
   fechaLocal: z.string().optional(),
   continenteDestino: z.string().optional(),
   rutas: z.array(RutaDetalleSchema).optional(),
+  
+  // --- NUEVO: Lista de recojos (para mostrar salidas en el frontend) ---
+  recojos: z.array(RecojoSchema).optional(), 
 });
 
 const EstadisticasFuturasSchema = z.object({
@@ -140,6 +152,8 @@ export type VueloDTO = z.infer<typeof VueloDTOSchema>;
 export type PedidoDTO = z.infer<typeof PedidoDTOSchema>;
 export type AeropuertoOcupacion = z.infer<typeof AeropuertoOcupacionSchema>;
 export type StopReason = z.infer<typeof StopReasonSchema>;
+// Exportamos el tipo de recojo por si se necesita fuera
+export type RecojoDTO = z.infer<typeof RecojoSchema>;
 
 export type WindowData = {
   index: number;
