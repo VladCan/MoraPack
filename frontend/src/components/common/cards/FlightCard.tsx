@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { Plane, X } from "lucide-react";
+import { Plane, X, Box } from "lucide-react";
 
-// Interfaz unificada para lo que la tarjeta necesita mostrar
+// Interfaz unificada
 export interface FlightCardData {
   id: string;
   origen: string;
@@ -16,7 +16,6 @@ export interface FlightCardData {
     destinoFinal: string;
     esConexion: boolean;
   }>;
-  // Opcionales para efectos visuales (usados en hover)
   planeColor?: string;
   pathColor?: string;
   progress?: number; 
@@ -24,31 +23,27 @@ export interface FlightCardData {
 
 interface FlightCardProps {
   data: FlightCardData;
-  simNowUtc?: string | null; // Para calcular progreso si no viene en data
+  simNowUtc?: string | null;
   onClose: () => void;
-  isHover?: boolean; // <--- Ahora sí lo usaremos
+  isHover?: boolean;
 }
 
-const getCargaColor = (ocupacion: number) => {
-  if (ocupacion > 0.8) return "#f97316";
-  if (ocupacion > 0.5) return "#facc15";
-  return "#38bdf8";
+// Helper para obtener el color base según la ocupación
+const getStatusColor = (ocupacion: number) => {
+  if (ocupacion > 0.8) return "orange"; // Carga Alta
+  if (ocupacion > 0.5) return "yellow"; // Carga Media
+  return "blue";   // Carga Baja
 };
 
 export default function FlightCard({ data, simNowUtc, onClose, isHover }: FlightCardProps) {
   
-  // Calcular progreso y color si no vienen pre-calculados (caso onClick desde panel)
-  const computedState = useMemo(() => {
+  const computed = useMemo(() => {
     let progress = data.progress ?? 0;
-    let color = data.pathColor;
-
+    
     const cap = data.capacidad || 1;
     const ocupacion = data.cantidadAsignada / cap;
-
-    if (!color) {
-      color = getCargaColor(ocupacion);
-    }
-
+    
+    // Si no viene el progreso pre-calculado, lo calculamos aquí
     if (data.progress === undefined && simNowUtc) {
       const now = new Date(simNowUtc).getTime();
       const start = new Date(data.salidaUtc).getTime();
@@ -58,123 +53,188 @@ export default function FlightCard({ data, simNowUtc, onClose, isHover }: Flight
       progress = Math.min(1, elapsed / total);
     }
 
-    return { progress, color, ocupacion };
+    return { progress, ocupacion };
   }, [data, simNowUtc]);
 
+  // Determinamos el color base
+  const statusColor = getStatusColor(computed.ocupacion);
+
+  // Clases dinámicas de Tailwind según el color
+  const colorClasses = {
+    iconBg: {
+      orange: "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200",
+      yellow: "bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200",
+      blue:   "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200"
+    },
+    bar: {
+      orange: "bg-orange-500",
+      yellow: "bg-yellow-500",
+      blue:   "bg-blue-500"
+    },
+    text: {
+      orange: "text-orange-600 dark:text-orange-400",
+      yellow: "text-yellow-600 dark:text-yellow-400",
+      blue:   "text-blue-600 dark:text-blue-400"
+    },
+    plane: {
+      orange: "text-orange-600 fill-orange-600",
+      yellow: "text-yellow-600 fill-yellow-600",
+      blue:   "text-blue-600 fill-blue-600"
+    }
+  };
+
+  // Formateador de hora corto (HH:mm)
+  const formatTime = (dateStr: string) => {
+    try {
+      return new Date(dateStr).toLocaleTimeString("es-PE", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "UTC",
+      });
+    } catch { return "--:--"; }
+  };
+
+  const originTime = formatTime(data.salidaUtc);
+  const destTime = formatTime(data.llegadaUtc);
+
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto animate-in slide-in-from-bottom-2 fade-in duration-300">
-      <div className="space-y-3">
-        <div className="flex items-center justify-between border-b border-border pb-2">
-          <div className="flex items-center gap-2">
-            {/* Si viene planeColor úsalo, sino icono genérico */}
-            {data.planeColor ? (
-               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: data.planeColor }}></div>
-            ) : (
-               <Plane className="w-4 h-4 text-primary" />
-            )}
-            <h3 className="font-semibold text-lg">{data.id}</h3>
+    <div className="fixed bottom-6 right-6 z-50 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl ring-1 ring-black/5 overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-300 font-sans">
+      
+      {/* --- HEADER: ID y Botón Cerrar --- */}
+      <div className="bg-slate-50 dark:bg-slate-800/50 px-4 py-2 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+        <div className="flex items-center gap-2 overflow-hidden">
+          {/* Icono dinámico según carga */}
+          <div className={`p-1 rounded-md shadow-sm border ${colorClasses.iconBg[statusColor]}`}>
+             <Plane className="w-3 h-3" />
           </div>
-          
-          <div className="flex items-center gap-2">
-             {/* Mostrar porcentaje de vuelo completado */}
-             <span className="text-xs text-muted-foreground">
-                {Math.round(computedState.progress * 100)}%
-             </span>
-             
-             {/* CORRECCIÓN: Solo mostramos el botón de cerrar si NO es hover */}
-             {!isHover && (
-               <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-                  <X className="h-4 w-4" />
-               </button>
-             )}
-          </div>
+          <span className="text-[10px] font-mono text-slate-400 truncate" title={data.id}>
+            {data.id}
+          </span>
         </div>
+        {!isHover && (
+          <button 
+            onClick={onClose} 
+            className="text-slate-400 hover:text-red-500 transition-colors p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <p className="text-muted-foreground text-xs">Origen</p>
-            <p className="font-mono text-xs">{data.origen}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Destino</p>
-            <p className="font-mono text-xs">{data.destino}</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <p className="text-muted-foreground text-xs">Salida</p>
-            <p className="font-mono text-xs">
-              {new Date(data.salidaUtc).toLocaleTimeString("es-PE", {
-                hour: "2-digit",
-                minute: "2-digit",
-                timeZone: "UTC",
-              })}{" "}
-              UTC
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Llegada</p>
-            <p className="font-mono text-xs">
-              {new Date(data.llegadaUtc).toLocaleTimeString("es-PE", {
-                hour: "2-digit",
-                minute: "2-digit",
-                timeZone: "UTC",
-              })}{" "}
-              UTC
-            </p>
-          </div>
-        </div>
+      {/* --- BODY: Ruta Visual --- */}
+      <div className="p-5">
+        <div className="flex justify-between items-center mb-1">
+            <div className="text-left">
+                <div className="text-2xl font-bold text-slate-800 dark:text-white leading-none">{data.origen}</div>
+                <div className="text-xs text-slate-400 font-mono mt-1">{originTime} UTC</div>
+            </div>
 
-        {/* Barra de Carga */}
-        <div>
-          <div className="flex justify-between text-sm mb-1">
-            <span className="text-muted-foreground">Carga</span>
-            <span className="font-semibold">
-              {data.cantidadAsignada} / {data.capacidad}
-            </span>
-          </div>
-          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-            <div
-              className="h-full transition-all"
-              style={{
-                width: `${computedState.ocupacion * 100}%`,
-                backgroundColor: getCargaColor(computedState.ocupacion),
-              }}
-            ></div>
-          </div>
-        </div>
+            {/* Visualización de Trayecto */}
+            <div className="flex-1 mx-4 relative flex flex-col items-center justify-center h-8">
+                {/* Línea base */}
+                <div className="w-full h-0.5 bg-slate-200 dark:bg-slate-700 rounded-full relative overflow-visible">
+                    {/* Línea de progreso */}
+                    <div 
+                        className={`h-full transition-all duration-1000 ease-linear ${colorClasses.bar[statusColor]}`}
+                        style={{ width: `${computed.progress * 100}%` }}
+                    />
+                    
+                    {/* Avión superpuesto */}
+                    <div 
+                        // 1. Quitamos -mt-2
+                        // 2. Usamos top-1/2 para ubicarlo al centro vertical
+                        // 3. El transform en style se encarga del centrado fino
+                        className="absolute top-1/2 z-10 transition-all duration-1000 ease-linear"
+                        style={{ 
+                            left: `${computed.progress * 100}%`, 
+                            // Esto centra el punto medio del icono con la línea
+                            transform: 'translate(-50%, -50%)' 
+                        }}
+                    >
+                        <Plane 
+                            // Usamos rotate-45 porque el icono de Lucide apunta al Noreste (↗)
+                            // Al rotar 45° queda mirando a la derecha (➡)
+                            className={`w-4 h-4 drop-shadow-md transform rotate-45 ${colorClasses.plane[statusColor]}`} 
+                        />
+                    </div>
+                </div>
+                
+                {/* Porcentaje debajo */}
+                <div className="mt-2 text-[9px] text-slate-400 font-medium">
+                    {Math.round(computed.progress * 100)}%
+                </div>
+            </div>
 
-        {/* Lista de carga */}
-        {data.carga && data.carga.length > 0 && (
-          <div className="max-h-32 overflow-y-auto space-y-1 mt-2 border-t border-border pt-2">
-            <p className="text-xs font-semibold text-muted-foreground mb-1">
-              Contenido ({data.carga.length}{" "}
-              {data.carga.length === 1 ? "pedido" : "pedidos"})
-            </p>
-            {data.carga.map((item, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between text-xs p-1.5 rounded bg-muted/50"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="font-mono font-semibold">
-                    #{item.pedidoId}
-                  </span>
-                  {item.esConexion && (
-                    <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
-                      Conexión
+            <div className="text-right">
+                <div className="text-2xl font-bold text-slate-800 dark:text-white leading-none">{data.destino}</div>
+                <div className="text-xs text-slate-400 font-mono mt-1">{destTime} UTC</div>
+            </div>
+        </div>
+      </div>
+
+      {/* --- FOOTER: Carga y Manifiesto --- */}
+      <div className="bg-slate-50/50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800">
+        
+        {/* Barra de Ocupación */}
+        <div className="px-4 py-3">
+            <div className="flex justify-between items-end mb-1.5">
+                <div className="flex items-center gap-1.5">
+                    <Box className="w-3.5 h-3.5 text-slate-400" />
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">Carga</span>
+                </div>
+                <div className="text-xs font-mono">
+                    <span className={`font-bold ${colorClasses.text[statusColor]}`}>
+                        {data.cantidadAsignada}
                     </span>
-                  )}
+                    <span className="text-slate-400">/{data.capacidad}</span>
                 </div>
-                <div className="text-right">
-                  <p className="font-semibold">{item.cantidad} uds</p>
-                  <p className="text-muted-foreground text-[10px]">
-                    → {item.destinoFinal}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
+            </div>
+            <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div 
+                    className={`h-full transition-all duration-500 ${colorClasses.bar[statusColor]}`}
+                    style={{ width: `${Math.min(computed.ocupacion * 100, 100)}%` }}
+                />
+            </div>
+        </div>
+
+        {/* Manifiesto Mini (Scrollable) */}
+        {data.carga && data.carga.length > 0 && (
+            <div className="border-t border-slate-100 dark:border-slate-800 max-h-[160px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
+                {data.carga.map((item, idx) => (
+                    <div 
+                        key={idx} 
+                        className={`flex items-center justify-between px-4 py-2.5 border-b border-slate-50 dark:border-slate-800/50 last:border-0 transition-colors ${
+                            item.esConexion 
+                                ? "bg-amber-50 dark:bg-amber-900/10 hover:bg-amber-100 dark:hover:bg-amber-900/20" 
+                                : "hover:bg-slate-50 dark:hover:bg-slate-800"
+                        }`}
+                    >
+                        <div className="flex items-center gap-2.5">
+                            {/* Indicador visual (punto) */}
+                            <div className={`w-1.5 h-1.5 rounded-full ${item.esConexion ? 'bg-amber-500' : 'bg-indigo-400'}`} />
+                            <div className="flex flex-col">
+                                <span className={`text-[11px] font-bold ${item.esConexion ? 'text-amber-800 dark:text-amber-200' : 'text-slate-700 dark:text-slate-200'}`}>
+                                    Pedido #{item.pedidoId}
+                                </span>
+                                {item.esConexion && (
+                                    <span className="text-[9px] text-amber-700 bg-amber-100/80 dark:text-amber-300 dark:bg-amber-900/40 px-1.5 rounded-sm w-fit mt-0.5 font-medium border border-amber-200 dark:border-amber-800/50">
+                                        Conexión
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className={`text-xs font-bold ${item.esConexion ? 'text-amber-800 dark:text-amber-200' : 'text-slate-600 dark:text-slate-300'}`}>
+                                {item.cantidad} <span className="text-[9px] font-normal opacity-70">uds</span>
+                            </div>
+                            <div className={`flex items-center gap-0.5 justify-end text-[10px] font-mono mt-0.5 ${item.esConexion ? 'text-amber-600/80 dark:text-amber-400' : 'text-slate-400'}`}>
+                                <span>→</span>
+                                <span>{item.destinoFinal}</span>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
         )}
       </div>
     </div>

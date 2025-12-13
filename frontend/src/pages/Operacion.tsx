@@ -1,3 +1,4 @@
+// src/pages/Operacion.tsx
 "use client";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { z } from "zod";
@@ -93,7 +94,6 @@ export  function OperacionContent() {
   }, [airportsDtoRaw]);
 
   // Conectar a la sesión y al SSE
-  // Nota: Eliminamos setToolsPanelOpen para no abrir la barra al hacer click
   const { 
     runId, 
     selectedAirportId, 
@@ -108,12 +108,12 @@ export  function OperacionContent() {
   } = useRunSession();
   
   const { 
-    runState,          
-    loadingMessage,    
-    loadingProgress,   
+    runState,           
+    loadingMessage,     
+    loadingProgress,    
     simNowUtc, 
     airportOccupancy, 
-    finishedReason,    
+    finishedReason,     
     simStartUtc, 
     wallStartUtc, 
     disconnect 
@@ -320,8 +320,12 @@ export  function OperacionContent() {
 
   const SEDES = ["SPIM", "EBCI", "UBBB"];
   const esSede = selectedAirportId ? SEDES.includes(selectedAirportId) : false;
+  
+  const activeAirportStaticData = useMemo(() => {
+    return airports.find((a) => a.id === selectedAirportId);
+  }, [airports, selectedAirportId]);
 
-  // Calcular vuelos que llegarán y saldrán en las próximas 24 horas
+  // Calcular vuelos futuros (llegadas/salidas) + RECOJOS DE CLIENTES
   const vuelosFuturos = useMemo(() => {
     if (!selectedAirportId || !simNowUtc || windows.length === 0) {
       return { llegadas: [], salidas: [] };
@@ -330,8 +334,8 @@ export  function OperacionContent() {
     const now = new Date(simNowUtc).getTime();
     const next24h = now + 24 * 60 * 60 * 1000; // 24 horas en ms
 
-    const llegadas: Array<{ id: string; origen: string; cantidad: number }> = [];
-    const salidas: Array<{ id: string; destino: string; cantidad: number }> = [];
+    const llegadas: Array<{ id: string; origen: string; cantidad: number; salidaUtc: string; llegadaUtc: string; isPickup?: boolean; pedidoId?: number }> = [];
+    const salidas: Array<{ id: string; destino: string; cantidad: number; salidaUtc: string; llegadaUtc: string; isPickup?: boolean; pedidoId?: number }> = [];
 
     // Recopilar todos los vuelos únicos de todas las ventanas
     const vuelosUnicos = new Map<string, typeof windows[0]['vuelos'][0]>();
@@ -352,28 +356,61 @@ export  function OperacionContent() {
         llegadas.push({ 
           id: vuelo.id, 
           origen: vuelo.origen, 
-          cantidad: vuelo.cantidadAsignada 
+          cantidad: vuelo.cantidadAsignada,
+          salidaUtc: vuelo.salidaUtc,
+          llegadaUtc: vuelo.llegadaUtc
         });
       }
 
       // Vuelos que saldrán del aeropuerto seleccionado
-      // Solo incluir vuelos que aún no han llegado a su destino (aún están en vuelo o saldrán en el futuro)
       if (vuelo.origen === selectedAirportId && salidaTime <= next24h && llegadaTime > now) {
         salidas.push({ 
           id: vuelo.id, 
           destino: vuelo.destino, 
-          cantidad: vuelo.cantidadAsignada 
+          cantidad: vuelo.cantidadAsignada,
+          salidaUtc: vuelo.salidaUtc,
+          llegadaUtc: vuelo.llegadaUtc
         });
       }
     });
 
-    // Ordenar salidas por tiempo de salida (más recientes primero)
-    salidas.sort((a, b) => {
-      const vueloA = vuelosUnicos.get(a.id);
-      const vueloB = vuelosUnicos.get(b.id);
-      if (!vueloA || !vueloB) return 0;
-      return new Date(vueloB.salidaUtc).getTime() - new Date(vueloA.salidaUtc).getTime();
+    // --- NUEVO: PROCESAR RECOJOS DE CLIENTES ---
+    // Iteramos los pedidos únicos de todas las ventanas
+    const pedidosUnicos = new Map<number, typeof windows[0]["pedidos"][0]>();
+    windows.forEach(w => {
+        if(w.pedidos) w.pedidos.forEach(p => pedidosUnicos.set(p.id, p));
     });
+
+    pedidosUnicos.forEach(pedido => {
+        // Solo si el destino es este aeropuerto y tiene recojos
+        if (pedido.destino === selectedAirportId && pedido.recojos) {
+            
+            pedido.recojos.forEach((recojo, idx) => {
+                const inicioEspera = new Date(recojo.inicioRecojo).getTime();
+                const finEspera = new Date(recojo.finRecojo).getTime();
+
+                // Lógica de visualización:
+                const esFuturoCercano = (inicioEspera > now && inicioEspera <= next24h);
+                const estaOcurriendo = (now >= inicioEspera && now <= finEspera);
+
+                if (esFuturoCercano || estaOcurriendo) {
+                    salidas.push({
+                        id: `PICKUP-${pedido.id}-${idx}`, // ID único visual
+                        destino: `Cliente ${pedido.idCliente}`, // Se verá en la Card
+                        cantidad: recojo.cantidad,
+                        salidaUtc: recojo.inicioRecojo, // Usamos inicio como "Salida" visual
+                        llegadaUtc: recojo.finRecojo,   // Usamos fin como "Llegada" visual
+                        isPickup: true, // Flag importante
+                        pedidoId: pedido.id // <--- PASAMOS EL ID DEL PEDIDO
+                    });
+                }
+            });
+        }
+    });
+
+    // Ordenar cronológicamente
+    llegadas.sort((a, b) => new Date(a.llegadaUtc).getTime() - new Date(b.llegadaUtc).getTime());
+    salidas.sort((a, b) => new Date(a.salidaUtc).getTime() - new Date(b.salidaUtc).getTime());
 
     return { llegadas, salidas };
   }, [selectedAirportId, simNowUtc, windows, vuelosCancelados]);
@@ -426,7 +463,6 @@ export  function OperacionContent() {
     // 2. Prioridad: Vuelo en Hover (solo si es de solución)
     if (hoveredFlight && hoveredFlight.esDeSolucion && !selectedAirportId) {
         // En Operación, los tipos ya coinciden bastante bien, solo aseguramos el casteo
-        // ya que FlightForRender tiene propiedades opcionales que FlightCardData podría requerir
         if(hoveredFlight.origenCodigo && hoveredFlight.destinoCodigo && hoveredFlight.salidaUtc && hoveredFlight.llegadaUtc) {
              return {
                 id: hoveredFlight.id,
@@ -475,6 +511,7 @@ export  function OperacionContent() {
       {selectedAirportId && activeAirportData && (
         <AirportCard
           airportId={selectedAirportId}
+          airportName={activeAirportStaticData?.name || selectedAirportId}
           data={activeAirportData}
           isSede={esSede}
           flights={vuelosFuturos}

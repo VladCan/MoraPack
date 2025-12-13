@@ -183,6 +183,7 @@ export function SimulacionContent() {
         progress,
         pathColor,
         planeColor,
+        // Card Data
         origen: vuelo.origen,
         destino: vuelo.destino,
         salidaUtc: vuelo.salidaUtc,
@@ -234,8 +235,26 @@ export function SimulacionContent() {
     const now = new Date(simNowUtc).getTime();
     const next24h = now + 24 * 60 * 60 * 1000;
     
-    const llegadas: Array<{ id: string; origen: string; cantidad: number; salidaUtc: string; llegadaUtc: string; isPickup?: boolean }> = [];
-    const salidas: Array<{ id: string; destino: string; cantidad: number; salidaUtc: string; llegadaUtc: string; isPickup?: boolean }> = [];
+    // --- TIPOS ACTUALIZADOS: Incluyen pedidoId ---
+    const llegadas: Array<{ 
+        id: string; 
+        origen: string; 
+        cantidad: number; 
+        salidaUtc: string; 
+        llegadaUtc: string; 
+        isPickup?: boolean; 
+        pedidoId?: number 
+    }> = [];
+    
+    const salidas: Array<{ 
+        id: string; 
+        destino: string; 
+        cantidad: number; 
+        salidaUtc: string; 
+        llegadaUtc: string; 
+        isPickup?: boolean; 
+        pedidoId?: number 
+    }> = [];
     
     // 1. PROCESAR VUELOS
     const vuelosUnicos = new Map<string, typeof windows[0]["vuelos"][0]>();
@@ -272,41 +291,36 @@ export function SimulacionContent() {
     });
 
     // 2. PROCESAR RECOJOS DE CLIENTES
-    // Iteramos los pedidos únicos de todas las ventanas
     const pedidosUnicos = new Map<number, typeof windows[0]["pedidos"][0]>();
     windows.forEach(w => {
         if(w.pedidos) w.pedidos.forEach(p => pedidosUnicos.set(p.id, p));
     });
 
     pedidosUnicos.forEach(pedido => {
-        // Solo si el destino es este aeropuerto y tiene recojos
         if (pedido.destino === selectedAirportId && pedido.recojos) {
             
             pedido.recojos.forEach((recojo, idx) => {
                 const inicioEspera = new Date(recojo.inicioRecojo).getTime();
                 const finEspera = new Date(recojo.finRecojo).getTime();
 
-                // Lógica de visualización:
-                // Mostrar si el recojo (inicio) está en las próximas 24h
-                // O si estamos ACTUALMENTE en el periodo de espera (entre inicio y fin)
                 const esFuturoCercano = (inicioEspera > now && inicioEspera <= next24h);
                 const estaOcurriendo = (now >= inicioEspera && now <= finEspera);
 
                 if (esFuturoCercano || estaOcurriendo) {
                     salidas.push({
-                        id: `PICKUP-${pedido.id}-${idx}`, // ID único visual
-                        destino: `Cliente ${pedido.idCliente}`, // Se verá en la Card
+                        id: `PICKUP-${pedido.id}-${idx}`, 
+                        destino: `Cliente ${pedido.idCliente}`, 
                         cantidad: recojo.cantidad,
-                        salidaUtc: recojo.inicioRecojo, // Usamos inicio como "Salida" visual
-                        llegadaUtc: recojo.finRecojo,   // Usamos fin como "Llegada" visual
-                        isPickup: true // Flag importante
+                        salidaUtc: recojo.inicioRecojo, 
+                        llegadaUtc: recojo.finRecojo,   
+                        isPickup: true,
+                        pedidoId: pedido.id // <--- AQUÍ SE PASA EL ID DEL PEDIDO
                     });
                 }
             });
         }
     });
 
-    // Ordenar cronológicamente
     llegadas.sort((a, b) => new Date(a.llegadaUtc).getTime() - new Date(b.llegadaUtc).getTime());
     salidas.sort((a, b) => new Date(a.salidaUtc).getTime() - new Date(b.salidaUtc).getTime());
 

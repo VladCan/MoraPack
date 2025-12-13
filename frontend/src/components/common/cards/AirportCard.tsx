@@ -9,6 +9,7 @@ type FlightType = {
   salidaUtc: string;
   llegadaUtc: string;
   isPickup?: boolean;
+  pedidoId?: number;
 };
 
 interface AirportCardProps {
@@ -38,13 +39,6 @@ export default function AirportCard({
   onClose,
 }: AirportCardProps) {
 
-  // --- Separación de Datos ---
-  // Filtramos las salidas para separar Vuelos de Recojos
-  const flightDepartures = flights.salidas.filter(f => !f.isPickup);
-  const clientPickups = flights.salidas.filter(f => f.isPickup);
-  const flightArrivals = flights.llegadas;
-
-  // --- Helpers de Formato ---
   const formatTime = (isoString: string) => {
     try {
       if (!isoString) return "??:??";
@@ -52,9 +46,7 @@ export default function AirportCard({
       const hh = String(d.getUTCHours()).padStart(2, "0");
       const mm = String(d.getUTCMinutes()).padStart(2, "0");
       return `${hh}:${mm}`;
-    } catch {
-      return "??:??";
-    }
+    } catch { return "??:??"; }
   };
 
   const formatDateShort = (isoString: string) => {
@@ -64,12 +56,14 @@ export default function AirportCard({
       const day = String(d.getUTCDate()).padStart(2, "0");
       const month = String(d.getUTCMonth() + 1).padStart(2, "0");
       return `${day}/${month}`;
-    } catch {
-      return "";
-    }
+    } catch { return ""; }
   };
 
   const color = data.porcentaje > 0.8 ? "#ef4444" : data.porcentaje > 0.5 ? "#f97316" : "#3b82f6";
+
+  const flightDepartures = flights.salidas.filter(f => !f.isPickup);
+  const clientPickups = flights.salidas.filter(f => f.isPickup);
+  const flightArrivals = flights.llegadas;
 
   // --- Componente de Fila Unificado ---
   const FlightItem = ({ flight, type }: { flight: FlightType; type: "arrival" | "departure" | "pickup" }) => {
@@ -77,11 +71,12 @@ export default function AirportCard({
     const timeEnd = formatTime(flight.llegadaUtc);
     const dateStr = formatDateShort(flight.salidaUtc);
 
-    let icon, badgeClass, textClass, label, cantidadPrefix;
+    let icon, badgeClass, textClass, label;
+    let subLabel: string | null = null; // Nuevo campo para el subtítulo (Cliente)
+    let cantidadPrefix;
 
     switch (type) {
       case "arrival":
-        // LLEGADAS: Verde
         icon = <Plane className="w-4 h-4 text-emerald-500 rotate-90" />;
         badgeClass = "bg-emerald-100 text-emerald-700 border-emerald-200";
         textClass = "text-emerald-900 dark:text-emerald-100";
@@ -89,7 +84,6 @@ export default function AirportCard({
         cantidadPrefix = "+";
         break;
       case "departure":
-        // SALIDAS VUELO: Rojo (como pediste)
         icon = <Plane className="w-4 h-4 text-red-500 -rotate-45" />;
         badgeClass = "bg-red-100 text-red-700 border-red-200";
         textClass = "text-red-900 dark:text-red-100";
@@ -97,18 +91,27 @@ export default function AirportCard({
         cantidadPrefix = "-";
         break;
       case "pickup":
-        // RECOJOS: Índigo/Violeta
         icon = <Package className="w-4 h-4 text-indigo-500" />;
         badgeClass = "bg-indigo-100 text-indigo-700 border-indigo-200";
         textClass = "text-indigo-900 dark:text-indigo-100";
-        label = flight.destino || "Cliente"; // "Cliente 123"
+        
+        // --- LÓGICA VISUAL MEJORADA ---
+        if (flight.pedidoId) {
+            // Si hay pedido ID, lo mostramos grande y el cliente ("destino") abajo pequeño
+            label = `Pedido #${flight.pedidoId}`;
+            subLabel = flight.destino || "Cliente";
+        } else {
+            // Fallback por si acaso
+            label = flight.destino || "Cliente";
+        }
+        
         cantidadPrefix = "-";
         break;
     }
 
     return (
       <div className="py-2 px-3 border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-        {/* Fila 1: Hora y Fecha (Más pequeño y gris) */}
+        {/* Fila Superior: Hora y Fecha */}
         <div className="flex justify-between items-center mb-1">
            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono">
               <span className="font-semibold text-slate-500">{dateStr}</span>
@@ -120,14 +123,29 @@ export default function AirportCard({
            )}
         </div>
 
-        {/* Fila 2: Ruta y Cantidad (Grande y claro) */}
+        {/* Fila Inferior: Info Principal y Cantidad */}
         <div className="flex justify-between items-center">
-           <div className="flex items-center gap-2">
-              {icon}
-              <span className={`text-xs font-bold ${textClass} truncate max-w-[110px]`} title={label}>
-                {label}
-              </span>
+           <div className="flex items-center gap-2 overflow-hidden">
+              {/* Icono fijo */}
+              <div className="shrink-0">{icon}</div>
+              
+              {/* Contenedor de Textos (Flex Columna) */}
+              <div className="flex flex-col truncate max-w-[110px]">
+                 {/* Título (Origen/Destino/Pedido) */}
+                 <span className={`text-xs font-bold ${textClass} truncate`} title={label}>
+                   {label}
+                 </span>
+                 
+                 {/* Subtítulo (Cliente) - Solo aparece si existe subLabel */}
+                 {subLabel && (
+                    <span className="text-[9px] text-slate-400 font-medium truncate leading-none mt-0.5" title={subLabel}>
+                        {subLabel}
+                    </span>
+                 )}
+              </div>
            </div>
+
+           {/* Badge de Cantidad */}
            <div className={`text-xs font-bold px-1.5 py-0.5 rounded border ${badgeClass} min-w-[36px] text-center`}>
               {cantidadPrefix}{flight.cantidad}
            </div>
@@ -136,7 +154,6 @@ export default function AirportCard({
     );
   };
 
-  // --- Render Principal ---
   return (
     <div className="fixed bottom-6 right-6 z-50 w-[500px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl animate-in slide-in-from-bottom-4 fade-in duration-300 overflow-hidden font-sans ring-1 ring-black/5">
       
@@ -192,8 +209,7 @@ export default function AirportCard({
          
          {/* COLUMNA IZQUIERDA: VUELOS (Llegadas y Salidas) */}
          <div className="flex flex-col h-full overflow-hidden bg-white/50 dark:bg-slate-900/50">
-            
-            {/* Sección Llegadas (Mitad Superior) */}
+            {/* Sección Llegadas */}
             <div className="flex-1 flex flex-col min-h-0 border-b border-slate-100 dark:border-slate-800">
                 <div className="px-3 py-2 bg-emerald-50/50 dark:bg-emerald-900/10 border-b border-emerald-100/50 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm">
                     <div className="flex items-center gap-1.5">
@@ -211,7 +227,7 @@ export default function AirportCard({
                 </div>
             </div>
 
-            {/* Sección Salidas (Mitad Inferior) */}
+            {/* Sección Salidas */}
             <div className="flex-1 flex flex-col min-h-0">
                 <div className="px-3 py-2 bg-red-50/50 dark:bg-red-900/10 border-b border-red-100/50 flex items-center justify-between sticky top-0 z-10 backdrop-blur-sm">
                     <div className="flex items-center gap-1.5">
