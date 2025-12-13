@@ -6,7 +6,7 @@ import FlightPath from "@/components/common/FlightPath";
 import MainMap from "@/components/common/MainMap";
 import AirportMarkers, { type AirportPoint } from "@/components/common/map/AirportMarkers";
 import { useAirports } from "@/hooks/useAirports";
-import { useFlightsSSE } from "@/hooks/useFlightsSSE";
+// import { useFlightsSSE } from "@/hooks/useFlightsSSE"; // YA NO SE NECESITA
 import { useRunSession } from "@/lib/runSession";
 import { useRunSSE, type VueloDTO } from "@/hooks/useRunSSE";
 import type { AeropuertoDTO } from "@/types/api";
@@ -35,18 +35,6 @@ const AirportDtoSchema = z.object({
   sede: z.boolean().optional(),
 });
 const AirportsDtoSchema = z.array(AirportDtoSchema);
-
-// Tipo para vuelos de vuelos.txt (sin información completa)
-type FlightDto = {
-  id: string;
-  originLat: number;
-  originLon: number;
-  destLat: number;
-  destLon: number;
-  progress: number;
-  pathColor: string;
-  planeColor: string;
-};
 
 // Tipo para vuelos de la solución (con información completa)
 type FlightForRender = {
@@ -132,11 +120,9 @@ export  function OperacionContent() {
       return map;
     }, [windows]);
 
-  // Usar tiempo simulado si hay runId, sino usar hora del sistema
-  const liveFlightsEndpoint = runId 
-    ? `vuelos/live?runId=${runId}&limit=200`
-    : "vuelos/live?limit=200";
-  const { data: liveFlights } = useFlightsSSE(liveFlightsEndpoint);
+  // ELIMINADO: Ya no llamamos a useFlightsSSE aquí porque no queremos vuelos "extra"
+  // const liveFlightsEndpoint = ... 
+  // const { data: liveFlights } = useFlightsSSE(...)
   
   // Crear mapa de aeropuertos para calcular posiciones
   const airportsMap = useMemo(() => {
@@ -186,7 +172,7 @@ export  function OperacionContent() {
     // Si hay un pedido seleccionado, solo mostrar vuelos relacionados
     const tienePedidoSeleccionado = selectedPedido !== null && vuelosRelacionadosAlPedido.size > 0;
 
-    // 1. PRIMERO: Vuelos planificados por el algoritmo ALNS (prioridad)
+    // 1. SOLAMENTE: Vuelos planificados por el algoritmo ALNS
     if (windows.length > 0 && simNowUtc) {
       const vuelosUnicos = new Map<string, typeof windows[0]['vuelos'][0]>();
       
@@ -257,30 +243,8 @@ export  function OperacionContent() {
       });
     }
 
-    // 2. SEGUNDO: Vuelos de vuelos.txt que NO están planificados por el algoritmo
-    const arr = (liveFlights ?? []) as FlightDto[];
-    let vuelosTxtCount = 0;
-    const MAX_VUELOS_TXT = 20; 
-    
-    arr.forEach(f => {
-      if (tienePedidoSeleccionado) {
-        return; // Ocultar todos los vuelos SSE cuando hay un pedido seleccionado
-      }
-      
-      if (!vuelosCancelados.has(f.id) && !seenIds.has(f.id) && vuelosTxtCount < MAX_VUELOS_TXT) {
-        allFlights.push({
-          id: f.id,
-          origin: { lat: f.originLat, lon: f.originLon },
-          dest: { lat: f.destLat, lon: f.destLon },
-          progress: f.progress,
-          pathColor: f.pathColor,
-          planeColor: f.planeColor,
-          esDeSolucion: false,
-        });
-        seenIds.add(f.id);
-        vuelosTxtCount++;
-      }
-    });
+    // 2. ELIMINADO: Ya no agregamos vuelos "extra" de liveFlights. 
+    //    Esto limpia el mapa de aviones sin carga/pedido.
 
     // Limpiar vuelos que ya no están visibles
     flightFirstSeenRef.current.forEach((_, key) => {
@@ -290,7 +254,7 @@ export  function OperacionContent() {
     });
 
     return allFlights;
-  }, [liveFlights, vuelosCancelados, windows, simNowUtc, airportsMap, selectedPedido, vuelosRelacionadosAlPedido]);
+  }, [vuelosCancelados, windows, simNowUtc, airportsMap, selectedPedido, vuelosRelacionadosAlPedido]);
 
   // Sincronizar vuelo activo con datos actualizados
   useEffect(() => {
