@@ -75,6 +75,7 @@ export function SimulacionContent() {
     setSelectedPedido,
     selectedVuelo,
     setSelectedVuelo,
+    setToolsPanelOpen,
   } = useRunSession();
 
   const {
@@ -448,6 +449,7 @@ export function SimulacionContent() {
               if (vueloDto) {
                 setSelectedVuelo(vueloDto);
                 setSelectedAirport(null);
+                setToolsPanelOpen(true);
               }
               setHoveredFlight(null);
             }}
@@ -467,6 +469,7 @@ export function SimulacionContent() {
             setSelectedAirport(newId);
             if (newId) {
               setSelectedVuelo(null);
+              setToolsPanelOpen(true);
             }
           }}
           iconSize={16}
