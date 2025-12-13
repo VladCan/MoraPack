@@ -93,7 +93,7 @@ public class RunConfig {
                 sedes,
                 System.nanoTime(),
                 Duration.ofSeconds(60),
-                300//432//144
+                180//432//144
         );
     }
 
