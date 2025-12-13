@@ -3,6 +3,7 @@ package pe.edu.pucp.morapack.airscheduler.engine.scheduling.model;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter; // Importante
 import lombok.Singular;
 
 import java.time.Duration;
@@ -13,7 +14,8 @@ import java.util.List;
 
 /** Plan de un pedido dividido en múltiples rutas (cada ruta agrupa sus tramos y una cantidad). */
 @Getter
-@Builder
+@Setter // Agregado para permitir modificaciones si fuera necesario
+@Builder(toBuilder = true)
 @AllArgsConstructor
 public class PlanPedido {
     private final int idPedido;
@@ -31,17 +33,31 @@ public class PlanPedido {
         this.creadoUtc = otro.getCreadoUtc();
         this.demanda = otro.getDemanda();
 
-        // Copia profunda de las rutas
-        if (otro.getRutas() != null) {
+        // Copia profunda y MUTABLE de las rutas
+        if (otro.rutas != null) {
             this.rutas = new ArrayList<>();
-            for (RutaAsignada r : otro.getRutas()) {
-                this.rutas.add(new RutaAsignada(r)); // usamos constructor copia de RutaAsignada
+            for (RutaAsignada r : otro.rutas) {
+                this.rutas.add(new RutaAsignada(r)); 
             }
         } else {
             this.rutas = new ArrayList<>();
         }
     }
 
+    /**
+     * MÉTODO SEGURO: Garantiza que la lista sea mutable antes de intentar borrar.
+     * Esto evita el error UnsupportedOperationException.
+     */
+    public void removerRutasInvalidas() {
+        if (this.rutas == null) return;
+
+        // Si la lista no es un ArrayList (ej. es SingletonList de Lombok), la convertimos
+        if (!(this.rutas instanceof ArrayList)) {
+            this.rutas = new ArrayList<>(this.rutas);
+        }
+
+        this.rutas.removeIf(r -> r.getCantidad() <= 0 || r.getTramos() == null || r.getTramos().isEmpty());
+    }
 
     /** Cantidad total asignada (suma de cantidades de todas las rutas). */
     public int totalAsignado() {
@@ -110,5 +126,4 @@ public class PlanPedido {
             rutas = new ArrayList<>();
         }
     }
-
 }

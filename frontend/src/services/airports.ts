@@ -24,7 +24,7 @@ function toSearchParams(
   return sp;
 }
 
-/** ✅ Correcto: `apiWithLoadingToast` recibe una FUNCIÓN que retorna la tupla */
+/**Correcto: `apiWithLoadingToast` recibe una FUNCIÓN que retorna la tupla */
 export function listAirports(
   params?: ListAirportsParams
 ): Promise<[AeropuertoDTO[] | null, ApiError | null]> {

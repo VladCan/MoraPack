@@ -16,7 +16,8 @@ import ToastCustom from "@/components/common/ToastCustom";
 import { airportsMap } from "@/types/airportsMap";
 import { buildPedidoRequest } from "@/services/buildPedidoRequest";
 import type { PedidoResponse } from "@/types/pedidos";
-import { useRunSession } from "@/lib/runSession";
+import { useRunSession, RunSessionProvider } from "@/lib/runSession";
+import TopNav from "@/components/common/TopNav";
 
 /**Esto es para mostrar la información del archivo al cargarlo (nombre, peso, etc.)**/
 type Status = {
@@ -53,7 +54,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 const resolver = zodResolver(schema) as Resolver<FormValues>;
-export default function Registrar() {
+export function RegistrarContent() {
 
   //console.log("🧠 Componente Registrar montado");
 
@@ -64,7 +65,7 @@ export default function Registrar() {
     //termina el toast de carga
     if (data) {
       toast.custom((t) => (
-        <ToastCustom t={t} message={data.message + " ✅"} type="success" />),
+        <ToastCustom t={t} message={data.message} type="success" />),
         { duration: 8000 }
       );
 
@@ -152,12 +153,12 @@ export default function Registrar() {
     //EN EL BACK EL CONTROLLER TIENE QUE TENER EL ENDPOINT '/upload' (VER Línea 98)
     const [data, error] = await uploadFile(`${kind}/upload`, file);
     if (data) {
-      console.log("✅ [Registrar] Archivos enviados para operacionDiaria:", data);
+      console.log("[Registrar] Archivos enviados para operacionDiaria:", data);
 
       toast.custom((t) => (
         <ToastCustom
           t={t}
-          message={data.message + "✅"}
+          message={data.message}
           type="success"
         />),
         { duration: 5000 });
@@ -359,7 +360,7 @@ export default function Registrar() {
       toast.custom((t) => (
         <ToastCustom
           t={t}
-          message={data.message + "✅"}
+          message={data.message}
           type="success"
         />),
         { duration: 5000 });
@@ -518,5 +519,14 @@ export default function Registrar() {
       </div>
 
     </div>
+  );
+}
+
+export default function Registrar() {
+  return (
+    <RunSessionProvider>
+      <TopNav />
+      <RegistrarContent />
+    </RunSessionProvider>
   );
 }

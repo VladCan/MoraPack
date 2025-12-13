@@ -11,7 +11,12 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class SplitRepair implements RepairOperator {
+/**
+ * REPARADOR POR URGENCIA
+ * Ordena los pedidos por antigüedad (SLA) para asegurar que los más críticos
+ * tomen los vuelos disponibles antes que los nuevos.
+ */
+public class UrgencySplitRepair implements RepairOperator {
 
     private final List<String> sedes;
     private final IndexVuelos indexVuelos;
@@ -21,12 +26,10 @@ public class SplitRepair implements RepairOperator {
     private static final int MAX_SPLITS_PER_ORDER = 10;
     private static final int MAX_CAPACIDAD_SEGURA = 100000;
     
-    // RF5
     private static final Set<String> HUBS = Set.of("SPIM", "EBCI", "UBBB");
-    // RF1
     private static final long MAX_SLA_HOURS = 46;
 
-    public SplitRepair(List<String> sedes, VuelosTEG teg) {
+    public UrgencySplitRepair(List<String> sedes, VuelosTEG teg) {
         this.sedes = sedes;
         this.indexVuelos = new IndexVuelos(teg);
     }
@@ -34,34 +37,36 @@ public class SplitRepair implements RepairOperator {
     @Override
     public void repair(SolucionProgramacion s, ALNS.Journal journal, Instant presenteUTC) {
         List<PlanPedido> planes = new ArrayList<>(s.getPlanPorPedido().values());
-        Collections.shuffle(planes, new Random());
+        
+        // --- CAMBIO CLAVE: ORDENAMIENTO DETERMINISTA POR URGENCIA ---
+        planes.sort((p1, p2) -> {
+            // 1. Prioridad: Los incompletos van primero
+            boolean inc1 = !p1.estaCompleto();
+            boolean inc2 = !p2.estaCompleto();
+            if (inc1 && !inc2) return -1;
+            if (!inc1 && inc2) return 1;
+
+            // 2. Prioridad: Fecha de creación (SLA). Los más viejos primero.
+            return p1.getCreadoUtc().compareTo(p2.getCreadoUtc());
+        });
+        // -----------------------------------------------------------
 
         for (PlanPedido plan : planes) {
-            
             if (plan.getDemanda() <= 0) continue; 
             if (plan.getDemanda() > MAX_CAPACIDAD_SEGURA) continue; 
-            
             if (plan.estaCompleto()) continue;
 
             Map<VueloProgramadoId, Integer> prevByFlight = contribucionPorVuelo(plan);
-            
-            // Genera una lista de rutas propuestas (Respetando RF4 - Vuelos)
             List<RutaAsignada> nuevas = buildPackingMax(plan, s, prevByFlight);
             
             if (nuevas.isEmpty()) continue;
             nuevas = combinarRutasIguales(nuevas);
             nuevas.removeIf(r -> r.getCantidad() <= 0);
-
             if (nuevas.isEmpty()) continue;
 
-            // RF3: VERIFICACIÓN ESTRICTA
-            // Si el split propuesto no cabe en los almacenes, lo descartamos.
-            // No podemos permitir una solución inválida.
             if (verificarCapacidadAlmacenes(journal, plan, nuevas)) {
-                
                 aplicarDeltasCargaPorVuelo(s, prevByFlight, contribucionPorVuelo(nuevas));
                 reservarBodegasDeRutas(journal, plan.getCreadoUtc(), plan.getAeropuertoDestino(), nuevas);
-
                 List<RutaAsignada> listaFinal = new ArrayList<>(nuevas);
 
                 PlanPedido nuevoPlan = PlanPedido.builder()
@@ -76,19 +81,19 @@ public class SplitRepair implements RepairOperator {
         }
     }
 
+    // =================================================================================
+    // MÉTODOS AUXILIARES (Copia exacta de tu lógica original para que sea independiente)
+    // =================================================================================
+
     private boolean verificarCapacidadAlmacenes(ALNS.Journal journal, PlanPedido plan, List<RutaAsignada> rutas) {
         OcupacionPorAeropuerto occ = journal.getOcc(); 
-
         for (RutaAsignada r : rutas) {
             int q = r.getCantidad();
             List<TramoAsignado> tramos = r.getTramos();
             if (tramos == null || tramos.isEmpty()) continue;
-
             for (int i = 0; i < tramos.size(); i++) {
                 TramoAsignado t = tramos.get(i); 
                 VueloProgramadoId v = t.getVuelo(); 
-
-                // 1. Origen
                 if (!HUBS.contains(v.getOrigen())) {
                     Instant iniOri = (i == 0) ? plan.getCreadoUtc() : tramos.get(i - 1).getVuelo().getLlegadaUtc();
                     if (iniOri != null && v.getSalidaUtc() != null && v.getSalidaUtc().isAfter(iniOri)) {
@@ -96,13 +101,8 @@ public class SplitRepair implements RepairOperator {
                         if (q > maxCap) return false;
                     }
                 }
-
-                // 2. Destino
                 if (!HUBS.contains(v.getDestino())) {
-                    Instant finDst = (i + 1 < tramos.size()) 
-                        ? tramos.get(i + 1).getVuelo().getSalidaUtc() 
-                        : v.getLlegadaUtc().plus(PICKUP_FINAL); // RF2
-                    
+                    Instant finDst = (i + 1 < tramos.size()) ? tramos.get(i + 1).getVuelo().getSalidaUtc() : v.getLlegadaUtc().plus(PICKUP_FINAL);
                     if (v.getLlegadaUtc() != null && finDst != null && finDst.isAfter(v.getLlegadaUtc())) {
                         int maxCap = occ.maxReservable(v.getDestino(), v.getLlegadaUtc(), finDst);
                         if (q > maxCap) return false;
@@ -112,11 +112,6 @@ public class SplitRepair implements RepairOperator {
         }
         return true;
     }
-
-    // ... (buildPackingMax, buscarMejorRutaTimeAttack, dijkstraTimeBased con checks RF1 y RF5) ...
-    // Asegúrate de copiar el resto de métodos (son largos, pero usan la misma lógica que RegretRepair para RF1/RF5)
-    // El Dijkstra dentro de SplitRepair DEBE tener también el chequeo de HUBS y SLA que puse en RegretRepair.
-    // Te lo incluyo aquí completo para evitar errores:
 
     private List<RutaAsignada> buildPackingMax(PlanPedido plan, SolucionProgramacion s, Map<VueloProgramadoId, Integer> prevByFlight) {
         final Instant ref = plan.getCreadoUtc();
@@ -186,15 +181,10 @@ public class SplitRepair implements RepairOperator {
             String u = current.id();
             int d = depth.getOrDefault(u, 0);
             if (current.llegada.isAfter(bestArrival.getOrDefault(u, Instant.MAX))) continue;
-            
-            // RF1: SLA Check
             long horasTotal = Duration.between(refCreacion, current.llegada).toHours();
             if (horasTotal > MAX_SLA_HOURS) continue;
-
             if (u.equals(destino)) break; 
             if (d >= MAX_NODES_IN_PATH) continue;
-
-            // RF5: Hub Check
             if (HUBS.contains(u) && !u.equals(origen)) continue;
 
             List<VueloFicha> salidas = indexVuelos.porOrigen(u);
@@ -204,10 +194,7 @@ public class SplitRepair implements RepairOperator {
                 Instant salidaUtc = id.getSalidaUtc();
                 Instant llegadaUtc = id.getLlegadaUtc();
                 String nextAp = id.getDestino();
-
-                // RF5 Check en el siguiente nodo también
                 if (HUBS.contains(nextAp) && !nextAp.equals(destino)) continue;
-
                 if (salidaUtc.isBefore(current.llegada.plusSeconds(3600))) continue; 
                 if (residualAjustado(id, s, prevByFlight, addedNow) <= 0) continue;
 
@@ -239,10 +226,11 @@ public class SplitRepair implements RepairOperator {
         int asg = s.getCargaPorVuelo().asignado(id);
         int prev = prevByFlight.getOrDefault(id, 0);
         int added = addedNow.getOrDefault(id, 0);
-        int ocupadoVirtual = (asg - prev) + added;
-        return Math.max(0, cap - ocupadoVirtual);
+        return Math.max(0, cap - ((asg - prev) + added));
     }
+
     private Map<VueloProgramadoId, Integer> contribucionPorVuelo(PlanPedido plan) { return contribucionPorVuelo(plan.getRutas()); }
+    
     private Map<VueloProgramadoId, Integer> contribucionPorVuelo(List<RutaAsignada> rutas) {
         Map<VueloProgramadoId, Integer> acc = new HashMap<>();
         if (rutas == null) return acc;
@@ -254,6 +242,7 @@ public class SplitRepair implements RepairOperator {
         }
         return acc;
     }
+
     private List<RutaAsignada> combinarRutasIguales(List<RutaAsignada> rutas) {
         LinkedHashMap<List<VueloProgramadoId>, Integer> acc = new LinkedHashMap<>();
         for (RutaAsignada r : rutas) {
@@ -271,12 +260,14 @@ public class SplitRepair implements RepairOperator {
         }
         return res;
     }
+
     private void aplicarDeltasCargaPorVuelo(SolucionProgramacion s, Map<VueloProgramadoId, Integer> prev, Map<VueloProgramadoId, Integer> nuevo) {
         Map<VueloProgramadoId, Integer> map = s.getCargaPorVuelo().getAsignado();
         Map<VueloProgramadoId, Integer> delta = new HashMap<>(nuevo);
         prev.forEach((k, v) -> delta.merge(k, -v, Integer::sum));
         delta.forEach((k, v) -> { if (v != 0) { map.merge(k, v, Integer::sum); if (map.get(k) < 0) map.put(k, 0); } });
     }
+
     private void reservarBodegasDeRutas(ALNS.Journal journal, Instant cr, String dst, List<RutaAsignada> rutas) {
         if (journal == null || rutas == null) return;
         for (RutaAsignada r : rutas) {

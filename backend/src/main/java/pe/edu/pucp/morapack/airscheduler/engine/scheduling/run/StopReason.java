@@ -4,6 +4,6 @@ package pe.edu.pucp.morapack.airscheduler.engine.scheduling.run;
 public enum StopReason {
     MANUAL,
     FIN_DE_RANGO,
-    COLAPSE,
+    COLAPSO,
     ERROR
 }

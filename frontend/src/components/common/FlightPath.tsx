@@ -1,12 +1,14 @@
+// src/components/common/FlightPath.tsx
 import PlaneIcon from "@/assets/plane2.svg?react";
 import { Marker, Source, Layer } from "react-map-gl/maplibre";
 import { useMemo } from "react";
-import { useTheme } from "@/components/ui/theme-provider"; // ← para saber el tema
+import { useTheme } from "@/components/ui/theme-provider"; 
 
 // ==== Helpers matemáticos ====
 const toRad = (d: number) => (d * Math.PI) / 180;
 const toDeg = (r: number) => (r * 180) / Math.PI;
 const ROTATION_OFFSET = -45;
+
 function llToVec({ lat, lon }: { lat: number; lon: number }) {
   const φ = toRad(lat);
   const λ = toRad(lon);
@@ -157,15 +159,15 @@ export default function FlightPath({
           type="line"
           paint={{
             "line-color": pathColorFinal,
-            // sutil: un poco más gruesa cuando haces zoom
+            // <--- CAMBIO: Grosor duplicado en todos los niveles de zoom
             "line-width": [
               "interpolate",
               ["linear"],
               ["zoom"],
-              0, 0.3,
-              3, 0.6,
-              6, 1.2,
-              10, 2
+              0, 0.6,  // Antes 0.3
+              3, 1.2,  // Antes 0.6
+              6, 2.4,  // Antes 1.2
+              10, 4    // Antes 2
             ],
             // ligera suavidad para que no “corte”
             "line-blur": isDark ? 0.3 : 0.15,
@@ -184,7 +186,8 @@ export default function FlightPath({
           className="cursor-pointer"
         >
           <PlaneIcon
-            className="w-3 h-3 transition-transform duration-300"
+            // <--- CAMBIO: Aumentado tamaño de w-3 h-3 (12px) a w-4 h-4 (16px)
+            className="w-4 h-4 transition-transform duration-300"
             style={{
               color: planeColorFinal,
               transform: `rotate(${hdg + ROTATION_OFFSET}deg)`,

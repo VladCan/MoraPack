@@ -3,7 +3,6 @@ package pe.edu.pucp.morapack.airscheduler.test;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -30,7 +29,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.ssp.SSPGeneradorSeed;
 
 public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
     // Parámetros de simulación (ajustables)
-    private static final long HORAS_VENTANA = 3;
+    private static final long HORAS_VENTANA = 4;
     private static final long HORIZONTE_TEG_H = 48; // cuánto futuro modelar
 
     public  static  void main(String[] args) {
@@ -194,33 +193,47 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
             //ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt",presenteUTC);
             // ALNS
+            
             List<DestructionOperator> destructores = new ArrayList<>();
-            destructores.add(new RandomRemoval(20));
-            destructores.add(new WorstRemoval(20));
+            destructores.add(new RandomRemoval(25));
+            destructores.add(new RandomRemoval(60));
+            //destructores.add(new WorstRemoval(15));
+            destructores.add(new WarehouseCrisisRemoval(15, aeropuertosMap)); 
+            destructores.add(new WarehouseCrisisRemoval(40, aeropuertosMap)); // Versión agresiva
+            destructores.add(new SlaBreachRemoval(20));
             List<RepairOperator> reparadores = new ArrayList<>();
-            reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
-            reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
-            ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC, ocupacionPorAeropuerto);
+            //reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
+            //reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
+            reparadores.add(new Regret2RepairFast(new ArrayList<>(sedes), teg));
+            reparadores.add(new GreedyUrgencyRepair(new ArrayList<>(sedes), teg));
+            //reparadores.add(new UrgencySplitRepair(new ArrayList<>(sedes), teg));
+            ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC, ocupacionPorAeropuerto,aeropuertosMap);
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
+            
             //SEQM    410
             //48
             //24x410=9840
             // System.out.println("ALNS");
             // ImpresorSolucion.imprimirEnArchivo(solucionOptima);
-            //ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
-            //ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
+            ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
+            ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
             solucionAnterior = solucionOptima;
             // verificacionTotal(solucionAnterior)
             // System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
             // solucionOptima.imprimirFitness(presenteUTC);
             // System.exit(1);
-            // solucionAnterior = seed;
+            //solucionAnterior = seed;
             /* 
             solucionOptima.imprimirCapacidadVuelosEnVentana(
                     presenteUTC, finUTC,
                     "out/reporteCapacidadVuelos_" + presenteUTC.toString().replace(':', '-') + ".txt");
             */
-            VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46),mapa);
+            if(VerificadorSLA.assertBasicos(solucionAnterior, Duration.ofHours(46),mapa, aeropuertosMap)){
+                System.out.println("✅ Solución verificada para la ventana actual.");
+            } else {
+                System.err.println("❌ La solución tiene violaciones en la ventana actual.");
+                System.exit(1);
+            }
             long endVentanaDeTiempo = System.nanoTime();
             double durationSeconds = (endVentanaDeTiempo - startVentanaDeTiempo) / 1_000_000_000.0;
             System.out.println("⏱️ Tiempo total de ejecución: " + durationSeconds + " segundos");

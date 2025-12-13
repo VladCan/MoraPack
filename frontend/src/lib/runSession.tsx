@@ -22,7 +22,14 @@ interface RunSessionState {
     lastWindow: RunWindow | null;   // última ventana recibida por SSE (con vuelos y pedidos)
     windows: RunWindow[];           // historial completo de ventanas recibidas
     selectedAirportId: string | null;
+    selectedPedido: PedidoDTO | null;  // Pedido seleccionado para filtrar vuelos
     vuelosCancelados: Set<string>;  // IDs de vuelos cancelados localmente
+
+    selectedVuelo: VueloDTO | null;
+    setSelectedVuelo: (vuelo: VueloDTO | null) => void;
+
+    toolsPanelOpen: boolean;
+    setToolsPanelOpen: (open: boolean) => void;
 
     //Esto va a usar TopNav:
     begin: (runId: string) => void;
@@ -31,6 +38,7 @@ interface RunSessionState {
     setSimNow: (iso: string) => void;
     setWindow: (w: RunWindow) => void;
     setSelectedAirport: (id: string | null) => void;
+    setSelectedPedido: (pedido: PedidoDTO | null) => void;  // Actualizar pedido seleccionado
     cancelarVuelo: (vueloId: string) => void;  // Agregar vuelo a la lista de cancelados
 
     reset: () => void;
@@ -49,7 +57,11 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
     const [lastWindow, setLastWindow] = useState<RunWindow | null>(null);
     const [windows, setWindows] = useState<RunWindow[]>([]);
     const [selectedAirportId, setSelectedAirportId] = useState<string | null>(null);
+    const [selectedPedido, setSelectedPedidoState] = useState<PedidoDTO | null>(null);
     const [vuelosCancelados, setVuelosCancelados] = useState<Set<string>>(new Set());
+
+    const [selectedVuelo, setSelectedVueloState] = useState<VueloDTO | null>(null);
+    const [toolsPanelOpen, setToolsPanelOpenState] = useState(false);
 
     const [autoReconnect, setAutoReconnect] = useState<boolean>(true);
 
@@ -60,7 +72,9 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setLastWindow(null);
         setWindows([]);
         setSelectedAirportId(null);
+        setSelectedPedidoState(null);
         setVuelosCancelados(new Set());
+        setSelectedVueloState(null);
     }, []);
 
     //Esto es para reconectar, o conectar por primera vez desde otro pc
@@ -112,7 +126,7 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
                     toast.custom((t) => (
                         <ToastCustom
                             t={t}
-                            message={"Conexión establecida"+ msg + "! ✅"}
+                            message={"Conexión establecida"+ msg}
                             type="success"
                         />),
                     { duration: 5000})
@@ -140,7 +154,9 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setLastWindow(null);
         setWindows([]);
         setSelectedAirportId(null);
+        setSelectedPedidoState(null);
         setVuelosCancelados(new Set());
+        setSelectedVueloState(null); 
     }, []);
 
     const cancelarVuelo = useCallback((vueloId: string) => {
@@ -168,6 +184,18 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setSelectedAirportId(id);
     }, []);
 
+    const setSelectedPedido = useCallback((pedido: PedidoDTO | null) => {
+        setSelectedPedidoState(pedido);
+    }, []);
+
+    const setSelectedVuelo = useCallback((vuelo: VueloDTO | null) => {
+        setSelectedVueloState(vuelo);
+    }, []);
+
+    const setToolsPanelOpen = useCallback((open: boolean) => {
+        setToolsPanelOpenState(open);
+    }, []);
+
     const value = useMemo<RunSessionState>(() => ({
         runId,
         status,
@@ -175,17 +203,24 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         lastWindow,
         windows,
         selectedAirportId,
+        selectedPedido,
         vuelosCancelados,
+        selectedVuelo,
+        setSelectedVuelo,
+        toolsPanelOpen,
+        setToolsPanelOpen,
         begin,
         end,
         setSimNow,
         setWindow,
         setSelectedAirport,
+        setSelectedPedido,
         cancelarVuelo,
         reset,
         autoReconnect,
         setAutoReconnect
-    }), [runId, status, simNow, lastWindow, windows, selectedAirportId, vuelosCancelados, begin, end, setSimNow, setWindow, setSelectedAirport, cancelarVuelo, reset, autoReconnect]);
+    }), [runId, status, simNow, lastWindow, windows, selectedAirportId, selectedPedido, vuelosCancelados,
+        selectedVuelo, toolsPanelOpen, begin, end, setSimNow, setWindow, setSelectedAirport, setSelectedPedido, cancelarVuelo, reset, autoReconnect]);
 
     return (
         <RunSessionContext.Provider value={value}>

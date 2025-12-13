@@ -5,8 +5,8 @@ import java.time.Instant;
 import java.util.*;
 
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.AeropuertosMap;
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosMap; // NUEVO
-import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Vuelo;     // NUEVO
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.VuelosMap;
+import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Vuelo;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.PlanPedido;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.RutaAsignada;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.TramoAsignado;
@@ -16,47 +16,38 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.VueloProgramado
 public final class VerificadorSLA {
     private VerificadorSLA(){}
 
+    // ==========================================
+    // CONFIGURACIÓN DE SEDES (Stock Infinito)
+    // ==========================================
+    // Estas sedes nunca deben reportar error de capacidad ni de stock negativo.
+    private static final Set<String> SEDES_INFINITAS = new HashSet<>(Arrays.asList("SPIM", "EBCI", "UBBB"));
+
     // =========================
     // API pública
     // =========================
 
-    /** Compatibilidad: no valida bodegas (no hay mapa de capacidades). */
-    public static void assertBasicos(SolucionProgramacion sol, Duration ventana46h) {
-        SLAReport r = diagnosticar(sol, ventana46h, null, null);
-        if (r.ok()) return;
-        throw new IllegalStateException(renderError(sol, ventana46h, r));
-    }
-
-    /** Valida también capacidades de bodega por aeropuerto (recomendado). */
-    public static void assertBasicos(SolucionProgramacion sol, Duration ventana46h, AeropuertosMap aeropuertosMap) {
-        SLAReport r = diagnosticar(sol, ventana46h, aeropuertosMap, null);
-        if (r.ok()) return;
-        throw new IllegalStateException(renderError(sol, ventana46h, r));
-    }
-
-    /** NUEVO: valida rutas reales contra el archivo original de vuelos (VuelosMap). */
-    public static void assertBasicos(SolucionProgramacion sol, Duration ventana46h, VuelosMap vuelosMap) {
-        SLAReport r = diagnosticar(sol, ventana46h, null, vuelosMap);
-        if (r.ok()) {
-            System.out.println("[VerificadorSLA] ✅ No se violó ninguna restricción. Continuando...");
-            return;
-        }
-        throw new IllegalStateException(renderError(sol, ventana46h, r));
-    }
-
-    /** Opcional: valida bodegas + rutas reales. */
-    public static void assertBasicos(SolucionProgramacion sol, Duration ventana46h, AeropuertosMap aeropuertosMap, VuelosMap vuelosMap) {
+    /**
+     * Valida la solución buscando errores críticos de física (cargas negativas, stock negativo)
+     * y violaciones de reglas de negocio (SLA, capacidad).
+     * @return true si la solución es válida y segura; false si hay violaciones.
+     */
+    public static boolean assertBasicos(SolucionProgramacion sol, Duration ventana46h, VuelosMap vuelosMap, AeropuertosMap aeropuertosMap) {
         SLAReport r = diagnosticar(sol, ventana46h, aeropuertosMap, vuelosMap);
-        if (r.ok()) return;
-        throw new IllegalStateException(renderError(sol, ventana46h, r));
+        if (r.ok()) {
+            System.out.println("[VerificadorSLA] ✅ Solución válida. Física y Reglas de Negocio respetadas.");
+            return true;
+        }
+        System.err.println("[VerificadorSLA] ❌ SE ENCONTRARON ERRORES CRÍTICOS O VIOLACIONES DE SLA.");
+        System.err.println(renderError(sol, ventana46h, r));
+        return false;
+    }
+    
+    public static void assertBasicos(SolucionProgramacion sol, Duration ventana46h) {
+        if (!assertBasicos(sol, ventana46h, null, null)) {
+            throw new IllegalStateException("Solución inválida (ver logs anteriores)");
+        }
     }
 
-    /** Compatibilidad: no valida bodegas ni rutas reales. */
-    public static SLAReport diagnosticar(SolucionProgramacion sol, Duration ventana46h) {
-        return diagnosticar(sol, ventana46h, null, null);
-    }
-
-    /** NUEVO: diagnostica todo (bodegas opcional, rutas reales opcional). */
     public static SLAReport diagnosticar(SolucionProgramacion sol,
                                          Duration ventana46h,
                                          AeropuertosMap aeropuertosMap,
@@ -64,16 +55,50 @@ public final class VerificadorSLA {
         Objects.requireNonNull(sol, "sol");
         Objects.requireNonNull(ventana46h, "ventana46h");
 
-        // 1) Capacidad de vuelos (igual que antes)
+        // -------------------------------------------------
+        // GRUPO 1: SANIDAD DE DATOS (Física básica)
+        // -------------------------------------------------
+        
+        List<CargaNegativaViolation> cargaNegativa = new ArrayList<>();
+        List<CargaZeroViolation> cargaZero = new ArrayList<>();
         List<CapViolation> capViol = new ArrayList<>();
+
         sol.getCargaPorVuelo().getAsignado().forEach((id, asign) -> {
             int cap = sol.getCargaPorVuelo().capacidad(id);
             int asg = (asign == null ? 0 : asign);
-            if (asg > cap) capViol.add(new CapViolation(id, cap, asg));
+
+            if (asg < 0) {
+                cargaNegativa.add(new CargaNegativaViolation(id, asg));
+            }
+            else if (asg == 0) {
+                // Un vuelo está en el mapa con 0kg. 
+                // Esto pasa si alguien hizo map.put(id, 0) o map.merge(id, -val, sum) resultando en 0.
+                cargaZero.add(new CargaZeroViolation(id));
+            }
+            else if (asg > cap) {
+                capViol.add(new CapViolation(id, cap, asg));
+            }
         });
+        
         capViol.sort(Comparator.comparingInt((CapViolation v) -> v.asignado - v.capacidad).reversed());
 
-        // 2) SLA 46h y 48h + incompletos (igual que antes)
+        // -------------------------------------------------
+        // GRUPO 2: INTEGRIDAD DE ALMACÉN (Stock)
+        // -------------------------------------------------
+        
+        List<BodegaViolation> bodegaCapViolations = new ArrayList<>(); 
+        List<BodegaStockViolation> bodegaStockViolations = new ArrayList<>(); 
+
+        if (aeropuertosMap != null) {
+            ReporteBodega reporteBodega = detectarViolacionesBodega(sol, ventana46h, aeropuertosMap);
+            bodegaCapViolations = reporteBodega.capacidadExcedida;
+            bodegaStockViolations = reporteBodega.stockNegativo;
+        }
+
+        // -------------------------------------------------
+        // GRUPO 3: SLA Y COMPLETITUD (Reglas de Negocio)
+        // -------------------------------------------------
+
         List<SLAViolation> v46 = new ArrayList<>();
         List<SLAViolation> v48 = new ArrayList<>();
         List<PedidoIncompleto> incompletos = new ArrayList<>();
@@ -82,6 +107,7 @@ public final class VerificadorSLA {
             Instant creado = p.getCreadoUtc();
             Instant ult = p.ultimaLlegada();
 
+            // Validación SLA 46h
             Instant limite46 = (creado == null ? null : creado.plus(ventana46h));
             if (limite46 == null || ult == null || ult.isAfter(limite46)) {
                 long tardH = (limite46 == null || ult == null) ? -1L
@@ -89,6 +115,7 @@ public final class VerificadorSLA {
                 v46.add(new SLAViolation(p.getIdPedido(), creado, ult, tardH));
             }
 
+            // Validación SLA 48h (Hard Constraint)
             Instant limite48 = (creado == null ? null : creado.plus(Duration.ofHours(48)));
             boolean ok48 = (limite48 != null && ult != null && !ult.isAfter(limite48));
             if (!ok48) {
@@ -111,25 +138,25 @@ public final class VerificadorSLA {
         v48.sort(byTardDesc);
         incompletos.sort(Comparator.comparingDouble(PedidoIncompleto::pctAvance));
 
-        // 3) Capacidad de bodega por aeropuerto (opcional)
-        List<BodegaViolation> bodegaViolations = List.of();
-        if (aeropuertosMap != null) {
-            bodegaViolations = detectarViolacionesBodega(sol, ventana46h, aeropuertosMap);
-        }
-
-        // 4) NUEVO: Verificación de rutas reales contra el archivo original
-        List<RutaViolation> rutaViolations = List.of();
+        // -------------------------------------------------
+        // GRUPO 4: RUTAS ESTRUCTURALES
+        // -------------------------------------------------
+        
+        List<RutaViolation> rutaViolations = new ArrayList<>();
         if (vuelosMap != null) {
             rutaViolations = verificarRutasRealesOD(sol, vuelosMap);
         }
 
         return new SLAReport(
+                cargaNegativa,      
+                cargaZero,          
+                bodegaStockViolations, 
                 capViol,
                 v46,
                 v48,
                 incompletos,
-                bodegaViolations,
-                rutaViolations // NUEVO
+                bodegaCapViolations,
+                rutaViolations
         );
     }
 
@@ -139,176 +166,173 @@ public final class VerificadorSLA {
 
     private static String renderError(SolucionProgramacion sol, Duration ventana46h, SLAReport r) {
         StringBuilder sb = new StringBuilder(4096);
-        sb.append("Violaciones detectadas:\n");
+        sb.append("\n======================================================\n");
+        sb.append("   REPORTE DE VIOLACIONES DE INTEGRIDAD Y SLA\n");
+        sb.append("======================================================\n");
 
-        // Entrega 100%
-        if (!r.pedidosIncompletos().isEmpty()) {
-            sb.append("• Entrega 100% incumplida: ")
-              .append(r.pedidosIncompletos().size()).append(" pedidos; faltante total=")
-              .append(String.format("%,d", r.faltanteTotal())).append(" unidades\n");
-            for (PedidoIncompleto p : r.topIncompletos(20)) {
-                sb.append(String.format("   - Pedido %d  demanda=%,d  asignado=%,d  faltante=%,d  avance=%.1f%%%n",
-                        p.idPedido, p.demanda, p.asignado, p.faltante(), p.pctAvance()));
+        // 1. ERRORES DE FÍSICA
+        if (!r.cargaNegativa.isEmpty()) {
+            sb.append("\n🛑 [CRÍTICO] CARGA NEGATIVA EN VUELOS (").append(r.cargaNegativa.size()).append("):\n");
+            for (CargaNegativaViolation v : r.cargaNegativa.subList(0, Math.min(10, r.cargaNegativa.size()))) {
+                sb.append(String.format("   - %s  carga=%,d (IMPOSIBLE)\n", vueloIdStr(v.id), v.asignado));
             }
-            if (r.pedidosIncompletos().size() > 20) {
-                sb.append("   ... ").append(r.pedidosIncompletos().size() - 20).append(" más\n");
+        }
+        
+        if (!r.bodegaStockNegativo.isEmpty()) {
+            sb.append("\n🛑 [CRÍTICO] STOCK NEGATIVO EN ALMACÉN (").append(r.bodegaStockNegativo.size()).append("):\n");
+            for (BodegaStockViolation v : r.bodegaStockNegativo.subList(0, Math.min(10, r.bodegaStockNegativo.size()))) {
+                sb.append(String.format("   - %s  en %s  Stock=%,d\n", v.aeropuerto, iso(v.momento), v.stockReal));
             }
         }
 
-        // Capacidad de vuelos
-        if (!r.capacityViolations().isEmpty()) {
-            sb.append("• Capacidad de vuelos violada (").append(r.capacityViolations().size()).append(" vuelos):\n");
-            for (CapViolation v : r.topCapacity(20)) {
-                sb.append(String.format("   - %s  cap=%,d  asignado=%,d  exceso=+%,d%n",
+        // 2. ERRORES ESTRUCTURALES / FANTASMAS
+        if (!r.rutaViolations.isEmpty()) {
+            sb.append("\n🚫 RUTAS INVÁLIDAS / INEXISTENTES (").append(r.rutaViolations.size()).append("):\n");
+            for (RutaViolation rv : r.topRuta(20)) {
+                sb.append(String.format("   - Pedido %d Ruta#%d Tramo#%d: [%s] -> %s (Vuelo: %s)\n", 
+                        rv.idPedido, rv.idxRuta, rv.idxTramo, rv.causa, rv.detalle, vueloIdStr(rv.vuelo)));
+            }
+        }
+        
+        if (!r.cargaZero.isEmpty()) {
+            sb.append("\n⚠ VUELOS FANTASMA (Asignados con 0 Kg) (").append(r.cargaZero.size()).append("):\n");
+            sb.append("   (Estos registros existen en 'CargaPorVuelo' con valor 0. Revise operadores que hagan map.put(id,0))\n");
+             for (CargaZeroViolation v : r.cargaZero.subList(0, Math.min(10, r.cargaZero.size()))) {
+                // Info extra del vuelo para debugging
+                sb.append(String.format("   - %s -> %s | %s (Salida: %s)\n", 
+                    v.id.getOrigen(), v.id.getDestino(), v.id.toString(), v.id.getSalidaUtc()));
+            }
+             if (r.cargaZero.size() > 10) sb.append("     ... y " + (r.cargaZero.size()-10) + " más.");
+        }
+
+        // 3. CAPACIDAD
+        if (!r.capacityViolations.isEmpty()) {
+            sb.append("\n📦 SOBRECAPACIDAD DE AVIONES (").append(r.capacityViolations.size()).append("):\n");
+            for (CapViolation v : r.topCapacity(10)) {
+                sb.append(String.format("   - %s  cap=%,d  asig=%,d  exceso=+%,d\n",
                         vueloIdStr(v.id), v.capacidad, v.asignado, (v.asignado - v.capacidad)));
             }
-            if (r.capacityViolations().size() > 20) {
-                sb.append("   ... ").append(r.capacityViolations().size() - 20).append(" más\n");
+        }
+        
+        if (!r.bodegaCapViolations.isEmpty()) {
+             sb.append("\n🏭 SOBRECAPACIDAD DE ALMACÉN (").append(r.bodegaCapViolations.size()).append("):\n");
+             sb.append("   (Sedes Infinitas " + SEDES_INFINITAS + " fueron excluidas)\n");
+             for (BodegaViolation b : r.topBodega(10)) {
+                sb.append(String.format("   - %s  [%s]  ocup=%,d  cap=%,d  exceso=+%,d\n",
+                        b.aeropuerto, iso(b.desde), b.ocupacion, b.capacidad, Math.max(0, b.ocupacion - b.capacidad)));
             }
         }
 
-        // SLA 46h
-        if (!r.slaPickupViolations().isEmpty()) {
-            sb.append("• SLA llegada≤").append(ventana46h.toHours()).append("h violado (")
-              .append(r.slaPickupViolations().size()).append(" pedidos):\n");
-            for (SLAViolation v : r.topPickup(20)) {
-                String tard = v.tardanzaHoras < 0 ? "sin llegadas" : ("+" + v.tardanzaHoras + "h");
-                sb.append(String.format("   - Pedido %d  creado=%s  última_llegada=%s  %s%n",
-                        v.idPedido, iso(v.creadoUtc), iso(v.ultimaLlegadaUtc), tard));
-            }
-            if (r.slaPickupViolations().size() > 20) {
-                sb.append("   ... ").append(r.slaPickupViolations().size() - 20).append(" más\n");
+        // 4. SLA
+        if (!r.pedidosIncompletos.isEmpty()) {
+            sb.append("\n📉 PEDIDOS INCOMPLETOS (").append(r.pedidosIncompletos.size()).append("):\n");
+             for (PedidoIncompleto p : r.topIncompletos(10)) {
+                sb.append(String.format("   - Pedido %d  Avance=%.1f%%\n", p.idPedido, p.pctAvance()));
             }
         }
-
-        // SLA 48h
-        if (!r.sla48Violations().isEmpty()) {
-            sb.append("• SLA 48h violado (").append(r.sla48Violations().size()).append(" pedidos):\n");
-            for (SLAViolation v : r.top48(20)) {
-                String tard = v.tardanzaHoras < 0 ? "sin llegadas" : ("+" + v.tardanzaHoras + "h");
-                sb.append(String.format("   - Pedido %d  creado=%s  última_llegada=%s  %s%n",
-                        v.idPedido, iso(v.creadoUtc), iso(v.ultimaLlegadaUtc), tard));
-            }
-            if (r.sla48Violations().size() > 20) {
-                sb.append("   ... ").append(r.sla48Violations().size() - 20).append(" más\n");
-            }
-        }
-
-        // Bodega por aeropuerto
-        if (!r.bodegaViolations().isEmpty()) {
-            sb.append("• Capacidad de bodega violada (")
-              .append(r.bodegaViolations().size()).append(" segmentos):\n");
-            for (BodegaViolation b : r.topBodega(20)) {
-                sb.append(String.format("   - %s  [%s — %s)  ocup=%s  cap=%,d  exceso=+%,d%n",
-                        b.aeropuerto, iso(b.desde), iso(b.hasta),
-                        String.format("%,d", b.ocupacion), b.capacidad, Math.max(0, b.ocupacion - b.capacidad)));
-            }
-            if (r.bodegaViolations().size() > 20) {
-                sb.append("   ... ").append(r.bodegaViolations().size() - 20).append(" más\n");
-            }
-        }
-
-        // NUEVO: Rutas inválidas / inexistentes
-        if (!r.rutaViolations().isEmpty()) {
-            sb.append("• Rutas inválidas (").append(r.rutaViolations().size()).append(" halladas):\n");
-            for (RutaViolation rv : r.topRuta(30)) {
-                sb.append(String.format(
-                        "   - Pedido %d  ruta#%d tramo#%d  causa=%s  vuelo=%s  detalle=%s%n",
-                        rv.idPedido, rv.idxRuta, rv.idxTramo, rv.causa, vueloIdStr(rv.vuelo),
-                        rv.detalle == null ? "-" : rv.detalle
-                ));
-            }
-            if (r.rutaViolations().size() > 30) {
-                sb.append("   ... ").append(r.rutaViolations().size() - 30).append(" más\n");
-            }
+        
+        if (!r.sla48Violations.isEmpty()) {
+             sb.append("\n⏰ SLA 48H VIOLADO (").append(r.sla48Violations.size()).append("):\n");
+             for (SLAViolation v : r.top48(10)) {
+                sb.append(String.format("   - Pedido %d Tarde +%dh\n", v.idPedido, v.tardanzaHoras));
+             }
         }
 
         return sb.toString();
     }
 
     // =========================
-    // Cálculo de bodegas (igual)
+    // Lógica de Bodegas (CORREGIDA)
     // =========================
 
-    /** Detecta segmentos [t_i, t_{i+1}) donde la ocupación supera la capacidad declarada del aeropuerto. */
-    private static List<BodegaViolation> detectarViolacionesBodega(SolucionProgramacion sol,
-                                                                   Duration ventana46h,
-                                                                   AeropuertosMap aeropuertosMap) {
-        final Duration pickup = Duration.ofHours(48).minus(ventana46h);
+    private static class ReporteBodega {
+        List<BodegaViolation> capacidadExcedida = new ArrayList<>();
+        List<BodegaStockViolation> stockNegativo = new ArrayList<>();
+    }
 
+    private static ReporteBodega detectarViolacionesBodega(SolucionProgramacion sol,
+                                                          Duration ventana46h,
+                                                          AeropuertosMap aeropuertosMap) {
+        ReporteBodega reporte = new ReporteBodega();
+        final Duration pickup = Duration.ofHours(48).minus(ventana46h);
         Map<String, TreeMap<Instant, Integer>> deltasPorAeropuerto = new HashMap<>();
 
+        // 1. Construir Deltas (Entradas y Salidas)
         for (PlanPedido plan : sol.asMap().values()) {
-            List<RutaAsignada> rutas = plan.getRutas();
-            if (rutas == null || rutas.isEmpty()) continue;
+            if (plan.getRutas() == null) continue;
+            for (RutaAsignada ruta : plan.getRutas()) {
+                if (ruta.getTramos() == null) continue;
+                int q = ruta.getCantidad();
+                
+                // Si la ruta tiene 0kg, no afecta bodega (es un fantasma lógico)
+                if (q <= 0) continue; 
 
-            for (RutaAsignada ruta : rutas) {
                 List<TramoAsignado> tramos = ruta.getTramos();
-                if (tramos == null || tramos.isEmpty()) continue;
-
                 for (int i = 0; i < tramos.size(); i++) {
                     TramoAsignado tramo = tramos.get(i);
                     VueloProgramadoId v = tramo.getVuelo();
                     if (v == null) continue;
-                    int q = tramo.getCantidad();
-
-                    // ORIGEN: [esperaInicioOrigen, salida)
-                    Instant esperaInicioOrigen = (i == 0)
-                            ? plan.getCreadoUtc()
-                            : (tramos.get(i - 1).getVuelo() != null ? tramos.get(i - 1).getVuelo().getLlegadaUtc() : null);
-                    Instant esperaFinOrigen = v.getSalidaUtc();
-                    if (esperaInicioOrigen != null && esperaFinOrigen != null && !esperaFinOrigen.isBefore(esperaInicioOrigen)) {
-                        addDelta(deltasPorAeropuerto, v.getOrigen(), esperaInicioOrigen, q);
-                        addDelta(deltasPorAeropuerto, v.getOrigen(), esperaFinOrigen, -q);
+                    
+                    // ORIGEN
+                    Instant llegadaAnterior = (i == 0) ? plan.getCreadoUtc() 
+                            : tramos.get(i - 1).getVuelo().getLlegadaUtc();
+                    
+                    if (llegadaAnterior != null && v.getSalidaUtc() != null && !v.getSalidaUtc().isBefore(llegadaAnterior)) {
+                        addDelta(deltasPorAeropuerto, v.getOrigen(), llegadaAnterior, q);   
+                        addDelta(deltasPorAeropuerto, v.getOrigen(), v.getSalidaUtc(), -q); 
                     }
 
-                    // DESTINO:
-                    Instant esperaInicioDestino = v.getLlegadaUtc();
-                    Instant esperaFinDestino;
+                    // DESTINO
+                    Instant salidaSiguiente;
                     if (i + 1 < tramos.size()) {
-                        VueloProgramadoId next = tramos.get(i + 1).getVuelo();
-                        esperaFinDestino = (next != null) ? next.getSalidaUtc() : null;
+                        salidaSiguiente = tramos.get(i + 1).getVuelo().getSalidaUtc();
                     } else {
-                        esperaFinDestino = (esperaInicioDestino != null) ? esperaInicioDestino.plus(pickup) : null;
+                        salidaSiguiente = (v.getLlegadaUtc() != null) ? v.getLlegadaUtc().plus(pickup) : null;
                     }
-                    if (esperaInicioDestino != null && esperaFinDestino != null && !esperaFinDestino.isBefore(esperaInicioDestino)) {
-                        addDelta(deltasPorAeropuerto, v.getDestino(), esperaInicioDestino, q);
-                        addDelta(deltasPorAeropuerto, v.getDestino(), esperaFinDestino, -q);
+                    
+                    if (v.getLlegadaUtc() != null && salidaSiguiente != null && !salidaSiguiente.isBefore(v.getLlegadaUtc())) {
+                         addDelta(deltasPorAeropuerto, v.getDestino(), v.getLlegadaUtc(), q); 
+                         addDelta(deltasPorAeropuerto, v.getDestino(), salidaSiguiente, -q);  
                     }
                 }
             }
         }
 
-        List<BodegaViolation> violaciones = new ArrayList<>();
+        // 2. Simular línea de tiempo
         for (Map.Entry<String, TreeMap<Instant, Integer>> e : deltasPorAeropuerto.entrySet()) {
             String ap = e.getKey();
+            
+            // CORRECCIÓN SOLICITADA: 
+            // Si el aeropuerto es una SEDE INFINITA, no verificamos stock ni capacidad.
+            if (SEDES_INFINITAS.contains(ap)) continue;
+
             TreeMap<Instant, Integer> deltas = e.getValue();
             int capacidad = aeropuertosMap.getCapBodega(ap);
 
-            int ocup = 0;
+            int currentStock = 0;
             Instant prev = null;
+            
             for (Map.Entry<Instant, Integer> d : deltas.entrySet()) {
                 Instant t = d.getKey();
+                int cambio = d.getValue();
+
                 if (prev != null && t.isAfter(prev)) {
-                    if (ocup > capacidad) {
-                        violaciones.add(new BodegaViolation(ap, prev, t, capacidad, ocup));
+                    if (currentStock > capacidad) {
+                        reporte.capacidadExcedida.add(new BodegaViolation(ap, prev, t, capacidad, currentStock));
+                    }
+                    if (currentStock < 0) {
+                        reporte.stockNegativo.add(new BodegaStockViolation(ap, prev, currentStock));
                     }
                 }
-                ocup += d.getValue();
+                currentStock += cambio;
                 prev = t;
             }
         }
-
-        violaciones.sort(Comparator
-                .comparingInt((BodegaViolation b) -> Math.max(0, b.ocupacion - b.capacidad)).reversed()
-                .thenComparing(b -> b.aeropuerto)
-                .thenComparing(b -> b.desde));
-
-        return violaciones;
+        return reporte;
     }
 
     // =========================
-    // NUEVO: Verificación de rutas reales (O-D)
+    // Lógica de Rutas
     // =========================
 
     private static List<RutaViolation> verificarRutasRealesOD(SolucionProgramacion sol, VuelosMap mapa) {
@@ -343,26 +367,15 @@ public final class VerificadorSLA {
                     if (o == null || o.isBlank() || d == null || d.isBlank()) {
                         out.add(new RutaViolation(idPedido, idxRuta, idxTramo, "VUELO_SIN_CODIGOS", v, "Origen/Destino nulos o vacíos"));
                     } else {
-                        // Origen debe existir en el catálogo
                         if (!mapa.origenes().contains(o)) {
                             out.add(new RutaViolation(idPedido, idxRuta, idxTramo, "ORIGEN_NO_EN_CATALOGO", v, "No hay vuelos con origen=" + o));
                         } else {
-                            // Debe existir algún vuelo O->D en el archivo
                             if (!existeOD(mapa, o, d)) {
-                                out.add(new RutaViolation(idPedido, idxRuta, idxTramo, "TRAMO_SIN_OFERTA_OD", v, "No existe vuelo " + o + "→" + d + " en el archivo"));
+                                out.add(new RutaViolation(idPedido, idxRuta, idxTramo, "TRAMO_SIN_OFERTA_OD", v, "No existe vuelo " + o + " -> " + d));
                             }
                         }
-
-                        // (Opcional futuro) Validar horario local exacto contra archivo:
-                        // int hhmmDepLocal = hhmmLocal(v.getSalidaUtc(), o, mapa); // requiere exponer GMT o helper en VuelosMap
-                        // int hhmmArrLocal = hhmmLocal(v.getLlegadaUtc(), d, mapa);
-                        // if (!existeODHhmm(mapa, o, d, hhmmDepLocal, hhmmArrLocal)) {
-                        //     out.add(new RutaViolation(idPedido, idxRuta, idxTramo, "HORARIO_NO_COINCIDE", v,
-                        //         "No hay un vuelo " + o + "→" + d + " con HH:mm dep/arr del archivo"));
-                        // }
                     }
 
-                    // Conexiones espaciales/temporales (lo que ya hacíamos)
                     if (prev != null) {
                         String dPrev = prev.getDestino();
                         String oAct = v.getOrigen();
@@ -377,17 +390,15 @@ public final class VerificadorSLA {
                                     "Salida sig.=" + iso(depAct) + " < llegada prev.=" + iso(arrPrev)));
                         }
                     }
-
                     prev = v;
                 }
             }
         }
-
+        
         out.sort(Comparator
                 .comparing(RutaViolation::causa)
                 .thenComparingInt(RutaViolation::idPedido)
-                .thenComparingInt(RutaViolation::idxRuta)
-                .thenComparingInt(RutaViolation::idxTramo));
+                .thenComparingInt(RutaViolation::idxRuta));
         return out;
     }
 
@@ -395,88 +406,70 @@ public final class VerificadorSLA {
         List<Vuelo> lista = mapa.vuelosDesde(origen);
         if (lista == null || lista.isEmpty()) return false;
         for (Vuelo base : lista) {
-            // Ajusta aquí el getter si tu Vuelo usa otro nombre para destino.
             if (destino.equals(base.getDestino())) return true;
         }
         return false;
     }
 
-    private static void addDelta(Map<String, TreeMap<Instant, Integer>> deltasByAp,
-                                 String aeropuerto,
-                                 Instant t,
-                                 int delta) {
-        if (aeropuerto == null || aeropuerto.isBlank() || t == null) return;
-        TreeMap<Instant, Integer> deltas = deltasByAp.computeIfAbsent(aeropuerto, k -> new TreeMap<>());
-        deltas.merge(t, delta, Integer::sum);
+    // =========================
+    // Métodos Auxiliares
+    // =========================
+
+    private static void addDelta(Map<String, TreeMap<Instant, Integer>> map, String ap, Instant t, int d) {
+        if (ap == null || t == null) return;
+        map.computeIfAbsent(ap, k -> new TreeMap<>()).merge(t, d, Integer::sum);
     }
 
+    private static String str(String x) { return x == null ? "-" : x; }
+    private static String iso(Instant t) { return t == null ? "-" : t.toString(); }
+    private static String vueloIdStr(VueloProgramadoId v) { return v == null ? "null" : v.toString(); }
+
     // =========================
-    // Tipos de datos del reporte
+    // Records
     // =========================
 
+    public record CargaNegativaViolation(VueloProgramadoId id, int asignado) {}
+    public record CargaZeroViolation(VueloProgramadoId id) {}
+    public record BodegaStockViolation(String aeropuerto, Instant momento, int stockReal) {}
+    
     public record CapViolation(VueloProgramadoId id, int capacidad, int asignado) {}
-
     public record SLAViolation(int idPedido, Instant creadoUtc, Instant ultimaLlegadaUtc, long tardanzaHoras) {}
-
     public record PedidoIncompleto(int idPedido, int demanda, int asignado) {
         public double pctAvance() { return demanda == 0 ? 100.0 : (100.0 * asignado / (double) demanda); }
         public int faltante() { return Math.max(0, demanda - asignado); }
     }
-
     public record BodegaViolation(String aeropuerto, Instant desde, Instant hasta, int capacidad, int ocupacion) {}
-
-    /** NUEVO: violación en la estructura/realidad de rutas. */
     public record RutaViolation(int idPedido, int idxRuta, int idxTramo, String causa, VueloProgramadoId vuelo, String detalle) {}
 
     public record SLAReport(
+            List<CargaNegativaViolation> cargaNegativa,
+            List<CargaZeroViolation> cargaZero,
+            List<BodegaStockViolation> bodegaStockNegativo,
             List<CapViolation> capacityViolations,
             List<SLAViolation> slaPickupViolations,
             List<SLAViolation> sla48Violations,
             List<PedidoIncompleto> pedidosIncompletos,
-            List<BodegaViolation> bodegaViolations,
-            List<RutaViolation> rutaViolations // NUEVO
+            List<BodegaViolation> bodegaCapViolations,
+            List<RutaViolation> rutaViolations
     ) {
         public boolean ok() {
-            return capacityViolations.isEmpty()
-                && slaPickupViolations.isEmpty()
-                && sla48Violations.isEmpty()
-                && pedidosIncompletos.isEmpty()
-                && bodegaViolations.isEmpty()
-                && rutaViolations.isEmpty();
+            return cargaNegativa.isEmpty() && 
+                   bodegaStockNegativo.isEmpty() && 
+                   capacityViolations.isEmpty() && 
+                   bodegaCapViolations.isEmpty() &&
+                   rutaViolations.isEmpty() &&
+                   sla48Violations.isEmpty();
         }
-
-        public List<CapViolation> topCapacity(int n) { return capacityViolations.subList(0, Math.min(n, capacityViolations.size())); }
-        public List<SLAViolation> topPickup(int n)   { return slaPickupViolations.subList(0, Math.min(n, slaPickupViolations.size())); }
-        public List<SLAViolation> top48(int n)       { return sla48Violations.subList(0, Math.min(n, sla48Violations.size())); }
-        public List<PedidoIncompleto> topIncompletos(int n) { return pedidosIncompletos.subList(0, Math.min(n, pedidosIncompletos.size())); }
-        public List<BodegaViolation> topBodega(int n) { return bodegaViolations.subList(0, Math.min(n, bodegaViolations.size())); }
-        public List<RutaViolation> topRuta(int n)     { return rutaViolations.subList(0, Math.min(n, rutaViolations.size())); }
-
-        public int faltanteTotal() {
-            int sum = 0;
-            for (PedidoIncompleto p : pedidosIncompletos) sum += p.faltante();
-            return sum;
+        
+        public List<CapViolation> topCapacity(int n) { return sub(capacityViolations, n); }
+        public List<SLAViolation> top48(int n) { return sub(sla48Violations, n); }
+        public List<SLAViolation> topPickup(int n) { return sub(slaPickupViolations, n); }
+        public List<PedidoIncompleto> topIncompletos(int n) { return sub(pedidosIncompletos, n); }
+        public List<BodegaViolation> topBodega(int n) { return sub(bodegaCapViolations, n); }
+        public List<RutaViolation> topRuta(int n) { return sub(rutaViolations, n); }
+        
+        private <T> List<T> sub(List<T> list, int n) {
+            return list.subList(0, Math.min(n, list.size()));
         }
     }
-
-    // =========================
-    // Utils de formato
-    // =========================
-
-    private static String iso(Instant t) {
-        return t == null ? "-" : java.time.format.DateTimeFormatter.ISO_INSTANT.format(t);
-    }
-
-    private static String vueloIdStr(VueloProgramadoId v) {
-        if (v == null) return "-";
-        String o = v.getOrigen() == null ? "" : v.getOrigen();
-        String d = v.getDestino() == null ? "" : v.getDestino();
-        String s = v.getSalidaUtc() == null ? "" : java.time.format.DateTimeFormatter
-                .ofPattern("yyyyMMdd'T'HHmmss'Z'")
-                .withZone(java.time.ZoneOffset.UTC)
-                .format(v.getSalidaUtc());
-        return o + d + s;
-    }
-
-    private static String str(String x) { return x == null ? "-" : x; }
 }

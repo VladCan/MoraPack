@@ -4,16 +4,23 @@ import MainMap from "@/components/common/MainMap";
 import AirportMarkers, { type AirportPoint } from "@/components/common/map/AirportMarkers";
 import FlightPath from "@/components/common/FlightPath";
 import { useAirports } from "@/hooks/useAirports";
-import { useRunSSE } from "@/hooks/useRunSSE";
+import { useRunSSE, type VueloDTO } from "@/hooks/useRunSSE";
 import { useRunSession } from "@/lib/runSession";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import SimulationFinishedOverlay from "@/components/common/SimulationFinishedOverlay";
 import { downloadFile } from "@/services/api";
 
-const COLOR_SEDE   = "#005097";
+// Importamos las Cards
+import AirportCard from "@/components/common/cards/AirportCard";
+import FlightCard, { type FlightCardData } from "@/components/common/cards/FlightCard";
+import OrderCard from "@/components/common/cards/OrderCard";
+import { RunSessionProvider } from "@/lib/runSession";
+import TopNav from "@/components/common/TopNav";
+
+const COLOR_SEDE = "#005097";
 const COLOR_NORMAL = "#38bdf8";
-const HOVER_COLOR  = "#ef4444";
+const HOVER_COLOR = "#ef4444";
 const ACTIVE_COLOR = "#005097";
 
 // DTO backend (zod)
@@ -26,194 +33,313 @@ const AirportDtoSchema = z.object({
 });
 const AirportsDtoSchema = z.array(AirportDtoSchema);
 
-type FlightForRender = {
-  id: string;
+type FlightForRender = FlightCardData & {
   origin: { lat: number; lon: number };
   dest: { lat: number; lon: number };
-  progress: number;
-  pathColor: string;
-  planeColor: string;
-  // Información adicional para el tooltip
-  origenCodigo: string;
-  destinoCodigo: string;
-  salidaUtc: string;
-  llegadaUtc: string;
-  capacidad: number;
-  cantidadAsignada: number;
-  carga: Array<{
-    pedidoId: number;
-    cantidad: number;
-    destinoFinal: string;
-    esConexion: boolean;
-  }>;
 };
 
-export default function Simulacion() {
-
+export function SimulacionContent() {
   const { data: airportsDtoRaw } = useAirports();
   const [hoveredAirportId, setHoveredAirportId] = useState<string | null>(null);
   const [activeFlight, setActiveFlight] = useState<FlightForRender | null>(null);
+  const [hoveredFlight, setHoveredFlight] = useState<FlightForRender | null>(null);
 
   // Parsear aeropuertos
   const airports: AirportPoint[] = useMemo(() => {
-      const parsed = AirportsDtoSchema.safeParse(airportsDtoRaw);
-      if (!parsed.success) return [];
-      return parsed.data.map((a) => ({
-        id: a.codigo,
-        name: `${a.ciudad ?? a.codigo} (${a.codigo})`,
-        lon: a.lon,
-        lat: a.lat,
-        color: a.sede ? COLOR_SEDE : COLOR_NORMAL,
-        isSede: !!a.sede, 
-      }));
-    }, [airportsDtoRaw]);
+    const parsed = AirportsDtoSchema.safeParse(airportsDtoRaw);
+    if (!parsed.success) return [];
+    return parsed.data.map((a) => ({
+      id: a.codigo,
+      name: `${a.ciudad ?? a.codigo} (${a.codigo})`,
+      lon: a.lon,
+      lat: a.lat,
+      color: a.sede ? COLOR_SEDE : COLOR_NORMAL,
+      isSede: !!a.sede,
+    }));
+  }, [airportsDtoRaw]);
 
-  // Crear mapa de aeropuertos por código para lookups rápidos
   const airportsMap = useMemo(() => {
     const map = new Map<string, { lat: number; lon: number }>();
-    airports.forEach(a => map.set(a.id, { lat: a.lat, lon: a.lon }));
+    airports.forEach((a) => map.set(a.id, { lat: a.lat, lon: a.lon }));
     return map;
   }, [airports]);
 
-  // Conectar al SSE
-  const { runId, selectedAirportId, setSelectedAirport, reset, vuelosCancelados, windows } = useRunSession();
-const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, disconnect } = useRunSSE(runId || undefined);
+  const {
+    runId,
+    selectedAirportId,
+    setSelectedAirport,
+    reset,
+    vuelosCancelados,
+    windows,
+    selectedPedido,
+    setSelectedPedido,
+    selectedVuelo,
+    setSelectedVuelo,
+  } = useRunSession();
 
-  // Procesar vuelos para renderizar
-  const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
+  const {
+    runState,
+    loadingMessage,
+    loadingProgress,
+    simNowUtc,
+    airportOccupancy,
+    finishedReason,
+    simStartUtc,
+    wallStartUtc,
+    disconnect,
+  } = useRunSSE(runId || undefined);
 
-  const flightsToRender = useMemo<FlightForRender[]>(() => {
-    if (!simNowUtc || windows.length === 0) {
-      return [];
-    }
-
-    const now = new Date(simNowUtc).getTime();
-    const allFlights: FlightForRender[] = [];
-    const seenIds = new Set<string>();
-
-    // Crear un Set para evitar duplicados (mismo vuelo en múltiples ventanas)
-    const vuelosUnicos = new Map<string, typeof windows[0]['vuelos'][0]>();
-
-    // Acumular vuelos de TODAS las ventanas para tener el panorama completo
-    windows.forEach(window => {
-      window.vuelos.forEach(vuelo => {
-        // Solo agregar si no existe o si queremos actualizar con info más reciente
-        if (!vuelosUnicos.has(vuelo.id)) {
-          vuelosUnicos.set(vuelo.id, vuelo);
+  const vuelosMap = useMemo(() => {
+    const map = new Map<string, VueloDTO>();
+    windows.forEach((w) => {
+      w.vuelos.forEach((v) => {
+        if (!map.has(v.id)) {
+          map.set(v.id, v);
         }
       });
     });
+    return map;
+  }, [windows]);
 
-    // Ahora procesamos todos los vuelos únicos (excluyendo cancelados)
-    vuelosUnicos.forEach(vuelo => {
-        // Excluir vuelos cancelados
-        if (vuelosCancelados.has(vuelo.id)) return;
-        
-        const origen = airportsMap.get(vuelo.origen);
-        const destino = airportsMap.get(vuelo.destino);
+  const airportsForRender = useMemo<AirportPoint[]>(() => {
+    return airports.map((a) => {
+      const occ = airportOccupancy[a.id];
+      if (!occ || a.isSede) return a;
+      let color = COLOR_NORMAL;
+      if (occ.porcentaje > 0.8) color = "#f97316";
+      else if (occ.porcentaje > 0.5) color = "#facc15";
+      return { ...a, color };
+    });
+  }, [airports, airportOccupancy]);
 
-        if (!origen || !destino) {
-          console.warn(`[Simulacion] Aeropuerto no encontrado: ${vuelo.origen} o ${vuelo.destino}`);
-          return;
-        }
+  const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
 
-        const salidaTime = new Date(vuelo.salidaUtc).getTime();
-        const llegadaTime = new Date(vuelo.llegadaUtc).getTime();
+  const vuelosRelacionadosAlPedido = useMemo<Set<string>>(() => {
+    if (!selectedPedido || !selectedPedido.rutas) return new Set();
+    const vuelosIds = new Set<string>();
+    selectedPedido.rutas.forEach(ruta => {
+      ruta.vuelos.forEach(vuelo => {
+        const salidaUtcSinColon = vuelo.salidaUtc.replace(/:/g, '');
+        const vueloId = `${vuelo.origen}-${vuelo.destino}-${salidaUtcSinColon}`;
+        vuelosIds.add(vueloId);
+      });
+    });
+    return vuelosIds;
+  }, [selectedPedido]);
 
-        // Solo mostrar vuelos que ya salieron y no han llegado
-        if (now < salidaTime || now > llegadaTime) {
-          return;
-        }
+  // Flights render logic
+  const flightsToRender = useMemo<FlightForRender[]>(() => {
+    if (!simNowUtc || windows.length === 0) return [];
+    const now = new Date(simNowUtc).getTime();
+    const allFlights: FlightForRender[] = [];
+    const seenIds = new Set<string>();
+    const vuelosUnicos = new Map<string, typeof windows[0]["vuelos"][0]>();
 
-        // Calcular progreso (0.0 a 1.0)
-        //const duracion = llegadaTime - salidaTime; //not being used
-        if (!flightFirstSeenRef.current.has(vuelo.id)) {
-          flightFirstSeenRef.current.set(vuelo.id, Math.max(now, salidaTime));
-        }
-        const firstSeen = flightFirstSeenRef.current.get(vuelo.id) ?? Math.max(now, salidaTime);
-        const transcurridoDesdeVista = Math.max(0, Math.min(now, llegadaTime) - firstSeen);
-        const duracionRestante = Math.max(1, llegadaTime - firstSeen);
-        const progress = Math.min(1, transcurridoDesdeVista / duracionRestante);
-
-        // Determinar color basado en ocupación
-        const ocupacion = vuelo.cantidadAsignada / vuelo.capacidad;
-        let pathColor = "#38bdf8"; // Azul claro
-        let planeColor = "#0284c7"; // Azul
-
-        if (ocupacion > 0.8) {
-          pathColor = "#f97316"; // Naranja
-          planeColor = "#ea580c";
-        } else if (ocupacion > 0.5) {
-          pathColor = "#facc15"; // Amarillo
-          planeColor = "#eab308";
-        }
-
-        allFlights.push({
-          id: vuelo.id,
-          origin: origen,
-          dest: destino,
-          progress,
-          pathColor,
-          planeColor,
-          origenCodigo: vuelo.origen,
-          destinoCodigo: vuelo.destino,
-          salidaUtc: vuelo.salidaUtc,
-          llegadaUtc: vuelo.llegadaUtc,
-          capacidad: vuelo.capacidad,
-          cantidadAsignada: vuelo.cantidadAsignada,
-          carga: vuelo.carga || [],
-        });
-        seenIds.add(vuelo.id);
+    windows.forEach((window) => {
+      window.vuelos.forEach((vuelo) => {
+        if (!vuelosUnicos.has(vuelo.id)) vuelosUnicos.set(vuelo.id, vuelo);
+      });
     });
 
-    // Limpiar vuelos que ya no están visibles
-    flightFirstSeenRef.current.forEach((_, key) => {
-      if (!seenIds.has(key)) {
-        flightFirstSeenRef.current.delete(key);
+    const tienePedidoSeleccionado = selectedPedido !== null && vuelosRelacionadosAlPedido.size > 0;
+
+    vuelosUnicos.forEach((vuelo) => {
+      if (vuelosCancelados.has(vuelo.id)) return;
+      if (tienePedidoSeleccionado && !vuelosRelacionadosAlPedido.has(vuelo.id)) return;
+
+      const origen = airportsMap.get(vuelo.origen);
+      const destino = airportsMap.get(vuelo.destino);
+      if (!origen || !destino) return;
+
+      const salidaTime = new Date(vuelo.salidaUtc).getTime();
+      const llegadaTime = new Date(vuelo.llegadaUtc).getTime();
+
+      if (now < salidaTime || now > llegadaTime) return;
+
+      if (!flightFirstSeenRef.current.has(vuelo.id)) {
+        flightFirstSeenRef.current.set(vuelo.id, Math.max(now, salidaTime));
       }
+      const firstSeen =
+        flightFirstSeenRef.current.get(vuelo.id) ?? Math.max(now, salidaTime);
+      const duracionRestante = Math.max(1, llegadaTime - firstSeen);
+      const elapsed = Math.max(0, Math.min(now, llegadaTime) - firstSeen);
+      const progress = Math.min(1, elapsed / duracionRestante);
+
+      const ocupacion = vuelo.cantidadAsignada / vuelo.capacidad;
+      let pathColor = "#38bdf8";
+      let planeColor = "#0284c7";
+      if (ocupacion > 0.8) {
+        pathColor = "#f97316";
+        planeColor = "#ea580c";
+      } else if (ocupacion > 0.5) {
+        pathColor = "#facc15";
+        planeColor = "#eab308";
+      }
+
+      allFlights.push({
+        id: vuelo.id,
+        origin: origen,
+        dest: destino,
+        progress,
+        pathColor,
+        planeColor,
+        // Card Data
+        origen: vuelo.origen,
+        destino: vuelo.destino,
+        salidaUtc: vuelo.salidaUtc,
+        llegadaUtc: vuelo.llegadaUtc,
+        capacidad: vuelo.capacidad,
+        cantidadAsignada: vuelo.cantidadAsignada,
+        carga: vuelo.carga || [],
+      });
+      seenIds.add(vuelo.id);
+    });
+
+    flightFirstSeenRef.current.forEach((_, key) => {
+      if (!seenIds.has(key)) flightFirstSeenRef.current.delete(key);
     });
 
     return allFlights;
-  }, [windows, simNowUtc, airportsMap, vuelosCancelados]);
+  }, [windows, simNowUtc, airportsMap, vuelosCancelados, selectedPedido, vuelosRelacionadosAlPedido]);
 
-  // Sincronizar vuelo activo con datos actualizados y limpiar si fue cancelado
+  // Sincronizar vuelo activo (hover/click)
   useEffect(() => {
     if (!activeFlight) return;
-    // Limpiar si el vuelo fue cancelado
     if (vuelosCancelados.has(activeFlight.id)) {
       setActiveFlight(null);
       return;
     }
     const refreshed = flightsToRender.find((f) => f.id === activeFlight.id);
-    if (!refreshed) {
-      setActiveFlight(null);
-    } else if (refreshed !== activeFlight) {
-      setActiveFlight(refreshed);
-    }
+    if (!refreshed) setActiveFlight(null);
+    else if (refreshed !== activeFlight) setActiveFlight(refreshed);
   }, [flightsToRender, activeFlight, vuelosCancelados]);
 
-  // Obtener datos del aeropuerto activo
-  const activeAirportData = selectedAirportId && airportOccupancy[selectedAirportId]
-    ? airportOccupancy[selectedAirportId]
-    : null;
+  // Data aeropuerto activo
+  const activeAirportData =
+    selectedAirportId && airportOccupancy[selectedAirportId]
+      ? airportOccupancy[selectedAirportId]
+      : null;
+  const esSede = selectedAirportId
+    ? ["SPIM", "EBCI", "UBBB"].includes(selectedAirportId)
+    : false;
 
+  const activeAirportStaticData = useMemo(() => {
+    return airports.find((a) => a.id === selectedAirportId);
+  }, [airports, selectedAirportId]);
 
-  //Para la pantalla de fin:
+  // Cálculos de vuelos y RECOJOS futuros
+  const vuelosFuturos = useMemo(() => {
+    if (!selectedAirportId || !simNowUtc)
+      return { llegadas: [], salidas: [] };
 
+    const now = new Date(simNowUtc).getTime();
+    const next24h = now + 24 * 60 * 60 * 1000;
+    
+    // --- TIPOS ACTUALIZADOS: Incluyen pedidoId ---
+    const llegadas: Array<{ 
+        id: string; 
+        origen: string; 
+        cantidad: number; 
+        salidaUtc: string; 
+        llegadaUtc: string; 
+        isPickup?: boolean; 
+        pedidoId?: number 
+    }> = [];
+    
+    const salidas: Array<{ 
+        id: string; 
+        destino: string; 
+        cantidad: number; 
+        salidaUtc: string; 
+        llegadaUtc: string; 
+        isPickup?: boolean; 
+        pedidoId?: number 
+    }> = [];
+    
+    // 1. PROCESAR VUELOS
+    const vuelosUnicos = new Map<string, typeof windows[0]["vuelos"][0]>();
+    windows.forEach((window) => {
+      window.vuelos.forEach((vuelo) => {
+        if (!vuelosCancelados.has(vuelo.id) && !vuelosUnicos.has(vuelo.id)) {
+          vuelosUnicos.set(vuelo.id, vuelo);
+        }
+      });
+    });
+
+    vuelosUnicos.forEach((vuelo) => {
+      const salidaTime = new Date(vuelo.salidaUtc).getTime();
+      const llegadaTime = new Date(vuelo.llegadaUtc).getTime();
+
+      if (vuelo.destino === selectedAirportId && llegadaTime > now && llegadaTime <= next24h) {
+        llegadas.push({ 
+          id: vuelo.id, 
+          origen: vuelo.origen, 
+          cantidad: vuelo.cantidadAsignada,
+          salidaUtc: vuelo.salidaUtc,
+          llegadaUtc: vuelo.llegadaUtc
+        });
+      }
+      if (vuelo.origen === selectedAirportId && salidaTime <= next24h && llegadaTime > now) {
+        salidas.push({ 
+          id: vuelo.id, 
+          destino: vuelo.destino, 
+          cantidad: vuelo.cantidadAsignada,
+          salidaUtc: vuelo.salidaUtc,
+          llegadaUtc: vuelo.llegadaUtc
+        });
+      }
+    });
+
+    // 2. PROCESAR RECOJOS DE CLIENTES
+    const pedidosUnicos = new Map<number, typeof windows[0]["pedidos"][0]>();
+    windows.forEach(w => {
+        if(w.pedidos) w.pedidos.forEach(p => pedidosUnicos.set(p.id, p));
+    });
+
+    pedidosUnicos.forEach(pedido => {
+        if (pedido.destino === selectedAirportId && pedido.recojos) {
+            
+            pedido.recojos.forEach((recojo, idx) => {
+                const inicioEspera = new Date(recojo.inicioRecojo).getTime();
+                const finEspera = new Date(recojo.finRecojo).getTime();
+
+                const esFuturoCercano = (inicioEspera > now && inicioEspera <= next24h);
+                const estaOcurriendo = (now >= inicioEspera && now <= finEspera);
+
+                if (esFuturoCercano || estaOcurriendo) {
+                    salidas.push({
+                        id: `PICKUP-${pedido.id}-${idx}`, 
+                        destino: `Cliente ${pedido.idCliente}`, 
+                        cantidad: recojo.cantidad,
+                        salidaUtc: recojo.inicioRecojo, 
+                        llegadaUtc: recojo.finRecojo,   
+                        isPickup: true,
+                        pedidoId: pedido.id // <--- AQUÍ SE PASA EL ID DEL PEDIDO
+                    });
+                }
+            });
+        }
+    });
+
+    llegadas.sort((a, b) => new Date(a.llegadaUtc).getTime() - new Date(b.llegadaUtc).getTime());
+    salidas.sort((a, b) => new Date(a.salidaUtc).getTime() - new Date(b.salidaUtc).getTime());
+
+    return { llegadas, salidas };
+  }, [selectedAirportId, simNowUtc, windows, vuelosCancelados]);
+
+  // --- Lógica fin simulación ---
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
+  const [overlayVisible, setOverlayVisible] = useState(true);
 
   useEffect(() => {
-    if (!finished) return;
-    console.log ("🔚 [Simulación] Terminó:", finished.reason);
-
-    setOverlayVisible(true);
-  }, [finished, disconnect, reset]);
-
-  useEffect(() => {
-    if (finished && !finishedAt) {
-      setFinishedAt(Date.now());
+    if (finishedReason) {
+      setOverlayVisible(true);
     }
-  }, [finished, finishedAt]);
+  }, [finishedReason]);
+
+  useEffect(() => {
+    if (finishedReason && !finishedAt) setFinishedAt(Date.now());
+  }, [finishedReason, finishedAt]);
 
   useEffect(() => {
     setFinishedAt(null);
@@ -221,269 +347,136 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
 
   const handleDownloadReports = async () => {
     if (!runId) return;
-
-    await downloadFile(`reportes/download`, "reporteSimulacion.txt");
-
-    // Endpoint a crear, por ejemplo:
-    // GET /runs/{id}/report  -> devuelve ZIP
-    // downloadFile(`runs/${runId}/report`, `reporte-simulacion-${runId}.zip`);
+    await downloadFile(`reportes/downloadReporteSimulacion`, "reporteSimulacion.txt");
+    await downloadFile(`reportes/downloadUltimaPlanificacion`, "ultimaPlanificacion.txt");
   };
 
   const handleCloseOverlay = () => {
     setOverlayVisible(false);
-
-    //Cortamos el SSE
     disconnect();
-
-    //Limpiamos el contexto de la simulación
     reset();
   };
 
-  const [overlayVisible, setOverlayVisible] = useState(true);
+  const showFinishedOverlay = !!finishedReason && !!runId && overlayVisible;
 
-  const showFinishedOverlay = !!finished && !!runId && overlayVisible;
+  const flightDataForCard = useMemo(() => {
+    if (selectedVuelo) {
+      return {
+        ...selectedVuelo,
+        origenCodigo: selectedVuelo.origen,
+        destinoCodigo: selectedVuelo.destino
+      } as FlightCardData; 
+    }
+    if (hoveredFlight && !selectedAirportId) {
+      return hoveredFlight;
+    }
+    return null;
+  }, [selectedVuelo, hoveredFlight, selectedAirportId]);
 
   return (
     <div className="min-h-screen bg-neutral-50 relative">
-      {/*<p className="text-rose-600">{simNowUtc}</p>*/}
-      {/* Tooltip de aeropuerto */}
-      {activeAirportData && (
-        <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90">
-          <div className="space-y-3">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-border pb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeAirportData.porcentaje > 0.8 ? "#f97316" : activeAirportData.porcentaje > 0.5 ? "#facc15" : "#38bdf8" }}></div>
-                <h3 className="font-semibold text-lg">
-                  {selectedAirportId}
-                </h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {Math.round(activeAirportData.porcentaje * 100)}%
-                </span>
-                <button
-                  onClick={() => setSelectedAirport(null)}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Cerrar"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
+      {/* Toast de carga */}
+      {runState === "LOADING" && (
+        <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-xl p-4 flex items-center gap-4 max-w-sm">
+            <div className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full items-center justify-center bg-blue-50 dark:bg-blue-900/20">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
             </div>
-
-            {/* Capacidad */}
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-muted-foreground">Ocupación</span>
-                <span className="font-semibold">
-                  {activeAirportData.ocupacionActual} / {activeAirportData.capacidadTotal}
-                </span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                <div
-                  className="h-full transition-all"
-                  style={{
-                    width: `${activeAirportData.porcentaje * 100}%`,
-                    backgroundColor: activeAirportData.porcentaje > 0.8 ? "#f97316" : activeAirportData.porcentaje > 0.5 ? "#facc15" : "#38bdf8",
-                  }}
-                />
-              </div>
+            <div className="grid gap-1">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                Cargando Simulación...
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {loadingMessage || "Preparando entorno..."}
+                {loadingProgress > 0 && <span className="ml-1 font-mono">({Math.round(loadingProgress)}%)</span>}
+              </p>
             </div>
-
-            {/* Disponible */}
-            <div>
-              <p className="text-muted-foreground text-xs">Disponible</p>
-              <p className="font-semibold text-lg">{activeAirportData.disponible} uds</p>
-            </div>
-
-            {/* Eventos en tiempo real */}
-            {(activeAirportData.cargaLlegando !== undefined && activeAirportData.cargaLlegando > 0) ||
-             (activeAirportData.cargaSaliendo !== undefined && activeAirportData.cargaSaliendo > 0) ? (
-              <div className="border-t border-border pt-3 mt-3">
-                <p className="text-xs font-semibold mb-2 text-muted-foreground">En este momento</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {activeAirportData.cargaLlegando !== undefined && activeAirportData.cargaLlegando > 0 && (
-                    <div className="bg-green-500/10 rounded p-2 border border-green-500/20">
-                      <p className="text-green-600 dark:text-green-400 font-semibold">Llegando</p>
-                      <p className="text-sm font-bold text-green-700 dark:text-green-300">+{activeAirportData.cargaLlegando} uds</p>
-                    </div>
-                  )}
-                  {activeAirportData.cargaSaliendo !== undefined && activeAirportData.cargaSaliendo > 0 && (
-                    <div className="bg-orange-500/10 rounded p-2 border border-orange-500/20">
-                      <p className="text-orange-600 dark:text-orange-400 font-semibold">Saliendo</p>
-                      <p className="text-sm font-bold text-orange-700 dark:text-orange-300">-{activeAirportData.cargaSaliendo} uds</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : null}
-
-            {/* Estadísticas futuras (24h) */}
-            {activeAirportData.estadisticasFuturas && (
-              <div className="border-t border-border pt-3 mt-3">
-                <p className="text-xs font-semibold mb-2 text-muted-foreground">Próximas 24 horas</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <p className="text-muted-foreground">Llegadas</p>
-                    <p className="font-semibold">{activeAirportData.estadisticasFuturas.llegadasPrevistas} vuelos</p>
-                    <p className="text-[10px] text-muted-foreground">+{activeAirportData.estadisticasFuturas.cargaEntrante} uds</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Salidas</p>
-                    <p className="font-semibold">{activeAirportData.estadisticasFuturas.salidasPrevistas} vuelos</p>
-                    <p className="text-[10px] text-muted-foreground">-{activeAirportData.estadisticasFuturas.cargaSaliente} uds</p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      {/* Tooltip de vuelo */}
-      {activeFlight && !selectedAirportId && (
-        <div className="absolute top-20 right-4 z-50 w-80 p-4 rounded-xl shadow-2xl ring-1 ring-border backdrop-blur-xl backdrop-saturate-150 bg-card/90 pointer-events-auto">
-          <div className="space-y-3">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-border pb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activeFlight.planeColor }}></div>
-                <h3 className="font-semibold text-lg">
-                  {activeFlight.origenCodigo} → {activeFlight.destinoCodigo}
-                </h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {Math.round(activeFlight.progress * 100)}%
-                </span>
-                <button
-                  onClick={() => setActiveFlight(null)}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Cerrar detalles de vuelo"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
-            </div>
+      {/* 1. TARJETA DE AEROPUERTO */}
+      {activeAirportData && selectedAirportId && (
+        <AirportCard
+          airportId={selectedAirportId}
+          airportName={activeAirportStaticData?.name || selectedAirportId}
+          data={activeAirportData}
+          isSede={esSede}
+          flights={vuelosFuturos}
+          onClose={() => setSelectedAirport(null)}
+        />
+      )}
 
-            {/* Tiempos */}
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">Salida</p>
-                <p className="font-mono text-xs">
-                  {new Date(activeFlight.salidaUtc).toLocaleTimeString('es-PE', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    timeZone: 'UTC'
-                  })} UTC
-                </p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Llegada</p>
-                <p className="font-mono text-xs">
-                  {new Date(activeFlight.llegadaUtc).toLocaleTimeString('es-PE', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    timeZone: 'UTC'
-                  })} UTC
-                </p>
-              </div>
-            </div>
+      {/* 2. TARJETA DE VUELO */}
+      {flightDataForCard && !activeAirportData && (
+        <FlightCard
+          data={flightDataForCard}
+          simNowUtc={simNowUtc}
+          onClose={() => {
+            setSelectedVuelo(null);
+            setHoveredFlight(null);
+          }}
+          isHover={!!hoveredFlight && !selectedVuelo} 
+        />
+      )}
 
-            {/* Capacidad */}
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-muted-foreground">Ocupación</span>
-                <span className="font-semibold">
-                  {activeFlight.cantidadAsignada} / {activeFlight.capacidad}
-                </span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                <div
-                  className="h-full transition-all"
-                  style={{
-                    width: `${(activeFlight.cantidadAsignada / activeFlight.capacidad) * 100}%`,
-                    backgroundColor: activeFlight.pathColor,
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Carga */}
-            {activeFlight.carga.length > 0 && (
-              <div>
-                <p className="text-sm font-semibold mb-2">
-                  Carga ({activeFlight.carga.length} {activeFlight.carga.length === 1 ? 'pedido' : 'pedidos'})
-                </p>
-                <div className="max-h-40 overflow-y-auto space-y-1">
-                  {activeFlight.carga.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between text-xs p-2 rounded-lg bg-muted/50"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold">#{item.pedidoId}</span>
-                        {item.esConexion && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
-                            Conexión
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{item.cantidad} uds</p>
-                        <p className="text-muted-foreground text-[10px]">→ {item.destinoFinal}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* 3. TARJETA DE PEDIDO */}
+      {selectedPedido && !selectedVuelo && !selectedAirportId && (
+        <OrderCard
+          pedido={selectedPedido}
+          simNowUtc={simNowUtc}
+          variant="simulacion"
+          onClose={() => setSelectedPedido(null)}
+        />
       )}
 
       <MainMap>
-        {/* Renderizar vuelos animados */}
         {flightsToRender.map((flight) => (
           <FlightPath
             key={flight.id}
             id={flight.id}
             origin={flight.origin}
             dest={flight.dest}
-            progress={flight.progress}
+            progress={flight.progress ?? 0}
             pathColor={flight.pathColor}
             planeColor={flight.planeColor}
-            onClick={() =>
-              setActiveFlight((prev) => (prev?.id === flight.id ? null : flight))
-            }
+            onMouseEnter={() => setHoveredFlight(flight)}
+            onMouseLeave={() => setHoveredFlight(null)}
+            onClick={() => {
+              setActiveFlight((prev) => (prev?.id === flight.id ? null : flight));
+              const vueloDto = vuelosMap.get(flight.id);
+              if (vueloDto) {
+                setSelectedVuelo(vueloDto);
+                setSelectedAirport(null);
+              }
+              setHoveredFlight(null);
+            }}
           />
         ))}
 
-        {/* Renderizar aeropuertos */}
         <AirportMarkers
-          items={airports}
+          items={airportsForRender}
           activeId={selectedAirportId}
           hoveredId={hoveredAirportId}
           baseColor={COLOR_NORMAL}
           activeColor={ACTIVE_COLOR}
           hoverColor={HOVER_COLOR}
           onHoverChange={setHoveredAirportId}
-          onClick={(id) =>
-            setSelectedAirport(selectedAirportId === id ? null : id)
-          }
+          onClick={(id) => {
+            const newId = selectedAirportId === id ? null : id;
+            setSelectedAirport(newId);
+            if (newId) {
+              setSelectedVuelo(null);
+            }
+          }}
           iconSize={16}
         />
       </MainMap>
 
-      {finished && runId && (
+      {finishedReason && runId && (
         <SimulationFinishedOverlay
           open={showFinishedOverlay}
-          reason={finished.reason}
+          reason={finishedReason}
           simStartUtc={simStartUtc ?? null}
           simEndUtc={simNowUtc ?? null}
           wallAnchor={wallStartUtc}
@@ -492,7 +485,15 @@ const { simNowUtc, airportOccupancy, finished, simStartUtc, wallStartUtc, discon
           onDownloadReports={handleDownloadReports}
         />
       )}
-
     </div>
+  );
+}
+
+export default function Simulacion() {
+  return (
+    <RunSessionProvider>
+      <TopNav />
+      <SimulacionContent />
+    </RunSessionProvider>
   );
 }

@@ -114,6 +114,32 @@ public final class ImpresorSolucion {
                 }
         }
 
+        public static void imprimirUltimaPlanificacion(SolucionProgramacion sol, String nombreArchivo, Instant presenteUTC) {
+                String contenido = formatearReporte(sol, presenteUTC);
+
+                // 2) archivo (APPEND, sin truncar)
+                Path path = Paths.get(nombreArchivo == null || nombreArchivo.isBlank()
+                        ? "solucion.txt"
+                        : nombreArchivo);
+
+                System.out.println("[imprimirEnArchivo]: El path es: " + path);
+
+                try (var writer = Files.newBufferedWriter(
+                        path,
+                        StandardCharsets.UTF_8,
+                        StandardOpenOption.CREATE, // crea si no existe
+                        StandardOpenOption.WRITE,
+                        StandardOpenOption.APPEND // escribe al final
+                )) {
+                        writer.write(contenido);
+                        // separador opcional entre ejecuciones
+                        writer.write(System.lineSeparator());
+                        writer.write(System.lineSeparator());
+                } catch (IOException e) {
+                        throw new RuntimeException("No se pudo escribir en " + path.toAbsolutePath(), e);
+                }
+        }
+
         public static Path guardarTodo(SolucionProgramacion sol, Instant presenteUtc, String prefijo) {
                 try {
                         String base = (prefijo == null || prefijo.isBlank())
@@ -374,7 +400,7 @@ public final class ImpresorSolucion {
                 boolean sla48OK = sol.respetaSLA48hTodos();
 
                 sb.append("╔════════════════════════════════════════════════════════════╗\n");
-                sb.append("║               RESUMEN DE LA SOLUCIÓN DE PLANEO             ║\n");
+                sb.append("║             RESUMEN DE LA ÚLTIMA PLANIFICACIÓN             ║\n");
                 sb.append("╚════════════════════════════════════════════════════════════╝\n");
                 sb.append(String.format("Fecha y hora de ejecución (UTC): %s%n",
                                 DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss 'UTC'",

@@ -16,15 +16,13 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.time.format.DateTimeFormatter;
 
-// Imports para la anotación de reflexión
-import io.quarkus.runtime.annotations.RegisterForReflection; // <-- NUEVO IMPORT CRÍTICO
+import io.quarkus.runtime.annotations.RegisterForReflection; 
 
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunContext;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunId;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.StopReason;
-
-// ... (El método stream() se mantiene sin cambios) ...
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.WindowPacket;
 
 @Path("/runs")
 @RequestScoped
@@ -42,45 +40,67 @@ public class RunsSseController {
 
         return Multi.createFrom().emitter(emitter -> {
 
-            //Apenas se conecta, va a emitir un RUN_STARTED
-            RunContext ctx = runManager.requireContext(runId.value());
-            emitter.emit(new RunStartedEvt(runId.value(), ctx.simStartUtc().toString(),
-                    ctx.wallAnchor().toString(), ctx.speed()));
+            // 1. BLINDAJE INICIAL: Verificamos si el Run existe antes de empezar
+            try {
+                RunContext ctx = runManager.requireContext(runId.value());
+                // Si existe, emitimos el evento de inicio
+                emitter.emit(new RunStartedEvt(runId.value(), ctx.simStartUtc().toString(),
+                        ctx.wallAnchor().toString(), ctx.speed()));
+            } catch (IllegalStateException | IllegalArgumentException e) {
+                // Si el run no existe (ya terminó o id incorrecto), cerramos el stream suavemente
+                // System.out.println("SSE: El run " + runIdStr + " no existe o ya terminó. Cerrando conexión.");
+                emitter.complete();
+                return; // Salimos para no registrar listeners fantasmas
+            }
 
 
             // Listener que reenvía los eventos del RunManager al SSE
             RunManager.RunListener listener = new RunManager.RunListener() {
                 @Override
-                public void onWindow(pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.WindowPacket p) {
+                public void onWindow(WindowPacket p) {
                     emitter.emit(new WindowEvt(p.runId, p.windowId, p.windowStartUTC, p.windowEndUTC, p.vuelos, p.pedidos));
                 }
+
                 @Override
                 public void onFinished(String id, StopReason reason) {
                     emitter.emit(new FinishedEvt(id, reason.name()));
                     // NO cerramos el SSE aquí: los vuelos deben continuar hasta llegar
                 }
+
+                @Override
+                public void onLoading(String id, String message) {
+                    emitter.emit(new LoadingEvt(id, message, 0.0));
+                }
             };
-            // Suscribimos al run
-            runManager.registerListener(runId, listener);
             
-            //Tick cada 1s real (esto es simNowUtc)
+            // Suscribimos al run
+            // Nota: Aquí también podría fallar si se borra en el milisegundo exacto entre el try de arriba y esto,
+            // así que un try-catch extra no hace daño.
+            try {
+                runManager.registerListener(runId, listener);
+            } catch (Exception e) {
+                emitter.complete();
+                return;
+            }
+            
+            // Tick cada 1s real
             ScheduledExecutorService tickExec = Executors.newSingleThreadScheduledExecutor();
             ScheduledFuture<?> tickFuture = tickExec.scheduleAtFixedRate(() -> {
                 try {
-                   Instant now = Instant.now();
-                   Instant simNow = runManager.currentSimNow(runId.value());
+                    // 2. BLINDAJE DEL TICK: Si el run se borra, estos métodos lanzan excepción
+                    Instant simNow = runManager.currentSimNow(runId.value());
+                    var ocupacionAeropuertos = runManager.getCurrentAirportOccupancy(runId.value());
 
-                   // Imprime una sola línea, bien formateada
-                   System.out.printf("Tick executed at %s | simNow=%s%n",
-                            ISO.format(now),
-                            ISO.format(simNow));
-
-                   // Obtener ocupación actual de aeropuertos
-                   var ocupacionAeropuertos = runManager.getCurrentAirportOccupancy(runId.value());
-
-                   emitter.emit(new TickEvt(runId.value(), simNow.toString(), ocupacionAeropuertos));
+                    emitter.emit(new TickEvt(runId.value(), simNow.toString(), ocupacionAeropuertos));
+                }
+                catch (IllegalStateException ie) {
+                    // El run fue eliminado de memoria (normal al finalizar).
+                    // Capturamos la excepción para evitar el stack trace gigante en logs.
+                    // Lanzamos RuntimeException para detener el scheduler silenciosamente o no hacemos nada.
+                    throw new RuntimeException("Run finished, stopping ticker");
                 }
                 catch (Exception e) {
+                    // Otros errores reales sí los imprimimos
                     e.printStackTrace();
                 }
             }, 0L, 1L, TimeUnit.SECONDS);
@@ -95,9 +115,9 @@ public class RunsSseController {
         });
     }
 
-    // ---------- DTOs mínimos del SSE (AÑADIR @RegisterForReflection a TODOS) ----------
+    // ---------- DTOs del SSE ----------
 
-    @RegisterForReflection // <-- ¡Añadir!
+    @RegisterForReflection
     public static final class RunStartedEvt {
         public final String type = "RUN_STARTED";
         public final String runId;
@@ -109,7 +129,21 @@ public class RunsSseController {
         }
     }
 
-    @RegisterForReflection // <-- ¡Añadir!
+    @RegisterForReflection
+    public static final class LoadingEvt {
+        public final String type = "LOADING";
+        public final String runId;
+        public final String message;
+        public final Double progress; 
+        
+        public LoadingEvt(String runId, String message, Double progress) {
+            this.runId = runId;
+            this.message = message;
+            this.progress = progress;
+        }
+    }
+
+    @RegisterForReflection
     public static final class TickEvt{
         public final String type = "TICK";
         public final String runId;
@@ -120,7 +154,7 @@ public class RunsSseController {
         }
     }
 
-    @RegisterForReflection // <-- ¡Añadir!
+    @RegisterForReflection
     public static final class WindowEvt {
         public final String type = "WINDOW";
         public final String runId;
@@ -142,11 +176,11 @@ public class RunsSseController {
         }
     }
 
-    @RegisterForReflection // <-- ¡Añadir!
+    @RegisterForReflection
     public static final class FinishedEvt {
         public final String type = "FINISHED";
         public final String runId;
-        public final String reason; // MANUAL | FIN_DE_RANGO | COLAPSE | ERROR (StopReason.java)
+        public final String reason; // MANUAL | FIN_DE_RANGO | COLAPSO | ERROR
         public FinishedEvt(String runId, String reason) { this.runId = runId; this.reason = reason; }
     }
 }

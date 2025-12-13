@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import Logo from "@/assets/Logo-de-AirExpress-Distribution.svg";
 import LogoMark from "@/assets/airexpress2.svg";
-import { useEffect, useState, type JSX } from "react";
+import { useEffect, type JSX } from "react";
 import ToolsPanel, { ColapsoToolsPanel, OperacionDiariaToolsPanel } from "./ToolsPanel";
 import NavClock from "./NavClock";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -39,7 +39,7 @@ const CONTENT: Record<string, JSX.Element> = {
 };
 
 export default function TopNav() {
-  const [showContent, setShowContent] = useState(false);
+  //const [showContent, setShowContent] = useState(false);
   const { pathname: currentPage } = useLocation();
 
   const showButton = SHOW_BTN_PAGES.has(currentPage);
@@ -48,13 +48,17 @@ export default function TopNav() {
   //Esto es para la conexión SSE de la solución
 
   //Traemos el contexto
-  const { runId, status, end, setSimNow, setWindow, reset, setAutoReconnect } = useRunSession();
+  const { runId, status, end, setSimNow, setWindow, setAutoReconnect,
+    toolsPanelOpen, setToolsPanelOpen} = useRunSession();
+
+  const showContent = toolsPanelOpen;
 
   //Para el reloj
   const running = status === "running" && !!runId;
   
   //Acá expone connect(url, handlers) -> () => void
-  const { simNowUtc, windows, finished, wallStartUtc, disconnect } = useRunSSE(
+  // --- CORRECCIÓN: Usamos finishedReason en lugar de finished ---
+  const { simNowUtc, windows, finishedReason, wallStartUtc } = useRunSSE(
     status === "running" && runId ? runId : undefined
   );
 
@@ -77,9 +81,10 @@ export default function TopNav() {
     }
   }, [windows, setWindow]);
 
+  // --- CORRECCIÓN: Chequeamos finishedReason ---
   useEffect(() => {
-    if (finished) end("finished");
-  }, [finished, end]);
+    if (finishedReason) end("finished");
+  }, [finishedReason, end]);
 
   //Para finalizar/cancelar el run:
   const handleCancelRun = async () => {
@@ -108,24 +113,27 @@ export default function TopNav() {
     }
     else if (data) {
       if (data.cancelled){
-        console.log("✅ [TopNav] Simulación finalizada exitosamente:", data);
+        console.log("[TopNav] Simulación finalizada exitosamente:", data);
         toast.custom((t) => (
           <ToastCustom
             t={t}
-            message={"¡Simulación finalizada exitosamente!"+"✅"}
+            message={"¡Simulación finalizada exitosamente!"}
             type="success"
           />),
         { duration: 5000});
 
+        /*
         //Cortamos el SSE
         disconnect();
+          */
 
         //Para que no dispare el evento de reconexión
         setAutoReconnect(false);
 
+        /*
         //Limpiamos el contexto de la simulación
         reset();
-
+          */
       }
       else{
         console.error("❌ [ToolsPanel] Error al finalizar la simulación:", error);
@@ -240,7 +248,8 @@ export default function TopNav() {
             <div className="hidden md:block">
               <ClockSwitcher
                 running={running}
-                finished={!!finished}
+                // --- CORRECCIÓN: Convertimos finishedReason a booleano ---
+                finished={!!finishedReason}
                 runNow={simNowUtc ? new Date(simNowUtc) : null}
                 runStart={wallStartUtc ? new Date(wallStartUtc) : null}
                 onCancel={handleCancelRun}
@@ -288,7 +297,7 @@ export default function TopNav() {
         <div className="hidden md:block text-center mt-2">
           {showButton && !showContent && (
             <button
-              onClick={() => setShowContent(true)}
+              onClick={() => setToolsPanelOpen(true)}
               className="text-foreground hover:text-foreground/70 font-medium focus:outline-none ring-border"
             >
               Ver más ↓
@@ -302,7 +311,7 @@ export default function TopNav() {
               </div>
               <div className="mt-1">
                 <button
-                  onClick={() => setShowContent(false)}
+                  onClick={() => setToolsPanelOpen(false)}
                   className="text-foreground hover:text-foreground/70 font-medium focus:outline-none ring-border"
                 >
                   Ocultar ↑

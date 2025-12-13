@@ -1,9 +1,11 @@
 package pe.edu.pucp.morapack.airscheduler.api.controllers;
 
+import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import pe.edu.pucp.morapack.airscheduler.api.mapper.PedidoMapper;
 import pe.edu.pucp.morapack.airscheduler.api.response.JsonResponse;
 import pe.edu.pucp.morapack.airscheduler.api.response.PedidoResponse;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
@@ -25,6 +27,17 @@ public class OperacionDiariaController {
 
     @Inject
     RunManager runManager;
+
+    @RegisterForReflection
+    public static final class ForceReplanResponse {
+        public boolean forced;
+        public String message;
+
+        public ForceReplanResponse(boolean forced, String message) {
+            this.forced = forced;
+            this.message = message;
+        }
+    }
 
     @POST
     @Path("/upload")
@@ -58,13 +71,14 @@ public class OperacionDiariaController {
                             .entity(new JsonResponse("error", "Error al crear pedido", null))
                             .build();
                 }
-                pedidos.leerDatosProfe(sc);
+                    pedidos.leerDatosProfe(sc);
                 System.out.println("[OperacionDiariaController] Pedidos cargados: " + pedidos.getLista().size());
 
             } catch (Exception e) {
                 archivoCargado = false;
                 System.err.println("[OperacionDiariaController] Error procesando archivo de pedidos: " + e.getMessage());
             }
+            PedidoMapper.reasignarIds(pedidos.getLista());
 
             /// 2.2) Anclamos la fecha actual (por ahora, solo dd/mm/aaaa, no las horas)
             runManager.normalizarFechasOD(runId, pedidos.getLista());
@@ -102,11 +116,34 @@ public class OperacionDiariaController {
     @POST
     @Path("/{id}/force")
     public Response forceReplan(@PathParam("id") String runId){
-        System.out.println("[OperacionDiariaController]: Se recibió un forceReplan");
+        System.out.println("[OperacionDiariaController]: Se recibió un forceReplan para runId=" + runId);
 
-        runManager.setForcedReplan(runId);
+        if (runId == null || runId.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ForceReplanResponse(false, "runId es requerido"))
+                    .build();
+        }
 
-        return Response.ok().build();
+
+        try {
+            runManager.setForcedReplan(runId);
+            return Response.ok(
+                    new ForceReplanResponse(true, "Planificación forzada registrada correctamente")
+            ).build();
+
+        } catch (IllegalStateException e) {
+            // por ejemplo: no hay run activo con ese id
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(new ForceReplanResponse(false, "No se pudo forzar la planificación: " + e.getMessage()))
+                    .build();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Response.serverError()
+                    .entity(new ForceReplanResponse(false, "Error interno al forzar la planificación"))
+                    .build();
+        }
+
     }
 
 }
