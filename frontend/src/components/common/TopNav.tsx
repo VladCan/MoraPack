@@ -58,7 +58,7 @@ export default function TopNav() {
   
   //Acá expone connect(url, handlers) -> () => void
   // --- CORRECCIÓN: Usamos finishedReason en lugar de finished ---
-  const { simNowUtc, windows, finishedReason, wallStartUtc } = useRunSSE(
+  const { simNowUtc, windows, finishedReason, wallStartUtc, simStartUtc } = useRunSSE(
     status === "running" && runId ? runId : undefined
   );
 
@@ -252,6 +252,7 @@ export default function TopNav() {
                 finished={!!finishedReason}
                 runNow={simNowUtc ? new Date(simNowUtc) : null}
                 runStart={wallStartUtc ? new Date(wallStartUtc) : null}
+                simStartUtc={simStartUtc ? new Date(simStartUtc) : null}
                 onCancel={handleCancelRun}
               />
             </div>
