@@ -104,6 +104,7 @@ const RunEvtSchema = z.discriminatedUnion("type", [
   // 1. Estado LOADING
   z.object({
     type: z.literal("LOADING"), 
+    runId: z.string(),
     message: z.string().optional(),
     progress: z.number().optional()
   }),

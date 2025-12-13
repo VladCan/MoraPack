@@ -31,6 +31,10 @@ interface RunSessionState {
     toolsPanelOpen: boolean;
     setToolsPanelOpen: (open: boolean) => void;
 
+    loadingMessage: string;
+    loadingProgress: number;
+    showLoadingOverlay: boolean;
+
     //Esto va a usar TopNav:
     begin: (runId: string) => void;
     end: (status?: Extract<RunStatus, "finished" | "failed">) => void
@@ -45,6 +49,9 @@ interface RunSessionState {
 
     autoReconnect: boolean;
     setAutoReconnect: (state: boolean) => void;
+
+    setLoadingUI: (msg: string, progress: number) => void;
+    setShowLoadingOverlay: (show: boolean) => void;
 
 }
 
@@ -63,6 +70,10 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
     const [selectedVuelo, setSelectedVueloState] = useState<VueloDTO | null>(null);
     const [toolsPanelOpen, setToolsPanelOpenState] = useState(false);
 
+    const [loadingMessage, setLoadingMessage] = useState("");
+    const [loadingProgress, setLoadingProgress] = useState(0);
+    const [showLoadingOverlay, setShowLoadingOverlayState] = useState(false);
+
     const [autoReconnect, setAutoReconnect] = useState<boolean>(true);
 
     const begin = useCallback((id: string) => {
@@ -75,6 +86,9 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setSelectedPedidoState(null);
         setVuelosCancelados(new Set());
         setSelectedVueloState(null);
+        setLoadingMessage("");
+        setLoadingProgress(0);
+        setShowLoadingOverlayState(true);
     }, []);
 
     //Esto es para reconectar, o conectar por primera vez desde otro pc
@@ -157,6 +171,9 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setSelectedPedidoState(null);
         setVuelosCancelados(new Set());
         setSelectedVueloState(null); 
+        setLoadingMessage("");
+        setLoadingProgress(0);
+        setShowLoadingOverlayState(false);
     }, []);
 
     const cancelarVuelo = useCallback((vueloId: string) => {
@@ -196,6 +213,15 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setToolsPanelOpenState(open);
     }, []);
 
+    const setLoadingUI = useCallback((msg: string, progress: number) => {
+        setLoadingMessage(msg);
+        setLoadingProgress(progress);
+    }, []);
+
+    const setShowLoadingOverlay = useCallback((show: boolean) => {
+        setShowLoadingOverlayState(show);
+    }, []);
+
     const value = useMemo<RunSessionState>(() => ({
         runId,
         status,
@@ -218,9 +244,15 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         cancelarVuelo,
         reset,
         autoReconnect,
-        setAutoReconnect
+        setAutoReconnect,
+        loadingMessage,
+        loadingProgress,
+        showLoadingOverlay,
+        setLoadingUI,
+        setShowLoadingOverlay
     }), [runId, status, simNow, lastWindow, windows, selectedAirportId, selectedPedido, vuelosCancelados,
-        selectedVuelo, toolsPanelOpen, begin, end, setSimNow, setWindow, setSelectedAirport, setSelectedPedido, cancelarVuelo, reset, autoReconnect]);
+        selectedVuelo, toolsPanelOpen, begin, end, setSimNow, setWindow, setSelectedAirport, setSelectedPedido, cancelarVuelo, reset, autoReconnect,
+        loadingMessage, loadingProgress, showLoadingOverlay, setLoadingUI, setShowLoadingOverlay]);
 
     return (
         <RunSessionContext.Provider value={value}>

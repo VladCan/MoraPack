@@ -76,12 +76,15 @@ export function SimulacionContent() {
     selectedVuelo,
     setSelectedVuelo,
     setToolsPanelOpen,
-  } = useRunSession();
-
-  const {
-    runState,
+    //Para el overlay de LOADING:
+    showLoadingOverlay,
     loadingMessage,
     loadingProgress,
+  } = useRunSession();
+
+  const showOverlay = showLoadingOverlay && windows.length === 0; 
+
+  const {
     simNowUtc,
     airportOccupancy,
     finishedReason,
@@ -377,7 +380,7 @@ export function SimulacionContent() {
   return (
     <div className="min-h-screen bg-neutral-50 relative">
       {/* Toast de carga */}
-      {runState === "LOADING" && (
+      {showOverlay && (
         <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-xl p-4 flex items-center gap-4 max-w-sm">
             <div className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full items-center justify-center bg-blue-50 dark:bg-blue-900/20">
