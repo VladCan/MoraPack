@@ -75,7 +75,6 @@ export function SimulacionContent() {
     setSelectedPedido,
     selectedVuelo,
     setSelectedVuelo,
-    setToolsPanelOpen,
     //Para el overlay de LOADING:
     showLoadingOverlay,
     loadingMessage,
@@ -452,7 +451,7 @@ export function SimulacionContent() {
               if (vueloDto) {
                 setSelectedVuelo(vueloDto);
                 setSelectedAirport(null);
-                setToolsPanelOpen(true);
+                //setToolsPanelOpen(true);
               }
               setHoveredFlight(null);
             }}
@@ -472,7 +471,7 @@ export function SimulacionContent() {
             setSelectedAirport(newId);
             if (newId) {
               setSelectedVuelo(null);
-              setToolsPanelOpen(true);
+              //setToolsPanelOpen(true);
             }
           }}
           iconSize={16}
