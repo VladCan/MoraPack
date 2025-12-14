@@ -92,7 +92,8 @@ export  function OperacionContent() {
     selectedPedido,
     setSelectedPedido,
     selectedVuelo,
-    setSelectedVuelo 
+    setSelectedVuelo,
+    setToolsPanelOpen 
   } = useRunSession();
   
   const { 
@@ -538,6 +539,7 @@ export  function OperacionContent() {
                    if (vueloDto) {
                      setSelectedVuelo(vueloDto);
                      setSelectedAirport(null);
+                     setToolsPanelOpen(true);
                    }
                    //Para asegurar que el hover no quede abierto
                    setHoveredFlight(null);
@@ -561,6 +563,7 @@ export  function OperacionContent() {
             setSelectedAirport(newId);
             if (newId) {
                 setSelectedVuelo(null);
+                setToolsPanelOpen(true);
             }
           }}
           iconSize={16}

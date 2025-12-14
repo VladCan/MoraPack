@@ -1,20 +1,21 @@
 // src/components/common/ClockSwitcher.tsx
 import { useEffect, useRef, useState } from "react";
 import NavClock from "./NavClock";
-
+import { SimulatedElapsedBadge } from "./SimulatedElapsedBadge"; 
 type Props = {
   className?: string;
   running: boolean;       // ¿hay simulación activa?
   finished: boolean;      // ¿terminó la simulación?
   runNow?: Date | null;   // tick que llega del backend/contexto
   runStart?: Date | null; // inicio exacto de la simulación (del back viene en UTC)
+  simStartUtc?: Date | null;
   simTimeZone?: string // ZonaHoraria de la simulación (por defecto es UTC)
   onCancel?: () => void; //Para pasar la función que gestiona la cancelación
 };
 
-export default function ClockSwitcher({ className = "", running, finished, runNow, 
-  runStart, simTimeZone="UTC", onCancel}: Props) {
-    
+export default function ClockSwitcher({ className = "", running, finished, runNow, simStartUtc,
+  runStart, simTimeZone = "UTC", onCancel }: Props) {
+
   ///Esto es para contar el tiempo real de la simulación transcurrido
 
   const [elapsedMs, setElapsedMs] = useState(0);
@@ -44,41 +45,51 @@ export default function ClockSwitcher({ className = "", running, finished, runNo
     }, 1000);
     return () => clearInterval(id);
   }, [runStart, finished]);
-  
+
   return (
-  <div
-    className={[
-      "fixed top-2 right-3 z-[50] shrink-0 whitespace-nowrap", // posición original
-      className,
-    ].join(" ")}>
-
-    {/* Reloj del sistema */}
-    <NavClock
-      variant="system"
-      className={[
-        "absolute right-0 top-0 transition-all duration-300 ease-out",
-      ].join(" ")}
-    />
-
-    {/* Reloj de simulación + tiempo transcurrido */}
     <div
       className={[
-        "absolute right-0 top-0 transition-all duration-300 ease-out -mt-8",
-        running ? "translate-y-[110%] opacity-100" : "translate-y-0 opacity-0",
+        "fixed top-2 right-3 z-[50] shrink-0 whitespace-nowrap", // posición original
+        className,
       ].join(" ")}>
 
-      <div className="flex flex-col items-center gap-2 -mt-4">
-        <NavClock
-          variant="run"
-          value={runNow ?? undefined}
-          timeZone={simTimeZone}
-          className=""/>
-        
-        {/*Tiempo transcurrido*/}
-        {runStart && <ElapsedBadge ms={elapsedMs} finished={finished} />}
-      
-        {/*Cancelar simulación*/}
-        {onCancel && running && !finished && (
+      {/* Reloj del sistema */}
+      <NavClock
+        variant="system"
+        className={[
+          "absolute right-0 top-0 transition-all duration-300 ease-out",
+        ].join(" ")}
+      />
+
+      {/* Reloj de simulación + tiempo transcurrido */}
+      <div
+        className={[
+          "absolute right-0 top-0 transition-all duration-300 ease-out -mt-4",
+          running ? "translate-y-[110%] opacity-100" : "translate-y-0 opacity-0",
+        ].join(" ")}>
+
+        <div className="flex flex-col items-center gap-2 -mt-4">
+          <NavClock
+            variant="run"
+            value={runNow ?? undefined}
+            timeZone={simTimeZone}
+            className="" />
+
+          {/*Tiempo transcurrido*/}
+          {runStart && <ElapsedBadge ms={elapsedMs} finished={finished} />}
+
+          {/*Tiempo transcurrido simulado*/}
+
+          {simStartUtc && runNow && (
+            <SimulatedElapsedBadge
+              start={simStartUtc}
+              now={runNow}
+              finished={finished}
+            />
+          )}
+
+          {/*Cancelar simulación*/}
+          {onCancel && running && !finished && (
             <button
               type="button"
               onClick={onCancel}
@@ -86,12 +97,12 @@ export default function ClockSwitcher({ className = "", running, finished, runNo
             >
               Terminar simulación
             </button>
-        )}
+          )}
 
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
 }
 
 function ElapsedBadge({ ms, finished }: { ms: number; finished: boolean }) {
@@ -115,3 +126,4 @@ function ElapsedBadge({ ms, finished }: { ms: number; finished: boolean }) {
     </span>
   );
 }
+

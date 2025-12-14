@@ -105,6 +105,7 @@ const SnapshotSchema = z.object({
 const RunEvtSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("LOADING"), 
+    runId: z.string(),
     message: z.string().optional(),
     progress: z.number().optional()
   }),

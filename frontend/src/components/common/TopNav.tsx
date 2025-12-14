@@ -49,7 +49,7 @@ export default function TopNav() {
 
   //Traemos el contexto
   const { runId, status, end, setSimNow, setWindow, setAutoReconnect,
-    toolsPanelOpen, setToolsPanelOpen} = useRunSession();
+    toolsPanelOpen, setToolsPanelOpen, setLoadingUI, setShowLoadingOverlay} = useRunSession();
 
   const showContent = toolsPanelOpen;
 
@@ -58,9 +58,27 @@ export default function TopNav() {
   
   //Acá expone connect(url, handlers) -> () => void
   // --- CORRECCIÓN: Usamos finishedReason en lugar de finished ---
-  const { simNowUtc, windows, finishedReason, wallStartUtc } = useRunSSE(
+
+  const { simNowUtc, windows, finishedReason, wallStartUtc, simStartUtc } = useRunSSE(
+
+  const {loadingMessage, loadingProgress, simNowUtc, windows, finishedReason, wallStartUtc } = useRunSSE(
+
     status === "running" && runId ? runId : undefined
   );
+
+  //Propagamos el OVERLAY mientras estamos en LOADING
+  useEffect(() => {
+      console.log("!!!!!!!!!!!!!El mensaje es:", loadingMessage);
+      setShowLoadingOverlay(true);
+      setLoadingUI(loadingMessage ?? "", loadingProgress ?? 0);
+  }, [loadingMessage, loadingProgress, setLoadingUI, setShowLoadingOverlay])
+
+  //Apagamos el OVERLAY cuando llegue la primera WINDOW
+  useEffect(() => {
+    if (windows.length > 0) {
+      setShowLoadingOverlay(false);
+    }
+  }, [windows.length, setShowLoadingOverlay]);
 
   //Propagamos los TICKs al contexto
   useEffect(() => {
@@ -252,6 +270,7 @@ export default function TopNav() {
                 finished={!!finishedReason}
                 runNow={simNowUtc ? new Date(simNowUtc) : null}
                 runStart={wallStartUtc ? new Date(wallStartUtc) : null}
+                simStartUtc={simStartUtc ? new Date(simStartUtc) : null}
                 onCancel={handleCancelRun}
               />
             </div>
