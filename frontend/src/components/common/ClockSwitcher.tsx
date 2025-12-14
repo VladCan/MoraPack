@@ -63,7 +63,7 @@ export default function ClockSwitcher({ className = "", running, finished, runNo
     {/* Reloj de simulación + tiempo transcurrido */}
     <div
       className={[
-        "absolute right-0 top-0 transition-all duration-300 ease-out -mt-4",
+        "absolute right-0 top-0 transition-all duration-300 ease-out -mt-8",
         running ? "translate-y-[110%] opacity-100" : "translate-y-0 opacity-0",
       ].join(" ")}>
 

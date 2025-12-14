@@ -197,7 +197,7 @@ export default function ToolsPanel({
     const vuelosActivosMap = new Map<string, VueloDTO>();
     
     windows.forEach(window => {
-      window.vuelos.forEach(v => {
+      window.vuelos?.forEach(v => {
         if (vuelosCancelados.has(v.id)) return;
         
         if (!vuelosActivosMap.has(v.id)) {
@@ -228,7 +228,7 @@ export default function ToolsPanel({
     if (variant !== "operacion") return null;
     const map = new Map<number, PedidoDTO>();
     windows.forEach(window => {
-      window.pedidos.forEach(p => {
+      window.pedidos?.forEach(p => {
         map.set(p.id, p);
       });
     });
@@ -268,7 +268,7 @@ export default function ToolsPanel({
     const pedidosEnVueloSet = new Set<number>();
     
     windows.forEach(window => {
-      window.vuelos.forEach(vuelo => {
+      window.vuelos?.forEach(vuelo => {
         const salida = new Date(vuelo.salidaUtc).getTime();
         const llegada = new Date(vuelo.llegadaUtc).getTime();
         if (now >= salida && now <= llegada) {

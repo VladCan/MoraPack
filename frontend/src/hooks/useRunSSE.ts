@@ -6,10 +6,9 @@ import { z } from "zod";
 // 1. ZOD SCHEMAS & TIPOS (Source of Truth)
 // ==========================================
 
-// --- Tu Enum de Java reflejado en Zod ---
 export const RunStateSchema = z.enum([
   "PENDING",
-  "LOADING",   // <--- Aquí está el estado crítico para tu carga en memoria
+  "LOADING",   
   "RUNNING",
   "STOPPED",
   "COMPLETED",
@@ -54,11 +53,10 @@ const VueloDTOSchema = z.object({
   carga: z.array(CargaItemSchema),
 });
 
-// --- NUEVO: Schema para el detalle del recojo del cliente ---
 const RecojoSchema = z.object({
   cantidad: z.number(),
-  inicioRecojo: z.string(), // ISO 8601
-  finRecojo: z.string(),    // ISO 8601
+  inicioRecojo: z.string(), 
+  finRecojo: z.string(),    
 });
 
 const PedidoDTOSchema = z.object({
@@ -66,7 +64,6 @@ const PedidoDTOSchema = z.object({
   idCliente: z.number(),
   destino: z.string(),
   cantidad: z.number(),
-  // Por si acaso el backend manda numPaquetes en otro contexto
   numPaquetes: z.number().optional(), 
   origen: z.union([z.string(), z.array(z.string()), z.null()]),
   cantidadAsignada: z.number(),
@@ -75,8 +72,6 @@ const PedidoDTOSchema = z.object({
   fechaLocal: z.string().optional(),
   continenteDestino: z.string().optional(),
   rutas: z.array(RutaDetalleSchema).optional(),
-  
-  // --- NUEVO: Lista de recojos (para mostrar salidas en el frontend) ---
   recojos: z.array(RecojoSchema).optional(), 
 });
 
@@ -99,15 +94,20 @@ const AeropuertoOcupacionSchema = z.object({
 
 const StopReasonSchema = z.enum(["FIN_DE_RANGO", "MANUAL", "COLAPSO", "ERROR"]);
 
+// --- NUEVO: Schema para el Snapshot ---
+const SnapshotSchema = z.object({
+    runId: z.string(),
+    simNow: z.string(),
+    vuelos: z.array(VueloDTOSchema)
+});
+
 // --- EVENTOS DEL SSE ---
 const RunEvtSchema = z.discriminatedUnion("type", [
-  // 1. Estado LOADING
   z.object({
     type: z.literal("LOADING"), 
     message: z.string().optional(),
     progress: z.number().optional()
   }),
-  // 2. Estado RUNNING (Inicio)
   z.object({
     type: z.literal("RUN_STARTED"),
     runId: z.string(),
@@ -115,14 +115,12 @@ const RunEvtSchema = z.discriminatedUnion("type", [
     wallAnchorUtc: z.string(),
     speed: z.number(),
   }),
-  // 3. Actualizaciones durante RUNNING
   z.object({
     type: z.literal("TICK"),
     runId: z.string(),
     simNowUtc: z.string(),
     aeropuertos: z.record(z.string(), AeropuertoOcupacionSchema).optional(),
   }),
-  // 4. Ventanas de decisión
   z.object({
     type: z.literal("WINDOW"),
     runId: z.string(),
@@ -132,13 +130,11 @@ const RunEvtSchema = z.discriminatedUnion("type", [
     vuelos: z.array(VueloDTOSchema),
     pedidos: z.array(PedidoDTOSchema),
   }),
-  // 5. Estados finales
   z.object({
     type: z.literal("FINISHED"),
     runId: z.string(),
     reason: StopReasonSchema,
   }),
-  // 6. Error explícito
   z.object({
     type: z.literal("ERROR"),
     message: z.string()
@@ -152,7 +148,6 @@ export type VueloDTO = z.infer<typeof VueloDTOSchema>;
 export type PedidoDTO = z.infer<typeof PedidoDTOSchema>;
 export type AeropuertoOcupacion = z.infer<typeof AeropuertoOcupacionSchema>;
 export type StopReason = z.infer<typeof StopReasonSchema>;
-// Exportamos el tipo de recojo por si se necesita fuera
 export type RecojoDTO = z.infer<typeof RecojoSchema>;
 
 export type WindowData = {
@@ -168,18 +163,13 @@ export type WindowData = {
 // ==========================================
 
 export function useRunSSE(runId?: string) {
-  // Estado de conexión técnica
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // --- Estado Lógico del Run ---
   const [runState, setRunState] = useState<RunState>("PENDING");
-  
-  // Datos extra para UI de carga
   const [loadingMessage, setLoadingMessage] = useState<string>("");
   const [loadingProgress, setLoadingProgress] = useState<number>(0);
 
-  // Datos de Simulación
   const [speed, setSpeed] = useState<number | undefined>();
   const [simNowUtc, setSimNow] = useState<string | undefined>();
   const [simStartUtc, setSimStart] = useState<string | undefined>();
@@ -190,24 +180,17 @@ export function useRunSSE(runId?: string) {
 
   const esRef = useRef<EventSource | null>(null);
 
-  // =========================================================
-  // 🕵️ LOG DE DIAGNÓSTICO: MONITOREO DE CAMBIO DE ESTADO
-  // =========================================================
   useEffect(() => {
-    // Si cambia el estado, lo imprimimos con color verde brillante
     console.log(`%c[HOOK STATE] runState cambió a: ${runState}`, 'background: #000; color: #0f0; font-size: 14px; padding: 3px;');
-    
     if (runState === 'LOADING') {
-        console.log('%c[HOOK STATE] ⏳ ESTAMOS EN LOADING (La UI debería mostrar spinner)', 'background: orange; color: black; font-weight: bold; padding: 4px;');
+        console.log('%c[HOOK STATE] ⏳ ESTAMOS EN LOADING', 'background: orange; color: black; font-weight: bold; padding: 4px;');
     }
   }, [runState]);
 
-  // Construcción de URL
   const url = useMemo(() => {
     if (!runId) return null;
     const path = `runs/${runId}/stream`;
     const base = import.meta.env.VITE_API_BASE_URL as string | undefined;
-    
     try {
       if (base && base.length > 0) return new URL(path, base).toString();
       return `/${path}`;
@@ -233,6 +216,67 @@ export function useRunSSE(runId?: string) {
     setAirportOccupancy({});
   }, [runId]);
 
+  // =========================================================
+  // 📸 NUEVO: FETCH SNAPSHOT (Rehidratación)
+  // =========================================================
+  useEffect(() => {
+      if (!runId) return;
+
+      const fetchSnapshot = async () => {
+          try {
+              console.log(`%c[SNAPSHOT] Solicitando estado inicial para ${runId}...`, 'color: violet');
+              
+              // Construir URL del snapshot
+              const path = `runs/${runId}/snapshot`;
+              const base = import.meta.env.VITE_API_BASE_URL as string | undefined;
+              const snapshotUrl = base ? new URL(path, base).toString() : `/${path}`;
+
+              const res = await fetch(snapshotUrl);
+              if (!res.ok) {
+                  console.warn("[SNAPSHOT] No se pudo obtener snapshot (quizás el run apenas inicia)");
+                  return;
+              }
+
+              const json = await res.json();
+              // Validar con Zod
+              const data = SnapshotSchema.parse(json);
+
+              console.log(`%c[SNAPSHOT] Recibidos ${data.vuelos.length} vuelos activos`, 'color: violet');
+
+              // Actualizar tiempo simulado si no lo tenemos aún
+              setSimNow(prev => prev || data.simNow);
+
+              // Inyectar como una "Ventana Sintética" inicial
+              // Usamos índice -999 para que quede al principio y no moleste a las ventanas reales
+              setWindows(prev => {
+                  // Si ya tenemos datos (por SSE muy rápido), no sobrescribimos agresivamente,
+                  // pero idealmente el snapshot llega primero o complementa.
+                  // Simplemente lo agregamos.
+                  const snapshotWindow: WindowData = {
+                      index: -999, 
+                      startUtc: data.simNow,
+                      endUtc: data.simNow,
+                      vuelos: data.vuelos,
+                      pedidos: [] // El snapshot de vuelos no trae pedidos completos, solo carga
+                  };
+                  
+                  // Evitar duplicados si el efecto corre dos veces
+                  if (prev.some(w => w.index === -999)) return prev;
+                  
+                  return [snapshotWindow, ...prev];
+              });
+
+          } catch (error) {
+              console.error("[SNAPSHOT] Error procesando snapshot:", error);
+          }
+      };
+
+      fetchSnapshot();
+  }, [runId]);
+
+  // =========================================================
+  // SSE CONNECTION
+  // =========================================================
   useEffect(() => {
     if (!url) return;
 
@@ -247,7 +291,6 @@ export function useRunSSE(runId?: string) {
       console.log("%c[SSE OPEN] Conexión abierta", 'color: cyan');
       setConnected(true);
       setError(null);
-      // Por defecto, si estábamos pending, pasamos a loading al conectar (esperando datos)
       if (runState === 'PENDING') setRunState("LOADING"); 
     };
 
@@ -256,20 +299,14 @@ export function useRunSSE(runId?: string) {
       try {
         const raw = JSON.parse(ev.data);
         
-        // =========================================================
-        // 🕵️ LOG DE DIAGNÓSTICO: DATOS CRUDOS DEL BACKEND
-        // =========================================================
-        // Solo logueamos si NO es un TICK para no saturar la consola, 
-        // pero SI logueamos LOADING, ERROR, WINDOW, etc.
         if (raw.type !== 'TICK') {
             console.log(`%c📩 [SSE RAW] Evento recibido: ${raw.type}`, 'color: #aaa', raw);
         }
 
-        const evt = RunEvtSchema.parse(raw); // Validación Zod
+        const evt = RunEvtSchema.parse(raw); 
 
         switch (evt.type) {
           case "LOADING":
-            console.log("%c[SSE] Entrando al case LOADING", 'color: orange');
             setRunState("LOADING"); 
             if (evt.message) setLoadingMessage(evt.message);
             if (evt.progress !== undefined) setLoadingProgress(evt.progress);
@@ -324,9 +361,6 @@ export function useRunSSE(runId?: string) {
         }
       } catch (err) {
         if (err instanceof z.ZodError) {
-          // =========================================================
-          // 🕵️ LOG DE DIAGNÓSTICO: ERROR DE VALIDACIÓN
-          // =========================================================
           console.error("%c❌ [ZOD ERROR] El backend mandó datos inválidos:", 'background: red; color: white', err.issues);
           setError("Error de validación de datos (Backend mismatch)");
         } else {

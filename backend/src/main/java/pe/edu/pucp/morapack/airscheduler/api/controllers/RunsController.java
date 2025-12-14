@@ -10,7 +10,10 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.*;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.hibernate.internal.util.StringHelper.isBlank;
@@ -210,6 +213,26 @@ public class RunsController {
         System.out.println("[RunsController]: Enviando snapshot de runId " + runId);
         return Response.ok(pkt).build();
 
+    }
+    @GET
+    @Path("/{runId}/snapshot")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getSnapshot(@PathParam("runId") String runId) {
+        // Verificar si existe el run
+        if (runManager.requireContext(runId) == null) {
+             return Response.status(404).build();
+        }
+        
+        List<Object> activeFlights = runManager.getActiveStateSnapshot(runId);
+        
+        // Empaquetarlo en un objeto similar a WindowPacket pero "estático"
+        Map<String, Object> response = new HashMap<>();
+        response.put("runId", runId);
+        response.put("simNow", runManager.currentSimNow(runId).toString());
+        response.put("vuelos", activeFlights);
+        // También podrías añadir ocupación actual si la necesitas sincronizar al inicio
+        
+        return Response.ok(response).build();
     }
 
 }
