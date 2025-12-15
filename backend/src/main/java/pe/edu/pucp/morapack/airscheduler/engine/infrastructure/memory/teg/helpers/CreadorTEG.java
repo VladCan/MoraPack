@@ -4,9 +4,6 @@ import static pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg
 import static pe.edu.pucp.morapack.airscheduler.engine.infrastructure.memory.teg.helpers.FechasTEG.instantesDiariosEnVentana;
 
 import java.time.Instant;
-import java.time.LocalTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 

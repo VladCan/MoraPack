@@ -16,6 +16,9 @@ public class CancelacionesService {
     @Inject
     ArchivoManager archivoManager;
 
+    @SuppressWarnings("unused")
+    private boolean nuevoArchivoSubido;
+
     private static final String FILENAME = "cancelaciones.txt";
 
     public Path getCancelacionesFilePath() {
@@ -35,4 +38,23 @@ public class CancelacionesService {
 
         return targetPath;
     }
+
+    public synchronized void setNuevoArchivoSubido(boolean b) {
+    if (b) {
+        this.nuevoArchivoSubido = true;
+    }
+}
+
+/**
+ * Devuelve true SOLO UNA VEZ por cada archivo subido.
+ * Luego resetea el estado.
+ */
+public synchronized boolean isNuevoArchivoSubido() {
+    if (nuevoArchivoSubido) {
+        nuevoArchivoSubido = false; // se consume el evento
+        return true;
+    }
+    return false;
+}
+
 }

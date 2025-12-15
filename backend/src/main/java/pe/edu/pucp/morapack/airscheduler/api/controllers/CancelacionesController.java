@@ -32,10 +32,11 @@ public class CancelacionesController {
     public Response uploadCancelaciones(
             @FormParam("file") InputStream fileInputStream) {
 
-        try {
+        try (InputStream is = fileInputStream) {
             // **DELEGACIÓN:** El service se encarga de obtener la ruta, crear el directorio y copiar el archivo.
-            java.nio.file.Path targetPath = cancelacionesService.guardarArchivoCancelaciones(fileInputStream);
-
+            java.nio.file.Path targetPath = cancelacionesService.guardarArchivoCancelaciones(is);
+            // Levanta una bandera para saver que se subio un nuevo archivo
+            cancelacionesService.setNuevoArchivoSubido(true);
             return Response
                     .ok(new JsonResponse("success", "Archivo de pedidos guardado exitosamente", targetPath.toAbsolutePath().toString()))
                     .build();

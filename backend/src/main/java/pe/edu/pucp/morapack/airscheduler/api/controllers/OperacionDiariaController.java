@@ -12,10 +12,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 
-import java.io.IOException;
 import java.io.InputStream;
-import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;

@@ -42,7 +42,7 @@ import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.TramoAsignado;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.model.VueloProgramadoId;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.service.VerificadorSLA;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.ssp.SSPGeneradorSeed;
-
+import pe.edu.pucp.morapack.airscheduler.api.service.CancelacionesService;
 @ApplicationScoped
 public class RunManager {
 
@@ -62,6 +62,9 @@ public class RunManager {
 
     @Inject
     ReportesService reportesService;
+
+    @Inject
+    CancelacionesService cancelacionesService;
 
     private final ExecutorService executor = Executors.newCachedThreadPool((r -> {
         Thread t = new Thread(r, "run-" + UUID.randomUUID());
@@ -942,6 +945,12 @@ public class RunManager {
             System.out.println("[RunManager] Procesando ventana " + idx + ": " + wStart + " - " + wEnd);
 
             try {
+
+                if (cancelacionesService.isNuevoArchivoSubido()) {
+                    System.out.println("RunManager: detectado nuevo archivo de cancelaciones");
+
+                    }
+
 
                 ///  1. Preparar estado anterior
                 // 1. Preparar estado anterior si existe
