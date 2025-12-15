@@ -82,7 +82,7 @@ export function SimulacionContent() {
     loadingProgress,
   } = useRunSession();
 
-  const showOverlay = showLoadingOverlay && windows.length === 0; 
+  const showOverlay = showLoadingOverlay && windows.length === 1; 
 
   const {
     simNowUtc,
@@ -380,24 +380,44 @@ export function SimulacionContent() {
   return (
     <div className="min-h-screen bg-neutral-50 relative">
       {/* Toast de carga */}
-      {showOverlay && (
-        <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-xl p-4 flex items-center gap-4 max-w-sm">
-            <div className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full items-center justify-center bg-blue-50 dark:bg-blue-900/20">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-            </div>
-            <div className="grid gap-1">
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-                Cargando Simulación...
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {loadingMessage || "Preparando entorno..."}
-                {loadingProgress > 0 && <span className="ml-1 font-mono">({Math.round(loadingProgress)}%)</span>}
-              </p>
-            </div>
+      {/* Overlay de carga */}
+{showOverlay && (
+  <>
+    {/* Fondo borroso */}
+    <div
+      className="
+        fixed inset-0 z-[90]
+        bg-white/40 dark:bg-slate-950/40
+        backdrop-blur-sm
+        transition-opacity
+      "
+    />
+
+      {/* Toast de carga */}
+      <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-xl p-4 flex items-center gap-4 max-w-sm">
+          <div className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full items-center justify-center bg-blue-50 dark:bg-blue-900/20">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+          </div>
+
+          <div className="grid gap-1">
+            <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+              Cargando simulación…
+            </p>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {loadingMessage || "Preparando entorno…"}
+              {loadingProgress > 0 && (
+                <span className="ml-1 font-mono">
+                  ({Math.round(loadingProgress)}%)
+                </span>
+              )}
+            </p>
           </div>
         </div>
-      )}
+      </div>
+    </>
+  )}
 
       {/* 1. TARJETA DE AEROPUERTO */}
       {activeAirportData && selectedAirportId && (

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Plane, X, Box } from "lucide-react";
+import { Plane, X, Box, PlaneLanding } from "lucide-react";
 
 // Interfaz unificada
 export interface FlightCardData {
@@ -199,7 +199,7 @@ export default function FlightCard({ data, simNowUtc, onClose, isHover }: Flight
 
         {/* Manifiesto Mini (Scrollable) */}
         {data.carga && data.carga.length > 0 && (
-            <div className="border-t border-slate-100 dark:border-slate-800 max-h-[160px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
+            <div className="border-t border-slate-100 dark:border-slate-800 max-h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 hover:scrollbar-thumb-slate-300">
                 {data.carga.map((item, idx) => (
                     <div 
                         key={idx} 
@@ -213,7 +213,7 @@ export default function FlightCard({ data, simNowUtc, onClose, isHover }: Flight
                             {/* Indicador visual (punto) */}
                             <div className={`w-1.5 h-1.5 rounded-full ${item.esConexion ? 'bg-amber-500' : 'bg-indigo-400'}`} />
                             <div className="flex flex-col">
-                                <span className={`text-[11px] font-bold ${item.esConexion ? 'text-amber-800 dark:text-amber-200' : 'text-slate-700 dark:text-slate-200'}`}>
+                                <span className={`text-[14px] font-bold ${item.esConexion ? 'text-amber-800 dark:text-amber-200' : 'text-slate-700 dark:text-slate-200'}`}>
                                     Pedido #{item.pedidoId}
                                 </span>
                                 {item.esConexion && (
@@ -225,10 +225,10 @@ export default function FlightCard({ data, simNowUtc, onClose, isHover }: Flight
                         </div>
                         <div className="text-right">
                             <div className={`text-xs font-bold ${item.esConexion ? 'text-amber-800 dark:text-amber-200' : 'text-slate-600 dark:text-slate-300'}`}>
-                                {item.cantidad} <span className="text-[9px] font-normal opacity-70">uds</span>
+                                {item.cantidad} <span className="text-[9px] font-normal opacity-70">prod.</span>
                             </div>
                             <div className={`flex items-center gap-0.5 justify-end text-[10px] font-mono mt-0.5 ${item.esConexion ? 'text-amber-600/80 dark:text-amber-400' : 'text-slate-400'}`}>
-                                <span>→</span>
+                                <span><PlaneLanding className="w-3 h-3" strokeWidth={2.5} /></span>
                                 <span>{item.destinoFinal}</span>
                             </div>
                         </div>
