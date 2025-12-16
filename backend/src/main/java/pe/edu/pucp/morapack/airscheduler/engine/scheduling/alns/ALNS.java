@@ -59,8 +59,11 @@ public class ALNS {
         System.out.println(CYAN + ">>> INICIANDO ALNS (MODO: PROFILING ACTIVADO) <<<" + RESET);
         System.out.println(CYAN + "=================================================" + RESET);
 
+        final SolucionProgramacion solucionBackup = new SolucionProgramacion(solucionInicial);
+        final OcupacionPorAeropuerto ocupacionBackup = this.ocupacionPorAeropuerto.copiaProfunda();
+
         // Inicializamos el operador de emergencia con una cantidad fija a borrar (ej. 20)
-        this.emergencyOperator = new WarehouseCrisisRemoval(20, this.aeropuertosMap);
+        this.emergencyOperator = new WarehouseCrisisRemoval(3, this.aeropuertosMap);
 
         // Reset stats
         destroyTotalTimeNs.clear(); destroyCount.clear();
@@ -86,7 +89,7 @@ public class ALNS {
         int iteracionesSinMejora = 0;
         long tInicioGlobal = System.nanoTime();
         // Límite de tiempo: 29 segundos (para respetar timeouts típicos de 30s)
-        long tiempoLimiteNs = 29L * 1_000_000_000L; 
+        long tiempoLimiteNs = 120L * 1_000_000_000L;
 
         for (int iter = 0; iter < maxIter; iter++) {
 
@@ -208,7 +211,7 @@ public class ALNS {
         int intentos = 0;
         int maxIntentosLegalizacion = 50;
 
-        while (mejorOcupacion.hayExcesoDeCapacidad() && intentos < maxIntentosLegalizacion) {
+        while (mejorOcupacion.hayExcesoDeCapacidad() && intentos > maxIntentosLegalizacion) {
             intentos++;
             System.out.println(YELLOW + "⚠️ ALERTA DE CRISIS (" + intentos + "/" + maxIntentosLegalizacion + "): " +
                     "Limpiando almacenes desbordados de forma agresiva..." + RESET);
@@ -237,6 +240,17 @@ public class ALNS {
         long tTotal = (System.nanoTime() - tInicioGlobal) / 1_000_000;
         
         imprimirReporteTiempos();
+
+        /*if (!hayCargaAsignada(mejorSolucion)){
+            // Revertir solución
+            mejorSolucion = new SolucionProgramacion(solucionBackup);
+
+            // Revertir ocupación global (la que el RunManager comparte entre ventanas)
+            this.ocupacionPorAeropuerto.copiarDesde(ocupacionBackup);
+
+            //sanitizarSolucion(mejorSolucion);
+            //limpiarMapaGlobal(mejorSolucion);
+        }*/
 
         System.out.println(CYAN + ">>> FIN. Tiempo: " + tTotal + "ms. Mejor Costo: " + String.format("%,.0f", costoMejor) + RESET);
         return mejorSolucion;
@@ -337,6 +351,18 @@ public class ALNS {
         }
 
         return costo;
+    }
+
+    private boolean hayCargaAsignada(SolucionProgramacion sol) {
+        if (sol == null) return false;
+        if (sol.getCargaPorVuelo() == null) return false;
+        Map<VueloProgramadoId, Integer> asignado = sol.getCargaPorVuelo().getAsignado();
+        if (asignado == null || asignado.isEmpty()) return false;
+
+        for (Integer v : asignado.values()) {
+            if (v != null && v > 3000) return true;
+        }
+        return false;
     }
 
     public static final class Journal {

@@ -904,7 +904,7 @@ public class RunManager {
         /// Tenemos que hacer cambios para que soporte por minutos (no en el algoritmo, creo que ahí no,
         /// sino en RunConfig (línea 59 en dicho archivo))
 
-        Duration minutosVentana = Duration.ofMinutes(3);
+        Duration minutosVentana = Duration.ofMinutes(20);
 
         //Instant wEnd = wStart.plus(config.horasVentana());
         Instant wEnd = wStart.plus(minutosVentana);
@@ -1034,15 +1034,17 @@ public class RunManager {
 //Eliminar Vuelos
                 /// 4. Generamos la solución inicial (seed)
                 OcupacionPorAeropuerto ocupacionPorAeropuerto = ocupacionesPorRun.computeIfAbsent(id, k -> new OcupacionPorAeropuerto(aeropuertosMap));
+                System.out.println("Entrando al SSP");
                 SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of(), ocupacionPorAeropuerto);
                 SolucionProgramacion seed = ssp.generarSeed(teg, pedidosVentana, wStart);
+                System.out.println("Saliendo del SSP");
 
                 /// 5. Ejecutamos ALNS
-                List<DestructionOperator> destructores = new ArrayList<>();
+                 List<DestructionOperator> destructores = new ArrayList<>();
                 destructores.add(new RandomRemoval(30));
                 destructores.add(new WorstRemoval(15));
-                destructores.add(new WarehouseCrisisRemoval(15,aeropuertosMap));
-                destructores.add(new SlaBreachRemoval(10));
+                destructores.add(new WarehouseCrisisRemoval(3,aeropuertosMap));
+                destructores.add(new SlaBreachRemoval(3));
                 List<RepairOperator> reparadores = new ArrayList<>();
                 //reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
                 reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
@@ -1050,7 +1052,7 @@ public class RunManager {
                 reparadores.add(new UrgencySplitRepair(new ArrayList<>(sedes), teg));
 
                 ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto,aeropuertosMap);
-                SolucionProgramacion solucionOptima = alns.ejecutar(seed);
+                SolucionProgramacion solucionOptima = alns.ejecutar(seed); //seed;
 
                 /// 6. Guardar solución para la siguiente ventana y sincronizar ocupación
                 actualizarOcupacionDesdeSolucion(id, solucionOptima, solucionAnterior, reservas, enVuelo, wStart);

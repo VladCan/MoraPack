@@ -35,7 +35,7 @@ public class SSPGeneradorSeed {
     private final Set<String> sedes;                           // orígenes habilitados para multi-hop
     private final StockLibre stockLibre;                       // stock disponible por no-sede (arribos exógenos no comprometidos)
     private final OcupacionPorAeropuerto ocupacionPorAeropuerto;//clase nueva implementada para control de stocks en tierra
-    private final Duration slaLlegadaMax = Duration.ofHours(46);
+    private final Duration slaLlegadaMax = Duration.ofHours(72);
 
     /** Construye con sedes y arribos libres (no comprometidos) por aeropuerto. */
     public SSPGeneradorSeed(Set<String> sedes, Map<String, List<ArriboExogeno>> arribosLibres) {
@@ -70,7 +70,10 @@ public class SSPGeneradorSeed {
 
         Map<Integer, PlanPedido> planPorPedido = new HashMap<>();
 
+        int a = 1;
+
         for (Pedido p : pedidosOrdenados) {
+            System.out.println("a: " + a);
             String dest = p.getDestino();
             int demanda = cantidadPedido(p);
             int rem = demanda;
@@ -87,7 +90,9 @@ public class SSPGeneradorSeed {
                 // 1) Encontrar la MEJOR ruta (mín #escalas, luego menor llegada) desde cualquier sede a dest
                 Ruta ruta = null;
                 for (int hops = 0; hops <= H_MAX; hops++) {
+                    System.out.println("Entro al buscarRutaMinHops con hop: " + hops);
                     ruta = buscarRutaMinHops(idx, carga, sedes, dest, presenteUtc, limiteLlegada, hops);
+                    System.out.println("Salí del buscarRutaMinHops con hop " + hops + ": " + ruta);
                     if (ruta != null) break;
                 }
 
@@ -144,6 +149,9 @@ public class SSPGeneradorSeed {
                 if (primeraLlegada == null) primeraLlegada = ruta.arriboFinal;
                 // El while seguirá buscando más rutas que respeten la ventana 2h (con el límiteLlegada ajustado).
             }
+
+            System.out.println("Terminó el bucle " + a);
+            a++;
 
             PlanPedido plan = PlanPedido.builder()
                     .idPedido(p.getIdPedido())
@@ -239,6 +247,7 @@ public class SSPGeneradorSeed {
         // Por cada sede, DFS acotado por #hops y tiempos
         for (String sede : sedes) {
             Ruta r = dfsRutas(idx, carga, sede, dest, earliest, latest, hops, new ArrayList<>());
+            System.out.println("Para " + sede + ", encontré ruta en buscarRutaMinHops:" + r);
             if (r != null) {
                 if (mejor == null || r.arriboFinal.isBefore(mejor.arriboFinal)) {
                     mejor = r;
