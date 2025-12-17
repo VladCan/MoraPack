@@ -33,6 +33,16 @@ public class Pedido {
         this.cantidad = cantidad;
     }
 
+    public Pedido (int idPedido, int idCliente, String destino, LocalDateTime fecha,
+                   Instant fechaUTC, int cantidad){
+        this.idPedido = idPedido;
+        this.idCliente = idCliente;
+        this.destino = destino;
+        this.fecha = fecha;
+        this.createdAtUtc = fechaUTC;
+        this.cantidad = cantidad;
+    }
+
     public Instant getCreatedAtUtc() {
         return createdAtUtc;
     }
