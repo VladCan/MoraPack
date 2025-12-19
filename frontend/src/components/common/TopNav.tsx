@@ -280,6 +280,8 @@ export default function TopNav() {
               />
             </div>
 
+            <p>{wallStartUtc}</p>
+
             {/* ===== MÓVIL: FAB reloj (izquierda) ===== */}
             <MobileClockFab className="md:hidden fixed left-4 bottom-18 z-[60]" />
 
