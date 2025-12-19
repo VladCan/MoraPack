@@ -59,23 +59,28 @@ export default function TopNav() {
   //Acá expone connect(url, handlers) -> () => void
   // --- CORRECCIÓN: Usamos finishedReason en lugar de finished ---
 
-  const { simNowUtc, windows, finishedReason, wallStartUtc, simStartUtc } = useRunSSE(
 
-  const {loadingMessage, loadingProgress, simNowUtc, windows, finishedReason, wallStartUtc } = useRunSSE(
+  const {runState,loadingMessage, loadingProgress, simNowUtc, windows, finishedReason, wallStartUtc,simStartUtc } = useRunSSE(
 
     status === "running" && runId ? runId : undefined
   );
 
-  //Propagamos el OVERLAY mientras estamos en LOADING
+ //Propagamos el OVERLAY mientras estamos en LOADING
   useEffect(() => {
-      console.log("!!!!!!!!!!!!!El mensaje es:", loadingMessage);
-      setShowLoadingOverlay(true);
+    if (!runId) return;
+    // Solo mostrar mientras esté LOADING Y aún no haya ventanas
+    const show = windows.length <= 1;
+    console.log ("El valor de show es:", show)
+    setShowLoadingOverlay(show);
+    if (show) {
       setLoadingUI(loadingMessage ?? "", loadingProgress ?? 0);
-  }, [loadingMessage, loadingProgress, setLoadingUI, setShowLoadingOverlay])
+    }
+  }, [runId, runState, windows.length, loadingMessage, loadingProgress, setLoadingUI, setShowLoadingOverlay]);
 
   //Apagamos el OVERLAY cuando llegue la primera WINDOW
   useEffect(() => {
     if (windows.length > 0) {
+      console.log("[TopNav] Primera WINDOW recibida");
       setShowLoadingOverlay(false);
     }
   }, [windows.length, setShowLoadingOverlay]);

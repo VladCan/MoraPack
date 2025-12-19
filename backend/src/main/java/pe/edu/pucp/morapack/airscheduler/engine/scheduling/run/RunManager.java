@@ -1947,4 +1947,72 @@ public class RunManager {
         
         return vuelosPlanificados;
     }
+    public List<Object> getActiveStateSnapshot(String runId) {
+        List<Object> activeFlights = new ArrayList<>();
+        
+        try {
+            // 1. Obtener tiempo actual y plan maestro
+            Instant simNow = currentSimNow(runId);
+            Map<Integer, PlanPedido> masterPlan = masterPlanPorRun.get(runId);
+            SolucionProgramacion ultimaSolucion = solucionesAnteriores.get(runId); // Para capacidades
+
+            if (masterPlan == null || ultimaSolucion == null || ultimaSolucion.getCargaPorVuelo() == null) {
+                return activeFlights;
+            }
+
+            CargaPorVuelo cargaPorVuelo = ultimaSolucion.getCargaPorVuelo();
+            Set<VueloProgramadoId> vuelosProcesados = new HashSet<>();
+
+            // 2. Recorrer el plan maestro buscando vuelos activos
+            for (PlanPedido plan : masterPlan.values()) {
+                if (plan.getRutas() == null) continue;
+                for (RutaAsignada ruta : plan.getRutas()) {
+                    if (ruta.getTramos() == null) continue;
+                    
+                    for (TramoAsignado tramo : ruta.getTramos()) {
+                        VueloProgramadoId vuelo = tramo.getVuelo();
+                        if (vuelo == null) continue;
+
+                        // Un vuelo es relevante para el snapshot si:
+                        // A) Ya despegó (salida <= now)
+                        // B) Aún no ha "terminado" visualmente (llegada >= now - buffer)
+                        //    (Le damos un buffer de 30 mins post-llegada para que no desaparezca de golpe si hay lag)
+                        Instant salida = vuelo.getSalidaUtc();
+                        Instant llegada = vuelo.getLlegadaUtc();
+                        
+                        // Buffer visual: mostrar aviones que acaban de aterrizar hace poco
+                        Instant corteVisual = simNow.minus(Duration.ofMinutes(30));
+
+                        if (salida != null && llegada != null && 
+                            salida.isBefore(simNow) && // Ya salió
+                            llegada.isAfter(corteVisual)) { // Aún es relevante
+                            
+                            if (vuelosProcesados.contains(vuelo)) continue;
+                            vuelosProcesados.add(vuelo);
+
+                            // Construir DTO del vuelo (reutilizando lógica existente)
+                             String vueloIdStr = vuelo.getOrigen() + "-" + vuelo.getDestino() + "-" + vuelo.getSalidaUtc().toString().replace(":", "");
+                             
+                             int cantidadAsignada = cargaPorVuelo.getAsignado().getOrDefault(vuelo, 0);
+
+                             Map<String, Object> vueloDTO = new HashMap<>();
+                             vueloDTO.put("id", vueloIdStr);
+                             vueloDTO.put("origen", vuelo.getOrigen());
+                             vueloDTO.put("destino", vuelo.getDestino());
+                             vueloDTO.put("salidaUtc", vuelo.getSalidaUtc().toString());
+                             vueloDTO.put("llegadaUtc", vuelo.getLlegadaUtc() != null ? vuelo.getLlegadaUtc().toString() : null);
+                             vueloDTO.put("cantidadAsignada", cantidadAsignada);
+                             vueloDTO.put("capacidad", cargaPorVuelo.capacidad(vuelo));
+                             vueloDTO.put("carga", extraerCargaDelVuelo(ultimaSolucion, vuelo));
+                             
+                             activeFlights.add(vueloDTO);
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[RunManager] Error generando snapshot: " + e.getMessage());
+        }
+        return activeFlights;
+    }
 }
