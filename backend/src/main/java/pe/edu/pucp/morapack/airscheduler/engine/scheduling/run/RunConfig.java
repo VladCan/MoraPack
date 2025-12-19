@@ -71,7 +71,7 @@ public class RunConfig {
                 inicio,
                 null,
                 windowSize,
-                Duration.ofHours(24),
+                Duration.ofHours(72),
                 sedes,
                 System.nanoTime(),
                 Duration.ofSeconds(60),
