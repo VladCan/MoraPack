@@ -241,7 +241,7 @@ public class ALNS {
         
         imprimirReporteTiempos();
 
-        /*if (!hayCargaAsignada(mejorSolucion)){
+        if (true){
             // Revertir solución
             mejorSolucion = new SolucionProgramacion(solucionBackup);
 
@@ -250,7 +250,7 @@ public class ALNS {
 
             //sanitizarSolucion(mejorSolucion);
             //limpiarMapaGlobal(mejorSolucion);
-        }*/
+        }
 
         System.out.println(CYAN + ">>> FIN. Tiempo: " + tTotal + "ms. Mejor Costo: " + String.format("%,.0f", costoMejor) + RESET);
         return mejorSolucion;

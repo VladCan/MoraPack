@@ -25,6 +25,17 @@ public class Pedido {
     public Pedido() {
     }
 
+    public Pedido(Pedido pedido) {
+        this.idPedido = pedido.idPedido;
+        this.idCliente = pedido.idCliente;
+        this.destino = pedido.destino;
+        this.origen = pedido.origen;
+        this.fecha = pedido.fecha;
+        this.createdAtUtc = pedido.createdAtUtc;
+        this.cantidad = pedido.cantidad;
+        this.continenteDestino = pedido.continenteDestino;
+    }
+
     public Pedido(int idPedido, int idCliente, String destino, LocalDateTime fecha, int cantidad) {
         this.idPedido = idPedido;
         this.idCliente = idCliente;

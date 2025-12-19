@@ -95,7 +95,13 @@ public class RunManager {
 
     public String currentActiveRunId(){ return activeRunId.get(); }
     public void setActiveRunIdRunId(String runId) { activeRunId.set(runId); }
-    
+
+    private SolucionProgramacion solucionGlobal = null;
+
+    /// ///////////////////////////////////////////
+    /// ///////////////////////////////////////////
+    /// RETORNAR A ESTE PUNTO
+
     /**
      * Obtiene el último run activo (con estado RUNNING) de cualquier tipo.
      * Útil para obtener vuelos programados cuando no hay run de operación activo.
@@ -169,7 +175,7 @@ public class RunManager {
     // Catálogos compartidos (se cargan una vez)
     private volatile AeropuertosMap aeropuertosMap;
     private volatile VuelosMap vuelosMap;
-    private volatile CargarPedidos pedidosCargados;
+    private volatile CargarPedidos  pedidosCargados;
     private volatile Set<String> sedes;
     private volatile VuelosCancelados cancelados;
     // Estado de planificación por run
@@ -564,6 +570,8 @@ public class RunManager {
 
         slaBroken.remove(id);
         masterPlanPorRun.remove(id);
+
+        solucionGlobal = null;
     }
 
     private boolean isCancelled(String id){
@@ -904,7 +912,7 @@ public class RunManager {
         /// Tenemos que hacer cambios para que soporte por minutos (no en el algoritmo, creo que ahí no,
         /// sino en RunConfig (línea 59 en dicho archivo))
 
-        Duration minutosVentana = Duration.ofMinutes(20);
+        Duration minutosVentana = Duration.ofMinutes(30);
 
         //Instant wEnd = wStart.plus(config.horasVentana());
         Instant wEnd = wStart.plus(minutosVentana);
@@ -969,7 +977,7 @@ public class RunManager {
                         vuelosCanceladosPorRun.get(id).clear();
                     }
 
-                    pedidosCargados.eliminarYActualizarCumplidosHasta(wStart, solucionAnterior);
+                    pedidosCargados.eliminarYActualizarCumplidosHasta(wStart, solucionAnterior, true);
                     System.out.println("[RunManager] Después de eliminarYActualizarCumplidosHasta: " +
                             pedidosCargados.getLista().size() + " pedidos en cola");
                     enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior, wStart);
@@ -1054,6 +1062,9 @@ public class RunManager {
                 ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto,aeropuertosMap);
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed); //seed;
 
+                //
+                mergeSolucion(solucionOptima);
+
                 /// 6. Guardar solución para la siguiente ventana y sincronizar ocupación
                 actualizarOcupacionDesdeSolucion(id, solucionOptima, solucionAnterior, reservas, enVuelo, wStart);
                 solucionesAnteriores.put(id, solucionOptima);
@@ -1072,7 +1083,8 @@ public class RunManager {
 
                 // IMPORTANTE: Enviar TODOS los pedidos procesados (incluye parciales de ventanas anteriores)
                 // para que el frontend vea el estado actualizado de cada pedido
-                List<Object> pedidosVentanaDTO = convertirPedidosADTO(pedidosVentana, solucionOptima);
+                List<Pedido> pedidosUI = pedidosCargados.historicoHasta(wEnd);
+                List<Object> pedidosVentanaDTO = convertirPedidosADTO(pedidosUI, solucionGlobal);
 
                 /// 8. Marcar ventana como enviada y hacer broadcast
 
@@ -1104,6 +1116,33 @@ public class RunManager {
 
         }
     }
+
+    private void mergeSolucion(
+            SolucionProgramacion ventana
+    ) {
+        //Si es la primera ventana:
+        if (solucionGlobal == null){
+            solucionGlobal = new SolucionProgramacion(ventana);
+            return;
+        }
+
+        //Si no, continúa
+
+        if (ventana == null) return;
+
+        // 1️⃣ Merge de planes por pedido
+        for (var entry : ventana.getPlanPorPedido().entrySet()) {
+            Integer pedidoId = entry.getKey();
+            PlanPedido planVentana = entry.getValue();
+
+            // Si el pedido no existía, lo agregamos
+            solucionGlobal.getPlanPorPedido().putIfAbsent(
+                    pedidoId,
+                    new PlanPedido(planVentana)
+            );
+        }
+    }
+
 
     public LocalDateTime ajustarFechaPedidoPorDestino(LocalDateTime fechaPeru, String codDes) {
 
@@ -1162,7 +1201,9 @@ public class RunManager {
 
         //Realizamos el mismo proceso de normalizar y ordenar
         pedidosCargados.normalizarUtc(aeropuertosMap);
-            pedidosCargados.ordenarPorUTC();
+        pedidosCargados.ordenarPorUTC();
+        pedidosCargados.agregarAHistorico();
+
         System.out.println("[cargarPedidosDesdeQueue] Pedidos cargados: " + pedidosCargados.getLista().size());
     }
 

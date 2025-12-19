@@ -31,7 +31,7 @@ import java.util.*;
  */
 public class SSPGeneradorSeed {
 
-    private static final int H_MAX = 3;                        // tope razonable de escalas para evitar explosión
+    private static final int H_MAX = 2;                        // tope razonable de escalas para evitar explosión
     private final Set<String> sedes;                           // orígenes habilitados para multi-hop
     private final StockLibre stockLibre;                       // stock disponible por no-sede (arribos exógenos no comprometidos)
     private final OcupacionPorAeropuerto ocupacionPorAeropuerto;//clase nueva implementada para control de stocks en tierra
@@ -248,6 +248,7 @@ public class SSPGeneradorSeed {
         for (String sede : sedes) {
             Ruta r = dfsRutas(idx, carga, sede, dest, earliest, latest, hops, new ArrayList<>());
             System.out.println("Para " + sede + ", encontré ruta en buscarRutaMinHops:" + r);
+            DFS_DEADLINE.remove();
             if (r != null) {
                 if (mejor == null || r.arriboFinal.isBefore(mejor.arriboFinal)) {
                     mejor = r;
@@ -261,6 +262,11 @@ public class SSPGeneradorSeed {
      * DFS por #hops con poda por tiempos/capacidad.
      * path acumula los vuelos ya elegidos; earliest es la salida mínima del siguiente vuelo.
      */
+
+    private static final long DFS_TIMEOUT_NANOS =
+            Duration.ofSeconds(5).toNanos();
+    private static final ThreadLocal<Long> DFS_DEADLINE = new ThreadLocal<>();
+
     private Ruta dfsRutas(IndexVuelos idx,
                           CargaPorVuelo carga,
                           String origen,
@@ -270,6 +276,15 @@ public class SSPGeneradorSeed {
                           int hopsRestantes,
                           List<VueloFicha> path) {
 
+        // Inicializar deadline SOLO en la llamada raíz (cuando path está vacío)
+        boolean isRoot = path.isEmpty();
+        if (isRoot) {
+            DFS_DEADLINE.set(System.nanoTime() + DFS_TIMEOUT_NANOS);
+        }
+
+        long deadline = DFS_DEADLINE.get();
+        if (System.nanoTime() > deadline) return null;
+
         // salidas desde 'origen' a partir de 'earliest'
         List<VueloFicha> salidas = idx.porOrigen(origen);
         if (salidas.isEmpty()) return null;
@@ -278,6 +293,8 @@ public class SSPGeneradorSeed {
 
         // Iterar por vuelos que respeten el tiempo
         for (VueloFicha f : salidas) {
+            if (System.nanoTime() > deadline) return null;
+
             if (f.id().getSalidaUtc().isBefore(earliest)) continue;
             if (f.id().getLlegadaUtc().isAfter(latest)) continue;
 
