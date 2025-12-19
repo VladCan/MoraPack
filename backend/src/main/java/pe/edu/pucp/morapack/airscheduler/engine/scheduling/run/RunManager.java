@@ -1136,7 +1136,7 @@ public class RunManager {
             PlanPedido planVentana = entry.getValue();
 
             // Si el pedido no existía, lo agregamos
-            solucionGlobal.getPlanPorPedido().putIfAbsent(
+            solucionGlobal.getPlanPorPedido().put(
                     pedidoId,
                     new PlanPedido(planVentana)
             );
