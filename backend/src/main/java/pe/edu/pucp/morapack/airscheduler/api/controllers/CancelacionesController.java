@@ -24,7 +24,7 @@ public class CancelacionesController {
     CancelacionesService cancelacionesService;
 
     // Mantenemos el FILENAME para el cuerpo de las respuestas HTTP
-    private static final String FILENAME = "vuelos.txt";
+    private static final String FILENAME = "cancelaciones.txt";
 
     @POST
     @Path("/upload")
@@ -36,7 +36,6 @@ public class CancelacionesController {
             // **DELEGACIÓN:** El service se encarga de obtener la ruta, crear el directorio y copiar el archivo.
             java.nio.file.Path targetPath = cancelacionesService.guardarArchivoCancelaciones(is);
             // Levanta una bandera para saver que se subio un nuevo archivo
-            cancelacionesService.setNuevoArchivoSubido(true);
             return Response
                     .ok(new JsonResponse("success", "Archivo de pedidos guardado exitosamente", targetPath.toAbsolutePath().toString()))
                     .build();

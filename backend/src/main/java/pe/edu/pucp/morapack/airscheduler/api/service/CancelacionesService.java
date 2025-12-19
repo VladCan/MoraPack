@@ -13,48 +13,40 @@ import java.nio.file.StandardCopyOption;
 
 @ApplicationScoped
 public class CancelacionesService {
+
     @Inject
     ArchivoManager archivoManager;
 
-    @SuppressWarnings("unused")
     private boolean nuevoArchivoSubido;
 
     private static final String FILENAME = "cancelaciones.txt";
 
     public Path getCancelacionesFilePath() {
-        // Obtenemos la ruta base de uploads del manager, pero forzamos el nombre del archivo de pedidos.
-        // Esto asume que ArchivoManager.uploadDir está inyectado correctamente.
         return Paths.get(archivoManager.getUploadDir(), FILENAME);
     }
 
-    public Path guardarArchivoCancelaciones(InputStream fileInputStream) throws IOException {
+    public synchronized Path guardarArchivoCancelaciones(InputStream fileInputStream) throws IOException {
         Path targetPath = getCancelacionesFilePath();
 
-        // Asegurar que el directorio exista (e.g., /uploads)
         Files.createDirectories(targetPath.getParent());
-
-        // Copiar el stream al archivo
         Files.copy(fileInputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
+
+        // marcar evento
+        nuevoArchivoSubido = true;
 
         return targetPath;
     }
 
-    public synchronized void setNuevoArchivoSubido(boolean b) {
-    if (b) {
-        this.nuevoArchivoSubido = true;
+    /**
+     * Devuelve true SOLO UNA VEZ por cada archivo subido.
+     * Luego resetea el estado.
+     */
+    public synchronized boolean isNuevoArchivoSubido() {
+        if (nuevoArchivoSubido) {
+            nuevoArchivoSubido = false;
+            return true;
+        }
+        return false;
     }
 }
 
-/**
- * Devuelve true SOLO UNA VEZ por cada archivo subido.
- * Luego resetea el estado.
- */
-public synchronized boolean isNuevoArchivoSubido() {
-    if (nuevoArchivoSubido) {
-        nuevoArchivoSubido = false; // se consume el evento
-        return true;
-    }
-    return false;
-}
-
-}
