@@ -129,19 +129,19 @@ export function ColapsoContent() {
 
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
 
+  const pedidoSeleccionadoId = selectedPedido?.id ?? null;
+
   const vuelosRelacionadosAlPedido = useMemo<Set<string>>(() => {
-    if (!selectedPedido || !selectedPedido.rutas) {
-      return new Set();
-    }
-    const vuelosIds = new Set<string>();
-    selectedPedido.rutas.forEach(ruta => {
-      ruta.vuelos.forEach(vuelo => {
-        const salidaUtcSinColon = vuelo.salidaUtc.replace(/:/g, '');
+    const set = new Set<string>();
+    if (!selectedPedido?.rutas) return set;
+    selectedPedido.rutas.forEach((ruta) => {
+      ruta.vuelos.forEach((vuelo) => {
+        const salidaUtcSinColon = vuelo.salidaUtc.replace(/:/g, "");
         const vueloId = `${vuelo.origen}-${vuelo.destino}-${salidaUtcSinColon}`;
-        vuelosIds.add(vueloId);
+        set.add(vueloId);
       });
     });
-    return vuelosIds;
+    return set;
   }, [selectedPedido]);
 
   const flightsToRender = useMemo<FlightForRender[]>(() => {
@@ -151,7 +151,6 @@ export function ColapsoContent() {
 
     const now = new Date(simNowUtc).getTime();
     const allFlights: FlightForRender[] = [];
-    const seenIds = new Set<string>();
     const vuelosUnicos = new Map<string, typeof windows[0]['vuelos'][0]>();
 
     windows.forEach(window => {
@@ -161,14 +160,21 @@ export function ColapsoContent() {
         }
       });
     });
+    const todosLosIds = new Set(Array.from(vuelosUnicos.keys()));
 
-    const tienePedidoSeleccionado = selectedPedido !== null && vuelosRelacionadosAlPedido.size > 0;
+    const tienePedidoSeleccionado = pedidoSeleccionadoId !== null;
 
     vuelosUnicos.forEach(vuelo => {
         if (vuelosCancelados.has(vuelo.id)) return;
         
-        if (tienePedidoSeleccionado && !vuelosRelacionadosAlPedido.has(vuelo.id)) {
-          return;
+        if (tienePedidoSeleccionado) {
+          const cargaTienePedido = (vuelo.carga || []).some(
+            item => item.pedidoId === pedidoSeleccionadoId
+          );
+          const rutaTienePedido = vuelosRelacionadosAlPedido.has(vuelo.id);
+          if (!cargaTienePedido && !rutaTienePedido) {
+            return;
+          }
         }
         
         const origen = airportsMap.get(vuelo.origen);
@@ -219,17 +225,16 @@ export function ColapsoContent() {
           cantidadAsignada: vuelo.cantidadAsignada,
           carga: vuelo.carga || [],
         });
-        seenIds.add(vuelo.id);
     });
 
     flightFirstSeenRef.current.forEach((_, key) => {
-      if (!seenIds.has(key)) {
+      if (!todosLosIds.has(key)) {
         flightFirstSeenRef.current.delete(key);
       }
     });
 
     return allFlights;
-  }, [windows, simNowUtc, airportsMap, vuelosCancelados, selectedPedido, vuelosRelacionadosAlPedido]);
+  }, [windows, simNowUtc, airportsMap, vuelosCancelados, pedidoSeleccionadoId, vuelosRelacionadosAlPedido]);
 
   // Sincronizar el vuelo activo (para efectos visuales del mapa)
   useEffect(() => {

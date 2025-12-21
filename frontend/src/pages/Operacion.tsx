@@ -147,30 +147,27 @@ export  function OperacionContent() {
   const flightFirstSeenRef = useRef<Map<string, number>>(new Map());
 
   // Extraer IDs de vuelos relacionados al pedido seleccionado
+  const pedidoSeleccionadoId = selectedPedido?.id ?? null;
+
   const vuelosRelacionadosAlPedido = useMemo<Set<string>>(() => {
-    if (!selectedPedido || !selectedPedido.rutas) {
-      return new Set();
-    }
-    
-    const vuelosIds = new Set<string>();
-    selectedPedido.rutas.forEach(ruta => {
-      ruta.vuelos.forEach(vuelo => {
-        const salidaUtcSinColon = vuelo.salidaUtc.replace(/:/g, '');
+    const set = new Set<string>();
+    if (!selectedPedido?.rutas) return set;
+    selectedPedido.rutas.forEach((ruta) => {
+      ruta.vuelos.forEach((vuelo) => {
+        const salidaUtcSinColon = vuelo.salidaUtc.replace(/:/g, "");
         const vueloId = `${vuelo.origen}-${vuelo.destino}-${salidaUtcSinColon}`;
-        vuelosIds.add(vueloId);
+        set.add(vueloId);
       });
     });
-    
-    return vuelosIds;
+    return set;
   }, [selectedPedido]);
 
   const flightPaths = useMemo<FlightForRender[]>(() => {
     const now = simNowUtc ? new Date(simNowUtc).getTime() : Date.now();
     const allFlights: FlightForRender[] = [];
-    const seenIds = new Set<string>();
 
     // Si hay un pedido seleccionado, solo mostrar vuelos relacionados
-    const tienePedidoSeleccionado = selectedPedido !== null && vuelosRelacionadosAlPedido.size > 0;
+    const tienePedidoSeleccionado = pedidoSeleccionadoId !== null;
 
     // 1. SOLAMENTE: Vuelos planificados por el algoritmo ALNS
     if (windows.length > 0 && simNowUtc) {
@@ -184,11 +181,18 @@ export  function OperacionContent() {
           }
         });
       });
+      const todosLosIds = new Set(Array.from(vuelosUnicos.keys()));
 
       // Procesar vuelos planificados que están en el aire
       vuelosUnicos.forEach(vuelo => {
-        if (tienePedidoSeleccionado && !vuelosRelacionadosAlPedido.has(vuelo.id)) {
-          return;
+        if (tienePedidoSeleccionado) {
+          const cargaTienePedido = (vuelo.carga || []).some(
+            item => item.pedidoId === pedidoSeleccionadoId
+          );
+          const rutaTienePedido = vuelosRelacionadosAlPedido.has(vuelo.id);
+          if (!cargaTienePedido && !rutaTienePedido) {
+            return;
+          }
         }
         
         const origen = airportsMap.get(vuelo.origen);
@@ -238,7 +242,6 @@ export  function OperacionContent() {
             carga: vuelo.carga || [],
             esDeSolucion: true,
           });
-          seenIds.add(vuelo.id);
         }
       });
     }
@@ -246,15 +249,15 @@ export  function OperacionContent() {
     // 2. ELIMINADO: Ya no agregamos vuelos "extra" de liveFlights. 
     //    Esto limpia el mapa de aviones sin carga/pedido.
 
-    // Limpiar vuelos que ya no están visibles
+    // Limpiar vuelos que ya no están en los datos (no por filtro)
     flightFirstSeenRef.current.forEach((_, key) => {
-      if (!seenIds.has(key)) {
+      if (!todosLosIds.has(key)) {
         flightFirstSeenRef.current.delete(key);
       }
     });
 
     return allFlights;
-  }, [vuelosCancelados, windows, simNowUtc, airportsMap, selectedPedido, vuelosRelacionadosAlPedido]);
+  }, [vuelosCancelados, windows, simNowUtc, airportsMap, pedidoSeleccionadoId, vuelosRelacionadosAlPedido]);
 
   // Sincronizar vuelo activo con datos actualizados
   useEffect(() => {
