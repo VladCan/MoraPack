@@ -1044,10 +1044,9 @@ function OrderSelectCard({
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
   const [destinoFilter, setDestinoFilter] = useState<string>("all");
 
-  // Función para calcular el estado basado en cantidadEnVuelo
+  // Función para calcular el estado (mismo criterio que el pop up de Pedido)
   const calcularEstado = useCallback((pedido: PedidoDTO): string => {
     if (!pedido.rutas || !simNowUtc) {
-      // En operación diaria, si tiene rutas pero no hay simNowUtc, es PROGRAMADO
       if (variant === "operacion" && pedido.rutas && pedido.rutas.length > 0) {
         return "PROGRAMADO";
       }
@@ -1055,65 +1054,28 @@ function OrderSelectCard({
     }
 
     const now = new Date(simNowUtc).getTime();
-    
-    // En operación diaria: PROGRAMADO → EN_VUELO → COMPLETO
-    if (variant === "operacion") {
-      // Verificar si todos los vuelos han llegado (COMPLETO)
-      let todosVuelosLlegaron = true;
-      let tieneVuelosEnAire = false;
-      
-      pedido.rutas.forEach(ruta => {
-        ruta.vuelos.forEach(vuelo => {
-          const salida = new Date(vuelo.salidaUtc).getTime();
-          const llegada = new Date(vuelo.llegadaUtc).getTime();
-          
-          if (now <= llegada) {
-            // Aún no ha llegado este vuelo
-            todosVuelosLlegaron = false;
-            
-            // Verificar si está en el aire ahora
-            if (now >= salida && now <= llegada) {
-              tieneVuelosEnAire = true;
-            }
-          }
-        });
-      });
-      
-      if (todosVuelosLlegaron) {
-        return "COMPLETO";
-      }
-      if (tieneVuelosEnAire) {
-        return "EN_VUELO";
-      }
-      if (pedido.rutas && pedido.rutas.length > 0) {
-        return "PROGRAMADO";
-      }
-      return "PENDIENTE";
-    }
-    
-    // Para otros modos: calcular cantidadEnVuelo
-    const cantidadEnVuelo = pedido.rutas.reduce((sum, ruta) => {
-      // Sumar la cantidad de cada vuelo que está actualmente en el aire
-      const cantidadRutaEnVuelo = ruta.vuelos.reduce((sumVuelos, vuelo) => {
-        const salida = new Date(vuelo.salidaUtc).getTime();
-        const llegada = new Date(vuelo.llegadaUtc).getTime();
-        // Si el vuelo está en el aire ahora, sumar su cantidad
-        if (now >= salida && now <= llegada) {
-          return sumVuelos + vuelo.cantidad;
-        }
-        return sumVuelos;
-      }, 0);
-      return sum + cantidadRutaEnVuelo;
-    }, 0);
+    let cantidadEntregada = 0;
+    let cantidadEnCamino = 0;
 
-    // Para otros modos (simulación semanal, colapso): mantener lógica original
-    if (cantidadEnVuelo >= pedido.cantidad) {
-      return "COMPLETO";
-    }
-    if (cantidadEnVuelo > 0) {
-      return "PARCIAL";
-    }
+    pedido.rutas.forEach((ruta) => {
+      if (!ruta.vuelos || ruta.vuelos.length === 0) return;
+      const primerVuelo = ruta.vuelos[0];
+      const ultimoVuelo = ruta.vuelos[ruta.vuelos.length - 1];
+      const horaSalidaInicial = new Date(primerVuelo.salidaUtc).getTime();
+      const horaLlegadaFinal = new Date(ultimoVuelo.llegadaUtc).getTime();
 
+      if (now >= horaLlegadaFinal) {
+        cantidadEntregada += ruta.cantidad;
+      } else if (now >= horaSalidaInicial) {
+        cantidadEnCamino += ruta.cantidad;
+      }
+    });
+
+    const cantidadTotalProcesada = cantidadEntregada + cantidadEnCamino;
+
+    if (cantidadEntregada >= pedido.cantidad) return "COMPLETO";
+    if (cantidadTotalProcesada > 0) return "EN CAMINO";
+    if (pedido.rutas.length > 0) return "PROGRAMADO";
     return "PENDIENTE";
   }, [simNowUtc, variant]);
 
@@ -1239,7 +1201,7 @@ function OrderSelectCard({
                           estado === "PARCIAL" ? "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200" :
                           estado === "EN_VUELO" ? "bg-purple-100 text-purple-900 dark:bg-purple-900/30 dark:text-purple-200" :
                           estado === "PROGRAMADO" ? "bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-200" :
-                          "bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-200"
+                          "bg-blue-100 text-blue-700 border-blue-200"
                         }`}>
                           {estado}
                         </span>
