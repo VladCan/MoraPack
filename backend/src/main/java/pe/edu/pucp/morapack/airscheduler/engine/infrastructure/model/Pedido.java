@@ -33,6 +33,17 @@ public class Pedido {
         this.cantidad = cantidad;
     }
 
+    public Pedido(Pedido pedido) {
+        this.idPedido = pedido.idPedido;
+        this.idCliente = pedido.idCliente;
+        this.destino = pedido.destino;
+        this.origen = pedido.origen;
+        this.fecha = pedido.fecha;
+        this.createdAtUtc = pedido.createdAtUtc;
+        this.cantidad = pedido.cantidad;
+        this.continenteDestino = pedido.continenteDestino;
+    }
+
     public Instant getCreatedAtUtc() {
         return createdAtUtc;
     }
