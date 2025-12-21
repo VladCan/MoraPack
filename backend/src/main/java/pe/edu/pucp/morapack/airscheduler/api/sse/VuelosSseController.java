@@ -19,6 +19,10 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 @Path("/vuelos")
 @RequestScoped
@@ -28,12 +32,11 @@ public class VuelosSseController {
     
     @Inject RunManager runManager;
 
-        /**
-         * SSE: cada ~1s emite un array JSON con los vuelos EN EL AIRE.
-         * Query opcional: ?time=HH:mm  (usa esa hora UTC simulada por conexión).
-         * Query opcional: ?runId=xxx  (usa el tiempo simulado del run activo).
-         */
-        // src/main/java/.../controllers/VuelosSseController.java
+    /**
+     * SSE: cada ~1s emite un array JSON con los vuelos EN EL AIRE.
+     * Query opcional: ?time=HH:mm  (usa esa hora UTC simulada por conexión).
+     * Query opcional: ?runId=xxx  (usa el tiempo simulado del run activo).
+     */
     @GET
     @Deprecated
     @Path("/live")
@@ -98,36 +101,54 @@ public class VuelosSseController {
     @Produces(MediaType.SERVER_SENT_EVENTS)
     @RestStreamElementType(MediaType.APPLICATION_JSON)
     public Multi<List<Map<String, Object>>> scheduledNextDay(@QueryParam("runId") String runIdParam) {
-        return Multi.createFrom().ticks().every(Duration.ofSeconds(1))
-                .onItem().transform(t -> {
-                    // Si se proporciona un runId, usarlo; sino buscar el run activo apropiado
-                    String runId = runIdParam;
-                    if (runId == null || runId.isBlank()) {
-                        // Primero intentar el run de operación
-                        runId = runManager.currentOperacionRunId();
-                        // Si no hay run de operación, buscar el último run activo (para simulaciones)
-                        if (runId == null) {
-                            runId = runManager.getLastActiveRunId();
-                        }
-                    }
-                    
-                    System.out.println("[VuelosSseController] scheduledNextDay - runIdParam: " + runIdParam + ", runId final: " + runId);
-                    
+        return Multi.createFrom().emitter(emitter -> {
+            ScheduledExecutorService tickExec = Executors.newSingleThreadScheduledExecutor();
+            ScheduledFuture<?> tickFuture = tickExec.scheduleAtFixedRate(() -> {
+                if (emitter.isCancelled()) {
+                    return;
+                }
+
+                // Si se proporciona un runId, usarlo; sino buscar el run activo apropiado
+                String runId = runIdParam;
+                if (runId == null || runId.isBlank()) {
+                    // Primero intentar el run de operación
+                    runId = runManager.currentOperacionRunId();
+                    // Si no hay run de operación, buscar el último run activo (para simulaciones)
                     if (runId == null) {
-                        System.out.println("[VuelosSseController] No hay run activo disponible");
-                        return List.<Map<String, Object>>of(); // Retornar lista vacía si no hay run activo
+                        runId = runManager.getLastActiveRunId();
                     }
-                    
-                    // Obtener vuelos planificados del día siguiente
+                }
+
+                System.out.println("[VuelosSseController] scheduledNextDay - runIdParam: " + runIdParam + ", runId final: " + runId);
+
+                if (runId == null) {
+                    System.out.println("[VuelosSseController] No hay run activo disponible");
                     try {
-                        List<Map<String, Object>> vuelos = runManager.getScheduledFlightsNextDay(runId);
-                        System.out.println("[VuelosSseController] Vuelos programados obtenidos: " + vuelos.size());
-                        return vuelos;
-                    } catch (Exception e) {
+                        emitter.emit(List.<Map<String, Object>>of());
+                    } catch (Throwable ignored) {
+                        emitter.complete();
+                    }
+                    return;
+                }
+
+                // Obtener vuelos planificados del día siguiente
+                try {
+                    List<Map<String, Object>> vuelos = runManager.getScheduledFlightsNextDay(runId);
+                    System.out.println("[VuelosSseController] Vuelos programados obtenidos: " + vuelos.size());
+                    emitter.emit(vuelos);
+                } catch (Throwable e) {
+                    if (!emitter.isCancelled()) {
                         System.err.println("[VuelosSseController] Error obteniendo vuelos programados para runId " + runId + ": " + e.getMessage());
                         e.printStackTrace();
-                        return List.<Map<String, Object>>of();
                     }
-                });
+                    emitter.complete();
+                }
+            }, 0L, 1L, TimeUnit.SECONDS);
+
+            emitter.onTermination(() -> {
+                try { tickFuture.cancel(true); } catch (Throwable ignored) {}
+                try { tickExec.shutdownNow(); } catch (Throwable ignored) {}
+            });
+        });
     }
 }
