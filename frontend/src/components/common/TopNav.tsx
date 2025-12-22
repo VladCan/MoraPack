@@ -1,3 +1,4 @@
+// src/components/layout/TopNav.tsx
 import { NavLink, useLocation } from "react-router-dom";
 import Logo from "@/assets/Logo-de-AirExpress-Distribution.svg";
 import LogoMark from "@/assets/airexpress2.svg";
@@ -39,61 +40,82 @@ const CONTENT: Record<string, JSX.Element> = {
 };
 
 export default function TopNav() {
-  //const [showContent, setShowContent] = useState(false);
   const { pathname: currentPage } = useLocation();
 
   const showButton = SHOW_BTN_PAGES.has(currentPage);
   const currentContent = CONTENT[currentPage] ?? <p>Selecciona una opción del menú</p>;
 
-  //Esto es para la conexión SSE de la solución
+  // Traemos el contexto
+  const { 
+    runId, status, end, setSimNow, setWindow, setAutoReconnect,
+    toolsPanelOpen, setToolsPanelOpen, setLoadingUI, setShowLoadingOverlay
+  } = useRunSession();
 
-  //Traemos el contexto
-  const { runId, status, end, setSimNow, setWindow, setAutoReconnect,
-    toolsPanelOpen, setToolsPanelOpen, setLoadingUI, setShowLoadingOverlay} = useRunSession();
+  // 🔍 [LOG] Verificamos qué está llegando del Contexto
+  console.log(`[TopNav] RENDER. Contexto -> RunId: ${runId}, Status: ${status}, PanelOpen: ${toolsPanelOpen}`);
 
   const showContent = toolsPanelOpen;
-
-  //Para el reloj
   const running = status === "running" && !!runId;
   
-  //Acá expone connect(url, handlers) -> () => void
-  // --- CORRECCIÓN: Usamos finishedReason en lugar de finished ---
-
-
-  const {runState,loadingMessage, loadingProgress, simNowUtc, windows, finishedReason, wallStartUtc,simStartUtc } = useRunSSE(
-
+  // Hook SSE
+  const {
+    runState,
+    loadingMessage, 
+    loadingProgress, 
+    simNowUtc, 
+    windows, 
+    finishedReason, 
+    wallStartUtc,
+    simStartUtc 
+  } = useRunSSE(
     status === "running" && runId ? runId : undefined
   );
 
- //Propagamos el OVERLAY mientras estamos en LOADING
+  // 🔍 [LOG] Verificamos qué devuelve el Hook SSE
+  console.log(`[TopNav] Hook useRunSSE -> runState: ${runState}, Windows: ${windows.length}, Finished: ${finishedReason}, SimNow: ${simNowUtc}`);
+
+  // ---------------------------------------------------------
+  // EFFECT 1: Loading Overlay
+  // ---------------------------------------------------------
   useEffect(() => {
     if (!runId) return;
-    // Solo mostrar mientras esté LOADING Y aún no haya ventanas
+    
     const show = windows.length <= 1;
-    console.log ("El valor de show es:", show)
+    console.log(`[TopNav Effect] Overlay Logic. RunId: ${runId}, Windows: ${windows.length}, SHOW: ${show}`);
+    
     setShowLoadingOverlay(show);
     if (show) {
       setLoadingUI(loadingMessage ?? "", loadingProgress ?? 0);
     }
   }, [runId, runState, windows.length, loadingMessage, loadingProgress, setLoadingUI, setShowLoadingOverlay]);
 
-  //Apagamos el OVERLAY cuando llegue la primera WINDOW
+  // ---------------------------------------------------------
+  // EFFECT 2: Apagar Overlay con primera Window
+  // ---------------------------------------------------------
   useEffect(() => {
     if (windows.length > 0) {
-      console.log("[TopNav] Primera WINDOW recibida");
+      console.log("[TopNav Effect] Primera WINDOW recibida -> Apagando Overlay");
       setShowLoadingOverlay(false);
     }
   }, [windows.length, setShowLoadingOverlay]);
 
-  //Propagamos los TICKs al contexto
+  // ---------------------------------------------------------
+  // EFFECT 3: Propagar Ticks (SimNow)
+  // ---------------------------------------------------------
   useEffect(() => {
-    if (simNowUtc) setSimNow(simNowUtc);
+    if (simNowUtc) {
+      // console.log(`[TopNav Effect] Updating SimNow: ${simNowUtc}`); // Descomentar si no spamea mucho
+      setSimNow(simNowUtc);
+    }
   }, [simNowUtc, setSimNow]);
 
-  //Propagamos la última WINDOW al contexto
+  // ---------------------------------------------------------
+  // EFFECT 4: Propagar Ventana al Contexto
+  // ---------------------------------------------------------
   useEffect(() => {
     if (windows.length > 0) {
       const w = windows[windows.length - 1];
+      console.log(`[TopNav Effect] Propagando Ventana Index: ${w.index} al Contexto`);
       setWindow({ 
         index: w.index, 
         startUtc: w.startUtc, 
@@ -104,79 +126,56 @@ export default function TopNav() {
     }
   }, [windows, setWindow]);
 
-  // --- CORRECCIÓN: Chequeamos finishedReason ---
+  // ---------------------------------------------------------
+  // EFFECT 5: Finalización
+  // ---------------------------------------------------------
   useEffect(() => {
-    if (finishedReason) end("finished");
+    if (finishedReason) {
+      console.log(`[TopNav Effect] Run Finalizado por: ${finishedReason}`);
+      end("finished");
+    }
   }, [finishedReason, end]);
 
-  //Para finalizar/cancelar el run:
+  // ---------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------
   const handleCancelRun = async () => {
+    console.log("[TopNav] Intentando cancelar runId:", runId);
     if (!runId) return;
 
-    //const base = import.meta.env.VITE_API_BASE_URL
-    //const base = import.meta.env.prod.VITE_API_BASE_URL
-
     const path = `runs/${runId}/cancel`;
-
     const [data, error] = await handleApi(
       postJson<CancelRunResponse>(path)
-    )
+    );
 
     if (error) {
-        // aquí tu toast o UI de error
-        console.error("❌ [TopNav] Error al finalizar la simulación:", error);
-        //alert(`Error al iniciar simulación: ${error.message}`);
+        console.error("❌ [TopNav] Error al cancelar simulación:", error);
         toast.custom((t) => (
-          <ToastCustom
-            t={t}
-            message={error+"❗"}
-            type="error"
-          />),
-        { duration: 5000});
+          <ToastCustom t={t} message={error+"❗"} type="error" />
+        ), { duration: 5000});
     }
     else if (data) {
       if (data.cancelled){
-        console.log("[TopNav] Simulación finalizada exitosamente:", data);
+        console.log("[TopNav] Simulación cancelada exitosamente:", data);
         toast.custom((t) => (
-          <ToastCustom
-            t={t}
-            message={"¡Simulación finalizada exitosamente!"}
-            type="success"
-          />),
-        { duration: 5000});
+          <ToastCustom t={t} message={"¡Simulación finalizada exitosamente!"} type="success" />
+        ), { duration: 5000});
 
-        /*
-        //Cortamos el SSE
-        disconnect();
-          */
-
-        //Para que no dispare el evento de reconexión
         setAutoReconnect(false);
-
-        /*
-        //Limpiamos el contexto de la simulación
-        reset();
-          */
+        // reset(); // (Comentado en tu original)
       }
       else{
-        console.error("❌ [ToolsPanel] Error al finalizar la simulación:", error);
-        //alert(`Error al iniciar simulación: ${error.message}`);
+        console.error("❌ [TopNav] Cancelación fallida (data.cancelled false):", data);
         toast.custom((t) => (
-          <ToastCustom
-            t={t}
-            message={error+"❗"}
-            type="error"
-          />),
-        { duration: 5000});
+          <ToastCustom t={t} message={"No se pudo cancelar ❗"} type="error" />
+        ), { duration: 5000});
       }
     }
-
   }  
-
 
   return (
     <header className="fixed top-0 left-0 z-50 w-full h-16">
-      <div> {/*className={cx(showContent && "bg-card/20 shadow-lg ring-1 ring-border transition-all")} */}
+      <div> 
         {/* Logo */}
         <a
           href="/"
@@ -271,7 +270,6 @@ export default function TopNav() {
             <div className="hidden md:block">
               <ClockSwitcher
                 running={running}
-                // --- CORRECCIÓN: Convertimos finishedReason a booleano ---
                 finished={!!finishedReason}
                 runNow={simNowUtc ? new Date(simNowUtc) : null}
                 runStart={wallStartUtc ? new Date(wallStartUtc) : null}

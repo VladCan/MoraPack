@@ -202,36 +202,35 @@ public class RunsController {
     @Path("/{id}/snapshot")
     @Produces(MediaType.APPLICATION_JSON)
     public Response snapshot(@PathParam("id") String runId) {
-        System.out.println("[RunsController]: Vamos a ver si existe snapshot del runId: " + runId);
-        WindowPacket pkt = runManager.getLastWindow(runId);
-        if (pkt == null) {
-            System.out.println("[RunsController]: El runId no existe en el sistema.");
-            return Response.status(Response.Status.NO_CONTENT).build();
+        System.out.println("[RunsController]: Solicitando Snapshot de ESTADO COMPLETO para runId: " + runId);
+
+        // 1. Validar contexto
+        try {
+            runManager.requireContext(runId);
+        } catch (Exception e) {
+            return Response.status(Response.Status.NOT_FOUND).build();
         }
 
+        // 2. Obtener la hora simulada actual
+        Instant simNow = runManager.currentSimNow(runId);
 
-        System.out.println("[RunsController]: Enviando snapshot de runId " + runId);
-        return Response.ok(pkt).build();
-
-    }
-    @GET
-    @Path("/{runId}/snapshot")
-    @Produces(MediaType.APPLICATION_JSON)
-    public Response getSnapshot(@PathParam("runId") String runId) {
-        // Verificar si existe el run
-        if (runManager.requireContext(runId) == null) {
-             return Response.status(404).build();
-        }
-        
+        // 3. Obtener TODOS los vuelos activos (usando tu nueva lógica en RunManager)
+        // Esto traerá los 11 vuelos si están en el aire o programados para salir pronto
         List<Object> activeFlights = runManager.getActiveStateSnapshot(runId);
-        
-        // Empaquetarlo en un objeto similar a WindowPacket pero "estático"
+
+        System.out.println("[RunsController]: Snapshot generado con " + activeFlights.size() + " vuelos activos.");
+
+        // 4. Construir respuesta compatible con la interfaz WindowPacket del frontend
+        // El frontend espera: index, startUtc, endUtc, vuelos[], pedidos[]
         Map<String, Object> response = new HashMap<>();
         response.put("runId", runId);
-        response.put("simNow", runManager.currentSimNow(runId).toString());
+        response.put("index", -1); // -1 indica que es un Snapshot, no una ventana secuencial
+        response.put("startUtc", simNow.toString());
+        response.put("endUtc", simNow.toString()); 
         response.put("vuelos", activeFlights);
-        // También podrías añadir ocupación actual si la necesitas sincronizar al inicio
-        
+        response.put("pedidos", List.of()); // Puedes implementar getActivePedidosSnapshot si lo necesitas luego
+        response.put("type", "SNAPSHOT");
+
         return Response.ok(response).build();
     }
 

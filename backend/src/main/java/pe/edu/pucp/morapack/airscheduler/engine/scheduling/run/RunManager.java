@@ -695,6 +695,8 @@ public class RunManager {
 
         if (isCancelled(id)) return;
         states.put(id, RunState.RUNNING);
+
+        List<Pedido> todosLosPedidos = new ArrayList<>();
         
         List<VueloCancelado> vuelosCanceladosTeg = new ArrayList<>();
 
@@ -733,12 +735,14 @@ public class RunManager {
                     }
                     
                     pedidosCargados.eliminarYActualizarCumplidosHasta(wStart, solucionAnterior, true);
+                    
                     enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior, wStart);
                     reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior, wStart, Duration.ofHours(2));
                 }
 
                 // 2. Obtener pedidos
-                cargarPedidosDesdeLector(id, pedidosCargados, wCut); 
+                List<Pedido> nuevosDeArchivo = cargarPedidosDesdeLector(id, pedidosCargados, wCut);
+                todosLosPedidos.addAll(nuevosDeArchivo);
                 VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wCut);
                 List<Pedido> pedidosVentana = ventana.pedidos();
 
@@ -815,6 +819,8 @@ public class RunManager {
                 ALNS alns = new ALNS(teg, pedidosVentana, destructores, reparadores, wStart, ocupacionPorAeropuerto, aeropuertosMap);
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
+                mergeSolucion(solucionOptima);
+
                 if (isCancelled(id)) break;
 
                 // Guardamos solución
@@ -831,14 +837,14 @@ public class RunManager {
 
                 // Extraer y Emitir
                 final Instant wStartFinal = wStart;
-                final Instant wEndFinal = wEmit;
-                final Instant finExtraccion = wEndFinal;
+                final Instant wEndFinal = wStart.plus(config.horizon());
 
-                List<Object> vuelosVentana = extraerVuelosDeVentana(solucionOptima, wStartFinal, finExtraccion);
-                List<Object> pedidosVentanaDTO = convertirPedidosADTO(pedidosVentana, solucionOptima);
+                List<Object> vuelosVentana = extraerVuelosDeVentana(solucionGlobal, wStartFinal, wEndFinal);
+                List<Object> pedidosDTO = convertirPedidosADTO(todosLosPedidos, solucionGlobal);
 
                 ventanasEnviadasRun.add(windowIdISO);
-                broadcastWindow(new WindowPacket(id, idx, wStart, wEmit, vuelosVentana, pedidosVentanaDTO));
+                broadcastWindow(new WindowPacket(id, idx, wStart, wEmit, vuelosVentana, pedidosDTO));
+                System.out.println("[RunManager] SSE Emitido: " + vuelosVentana.size() + " vuelos (Ventana visual: " + wStartFinal + " a " + wEndFinal + ")");
 
                 Path reportePath = reportesService.getReportesFilePath();
                 ImpresorSolucion.imprimirEnArchivo(solucionOptima, reportePath.toString(), wStart);
@@ -1075,32 +1081,44 @@ public class RunManager {
 
         }
     }
-    private void mergeSolucion(
-            SolucionProgramacion ventana
-    ) {
-        //Si es la primera ventana:
+    private void mergeSolucion(SolucionProgramacion ventana) {
+        if (ventana == null) return;
+
+        // 1. Inicialización del Global si no existe
         if (solucionGlobal == null){
-            solucionGlobal = new SolucionProgramacion(ventana);
+            // Copia profunda inicial
+            solucionGlobal = new SolucionProgramacion(ventana); 
             return;
         }
 
-        //Si no, continúa
+        // 2. Merge de planes por pedido (Actualizar rutas o agregar nuevos)
+        if (ventana.getPlanPorPedido() != null) {
+            for (var entry : ventana.getPlanPorPedido().entrySet()) {
+                // Put reemplaza si el pedido fue replanificado, o agrega si es nuevo.
+                // Los pedidos viejos que no se tocaron se quedan intactos en solucionGlobal.
+                solucionGlobal.getPlanPorPedido().put(entry.getKey(), new PlanPedido(entry.getValue()));
+            }
+        }
 
-        if (ventana == null) return;
-
-        // 1️⃣ Merge de planes por pedido
-        for (var entry : ventana.getPlanPorPedido().entrySet()) {
-            Integer pedidoId = entry.getKey();
-            PlanPedido planVentana = entry.getValue();
-
-            // Si el pedido no existía, lo agregamos
-            solucionGlobal.getPlanPorPedido().putIfAbsent(
-                    pedidoId,
-                    new PlanPedido(planVentana)
-            );
+        // 3. Merge de CargaPorVuelo (Actualizar capacidades utilizadas)
+        CargaPorVuelo cargaGlobal = solucionGlobal.getCargaPorVuelo();
+        CargaPorVuelo cargaVentana = ventana.getCargaPorVuelo();
+        
+        if (cargaVentana != null && cargaGlobal != null) {
+            for (var entry : cargaVentana.getAsignado().entrySet()) {
+                VueloProgramadoId vuelo = entry.getKey();
+                Integer cantidadEnVentana = entry.getValue();
+                
+                // IMPORTANTE: Aquí actualizamos la carga del vuelo en el global.
+                // Si el algoritmo decidió usar más o menos carga en un vuelo existente, se actualiza.
+                // Si el vuelo es nuevo, se agrega.
+                if (cantidadEnVentana > 0) {
+                    cargaGlobal.getAsignado().put(vuelo, cantidadEnVentana);
+                }
+            }
         }
     }
-
+    
     public LocalDateTime ajustarFechaPedidoPorDestino(LocalDateTime fechaPeru, String codDes) {
 
         Aeropuerto origen = aeropuertosMap.obtener("SPIM");
@@ -1147,54 +1165,51 @@ public class RunManager {
         return newWEnd;
     }
 
-    private void cargarPedidosDesdeQueue(String id, CargarPedidos pedidosCargados){
+    private List<Pedido> cargarPedidosDesdeQueue(String id, CargarPedidos pedidosCargados){
         ConcurrentLinkedQueue<Pedido> queue = queues.computeIfAbsent(id, k -> new ConcurrentLinkedQueue<>());
-
+        List<Pedido> nuevos = new ArrayList<>(); // <--- Lista temporal
         //Retiramos el pedido de la cola, y lo agregamos a pedidosCargados
         while(!queue.isEmpty()){
             Pedido p = queue.poll();
             pedidosCargados.agregar(p);
+            nuevos.add(p); // <--- Guardamos referencia
         }
 
-        //Realizamos el mismo proceso de normalizar y ordenar
         pedidosCargados.normalizarUtc(aeropuertosMap);
         pedidosCargados.ordenarPorUTC();
         pedidosCargados.agregarAHistorico();
         System.out.println("[cargarPedidosDesdeQueue] Pedidos cargados: " + pedidosCargados.getLista().size());
+        
+        return nuevos; // <--- Retornamos
     }
 
-    private void cargarPedidosDesdeLector(String id, CargarPedidos pedidosCargados, Instant wEnd){
+    private List<Pedido> cargarPedidosDesdeLector(String id, CargarPedidos pedidosCargados, Instant wEnd){
         LectorPedidoMultiArchivo lectorArchivo = lectorArchivoPorRun.get(id);
+        List<Pedido> agregados = new ArrayList<>(); // <--- Lista temporal
 
         if (lectorArchivo != null) {
-            // Convertimos wEnd (Instant) a LocalDateTime en UTC para el lector
             try{
                 LocalDateTime finVentanaLT = LocalDateTime.ofInstant(wEnd, ZoneOffset.UTC);
-
                 List<Pedido> nuevosArchivo = lectorArchivo.leerHasta(finVentanaLT);
 
                 for (Pedido p : nuevosArchivo) {
                     pedidosCargados.agregar(p);
+                    agregados.add(p); // <--- Guardamos referencia
                 }
-
+                
                 if (!nuevosArchivo.isEmpty()) {
-                    System.out.println("[RunManager] Pedidos leídos desde archivos en esta ventana: "
-                            + nuevosArchivo.size());
+                    System.out.println("[RunManager] Pedidos leídos: " + nuevosArchivo.size());
                 }
-
             } catch (IOException e) {
-                System.err.println("[RunManager] Error leyendo pedidos desde archivos para run " + id
-                        + " hasta ventana " + wEnd + ": " + e.getMessage());
                 e.printStackTrace();
             }
-
         }
 
-        //Realizamos el mismo proceso de normalizar y ordenar
         pedidosCargados.normalizarUtc(aeropuertosMap);
         pedidosCargados.ordenarPorUTC();
-        System.out.println("[cargarPedidosDesdeLector] Pedidos cargados: " + pedidosCargados.getLista().size());
-
+        System.out.println("[cargarPedidosDesdeLector] Total en cola: " + pedidosCargados.getLista().size());
+        
+        return agregados; // <--- Retornamos
     }
 
     private void procesarCancelaciones(String runId, Set<VueloProgramadoId> vuelosCancelados, SolucionProgramacion solucionAnterior){
@@ -1626,27 +1641,36 @@ public class RunManager {
     
     private List<Object> extraerVuelosDeVentana(SolucionProgramacion solucion, Instant wStart, Instant wEnd) {
         List<Object> vuelosVentana = new ArrayList<>();
+        
+        // Validación básica
         if (solucion == null || solucion.getCargaPorVuelo() == null) return vuelosVentana;
 
         CargaPorVuelo cargaPorVuelo = solucion.getCargaPorVuelo();
+        
+        // Usamos un Set para recolectar IDs únicos y evitar duplicados
         Set<VueloProgramadoId> vuelosSeleccionados = new LinkedHashSet<>();
 
-        // 1. Recorrer asignaciones directas
+        // ---------------------------------------------------------
+        // 1. PRIMERA BARRIDA: Asignaciones Directas
+        // ---------------------------------------------------------
         for (Map.Entry<VueloProgramadoId, Integer> entry : cargaPorVuelo.getAsignado().entrySet()) {
             VueloProgramadoId vueloId = entry.getKey();
             Instant salida = vueloId.getSalidaUtc();
-            Instant llegada = vueloId.getLlegadaUtc(); 
+            Instant llegada = vueloId.getLlegadaUtc();
 
-            // 🔥 CORRECCIÓN APLICADA AQUÍ 🔥
-            // Usamos lógica de intersección: (Salida < FinVentana) Y (Llegada > InicioVentana)
+            // Lógica de intersección: El vuelo existe en esta ventana si...
+            // Salida es antes del fin de ventana Y Llegada es después del inicio de ventana
             if (salida != null && llegada != null) {
                 if (salida.isBefore(wEnd) && llegada.isAfter(wStart)) {
+                    // ¡SOLO AGREGAMOS EL ID AL SET! No creamos el DTO todavía.
                     vuelosSeleccionados.add(vueloId);
                 }
             }
         }
-        
-        // 2. Recorrer rutas de pedidos (para que no falten tramos de conexión)
+
+        // ---------------------------------------------------------
+        // 2. SEGUNDA BARRIDA: Rutas de Pedidos (Red de seguridad)
+        // ---------------------------------------------------------
         Map<Integer, PlanPedido> planPorPedido = solucion.getPlanPorPedido();
         if (planPorPedido != null) {
             for (PlanPedido plan : planPorPedido.values()) {
@@ -1655,11 +1679,11 @@ public class RunManager {
                     if (ruta.getTramos() == null) continue;
                     for (TramoAsignado tramo : ruta.getTramos()) {
                         VueloProgramadoId v = tramo.getVuelo();
+                        
                         if (v != null && v.getSalidaUtc() != null && v.getLlegadaUtc() != null) {
-                            
-                            // 🔥 CORRECCIÓN APLICADA AQUÍ TAMBIÉN 🔥
+                            // Misma lógica de intersección
                             if (v.getSalidaUtc().isBefore(wEnd) && v.getLlegadaUtc().isAfter(wStart)) {
-                                if (tramo.getCantidad() > 0) { 
+                                if (tramo.getCantidad() > 0) {
                                     vuelosSeleccionados.add(v);
                                 }
                             }
@@ -1669,29 +1693,43 @@ public class RunManager {
             }
         }
 
-        // 3. Construcción de DTOs (Esto estaba bien)
+        // ---------------------------------------------------------
+        // 3. CONSTRUCCIÓN ÚNICA DE DTOs
+        // ---------------------------------------------------------
         for (VueloProgramadoId vueloId : vuelosSeleccionados) {
+            
+            // Obtenemos la carga total acumulada en la solución global
             int cantidadAsignada = cargaPorVuelo.getAsignado().getOrDefault(vueloId, 0);
-            if (cantidadAsignada <= 0) continue;
+            
+            // Opcional: Si quieres ver vuelos vacíos (posicionamiento), comenta la siguiente línea.
+            // Si solo quieres ver vuelos con carga, déjala.
+            if (cantidadAsignada <= 0) continue; 
 
-            String vueloIdStr = vueloId.getOrigen() + "-" + vueloId.getDestino() + "-" + vueloId.getSalidaUtc().toString().replace(":", "");
+            // Generar ID único string
+            String vueloIdStr = vueloId.getOrigen() + "-" + vueloId.getDestino() + "-" + 
+                                vueloId.getSalidaUtc().toString().replace(":", "");
+
             Map<String, Object> vueloDTO = new HashMap<>();
             vueloDTO.put("id", vueloIdStr);
             vueloDTO.put("origen", vueloId.getOrigen());
             vueloDTO.put("destino", vueloId.getDestino());
             vueloDTO.put("salidaUtc", vueloId.getSalidaUtc().toString());
+            // Manejo seguro de llegada null
             vueloDTO.put("llegadaUtc", vueloId.getLlegadaUtc() != null ? vueloId.getLlegadaUtc().toString() : null);
+            
             vueloDTO.put("cantidadAsignada", cantidadAsignada);
             vueloDTO.put("capacidad", cargaPorVuelo.capacidad(vueloId));
             vueloDTO.put("residual", cargaPorVuelo.residual(vueloId));
             vueloDTO.put("costo", vueloId.getCosto());
+            
+            // Importante: Pasamos la 'solucion' completa para detallar qué pedidos van dentro
             vueloDTO.put("carga", extraerCargaDelVuelo(solucion, vueloId));
 
             vuelosVentana.add(vueloDTO);
         }
+
         return vuelosVentana;
     }
-    
     private List<Map<String, Object>> extraerCargaDelVuelo(SolucionProgramacion solucion, VueloProgramadoId vuelo) {
         List<Map<String, Object>> carga = new ArrayList<>();
         if (solucion == null || solucion.getPlanPorPedido() == null) return carga;

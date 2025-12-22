@@ -21,7 +21,7 @@ import FlightCard, {
 import OrderCard from "@/components/common/cards/OrderCard";
 import { RunSessionProvider } from "@/lib/runSession";
 import TopNav from "@/components/common/TopNav";
-import SimulationStatusWidget from "@/components/common/SimulationStatusWidget";
+//import SimulationStatusWidget from "@/components/common/SimulationStatusWidget";
 
 const COLOR_SEDE = "#005097";
 const COLOR_NORMAL = "#38bdf8";
@@ -56,7 +56,10 @@ export function SimulacionContent() {
   // Parsear aeropuertos
   const airports: AirportPoint[] = useMemo(() => {
     const parsed = AirportsDtoSchema.safeParse(airportsDtoRaw);
-    if (!parsed.success) return [];
+    if (!parsed.success) {
+        console.error("[Simulacion] Error parseando aeropuertos:", parsed.error);
+        return [];
+    }
     return parsed.data.map((a) => ({
       id: a.codigo,
       name: `${a.ciudad ?? a.codigo} (${a.codigo})`,
@@ -90,6 +93,9 @@ export function SimulacionContent() {
     loadingMessage,
     loadingProgress,
   } = useRunSession();
+
+  // [DEBUG] Diagnóstico de contexto
+  // console.log(`[Simulacion RENDER] RunId: ${runId}, Windows: ${windows.length}, Overlay: ${showLoadingOverlay}`);
 
   const showOverlay = showLoadingOverlay && windows.length === 1;
 
@@ -140,15 +146,12 @@ export function SimulacionContent() {
     return vuelosIds;
   }, [selectedPedido]);
 
-  console.log("DEBUG TIEMPO:", { 
-    simNowUtc, 
-    parsed: simNowUtc ? new Date(simNowUtc).toISOString() : undefined,
-    vuelosTotal: windows.length > 0 ? windows[windows.length-1].vuelos.length : 0 
-  });
 
   // Flights render logic
   const flightsToRender = useMemo<FlightForRender[]>(() => {
-    if (!simNowUtc || windows.length === 0) return [];
+    if (!simNowUtc) return []; // Si no hay hora, no hay mapa
+    if (windows.length === 0) return [];
+
     const now = new Date(simNowUtc).getTime();
     const allFlights: FlightForRender[] = [];
     const seenIds = new Set<string>();
@@ -163,19 +166,36 @@ export function SimulacionContent() {
     const tienePedidoSeleccionado =
       selectedPedido !== null && vuelosRelacionadosAlPedido.size > 0;
 
+    // Contadores para DEBUG
+    let rejectedByCancel = 0;
+    let rejectedByCoords = 0;
+    let rejectedByTime = 0;
+
     vuelosUnicos.forEach((vuelo) => {
-      if (vuelosCancelados.has(vuelo.id)) return;
+      if (vuelosCancelados.has(vuelo.id)) {
+        rejectedByCancel++;
+        return;
+      }
       if (tienePedidoSeleccionado && !vuelosRelacionadosAlPedido.has(vuelo.id))
         return;
 
       const origen = airportsMap.get(vuelo.origen);
       const destino = airportsMap.get(vuelo.destino);
-      if (!origen || !destino) return;
+      
+      if (!origen || !destino) {
+        // console.warn(`[Simulacion] Coordenadas faltantes para vuelo ${vuelo.id}: ${vuelo.origen}->${vuelo.destino}`);
+        rejectedByCoords++;
+        return;
+      }
 
       const salidaTime = new Date(vuelo.salidaUtc).getTime();
       const llegadaTime = new Date(vuelo.llegadaUtc).getTime();
 
-      if (now < salidaTime || now > llegadaTime) return;
+      // [DEBUG LOGIC] ¿Está el vuelo en el aire AHORA?
+      if (now < salidaTime || now > llegadaTime) {
+        rejectedByTime++;
+        return;
+      }
 
       if (!flightFirstSeenRef.current.has(vuelo.id)) {
         flightFirstSeenRef.current.set(vuelo.id, Math.max(now, salidaTime));
@@ -220,6 +240,12 @@ export function SimulacionContent() {
       if (!seenIds.has(key)) flightFirstSeenRef.current.delete(key);
     });
 
+    // [DEBUG LOG] Resumen del ciclo de renderizado
+    console.log(
+        `[Simulacion Loop] Total Únicos: ${vuelosUnicos.size} -> Renderizados: ${allFlights.length}. ` +
+        `Rechazados: Tiempo(${rejectedByTime}), Coords(${rejectedByCoords}), Cancel(${rejectedByCancel})`
+    );
+
     return allFlights;
   }, [
     windows,
@@ -234,6 +260,7 @@ export function SimulacionContent() {
   useEffect(() => {
     if (!activeFlight) return;
     if (vuelosCancelados.has(activeFlight.id)) {
+      console.log("[Simulacion] Deseleccionando vuelo activo por cancelación");
       setActiveFlight(null);
       return;
     }
@@ -373,6 +400,7 @@ export function SimulacionContent() {
 
   useEffect(() => {
     if (finishedReason) {
+      console.log("[Simulacion] Run finalizado. Razón:", finishedReason);
       setOverlayVisible(true);
     }
   }, [finishedReason]);
@@ -398,9 +426,10 @@ export function SimulacionContent() {
   };
 
   const handleCloseOverlay = () => {
+    console.log("[Simulacion] Cerrando overlay y reseteando sesión.");
     setOverlayVisible(false);
-    disconnect();
-    reset();
+    disconnect(); // <--- Usado
+    reset();      // <--- Usado
   };
 
   const showFinishedOverlay = !!finishedReason && !!runId && overlayVisible;
@@ -421,7 +450,7 @@ export function SimulacionContent() {
 
   return (
     <div className="min-h-screen bg-neutral-50 relative">
-    <SimulationStatusWidget />
+    {/*<SimulationStatusWidget />*/}
       {/* Toast de carga */}
       {/* Overlay de carga */}
       {showOverlay && (
@@ -510,6 +539,7 @@ export function SimulacionContent() {
             onMouseEnter={() => setHoveredFlight(flight)}
             onMouseLeave={() => setHoveredFlight(null)}
             onClick={() => {
+              console.log("[Simulacion] Click en FlightPath:", flight.id);
               setActiveFlight((prev) =>
                 prev?.id === flight.id ? null : flight
               );
@@ -517,7 +547,7 @@ export function SimulacionContent() {
               if (vueloDto) {
                 setSelectedVuelo(vueloDto);
                 setSelectedAirport(null);
-                setToolsPanelOpen(true);
+                setToolsPanelOpen(true); // <--- Usado
               }
               setHoveredFlight(null);
             }}
@@ -533,11 +563,12 @@ export function SimulacionContent() {
           hoverColor={HOVER_COLOR}
           onHoverChange={setHoveredAirportId}
           onClick={(id) => {
+            console.log("[Simulacion] Click en Aeropuerto:", id);
             const newId = selectedAirportId === id ? null : id;
             setSelectedAirport(newId);
             if (newId) {
               setSelectedVuelo(null);
-              setToolsPanelOpen(true);
+              setToolsPanelOpen(true); // <--- Usado
             }
           }}
           iconSize={16}

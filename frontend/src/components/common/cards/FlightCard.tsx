@@ -97,6 +97,17 @@ export default function FlightCard({ data, simNowUtc, onClose, isHover }: Flight
   const originTime = formatTime(data.salidaUtc);
   const destTime = formatTime(data.llegadaUtc);
 
+  const formatFlightId = (id: string): string => {
+    const regex = /^([A-Z]{4})-([A-Z]{4})-(\d{4})-(\d{2})-(\d{2})T(\d{2})(\d{2})(\d{2})Z$/;
+    const match = id.match(regex);
+
+    if (!match) return id;
+
+    // CORRECCIÓN: Quitamos el "_" pero mantenemos la coma al inicio
+    const [, origin, dest, year, month, day, hour, min, sec] = match;
+
+    return `${origin} ➝ ${dest} • ${day}/${month}/${year} ${hour}:${min}:${sec} UTC`;
+  };
   return (
     <div className="fixed bottom-6 right-6 z-50 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-2xl ring-1 ring-black/5 overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-300 font-sans">
       
@@ -107,8 +118,11 @@ export default function FlightCard({ data, simNowUtc, onClose, isHover }: Flight
           <div className={`p-1 rounded-md shadow-sm border ${colorClasses.iconBg[statusColor]}`}>
              <Plane className="w-3 h-3" />
           </div>
-          <span className="text-[10px] font-mono text-slate-400 truncate" title={data.id}>
-            {data.id}
+          <span 
+            className="text-[10px] font-mono text-slate-500 whitespace-nowrap" 
+            title={data.id} // El tooltip puede mantener el ID original o el formateado
+          >
+            {formatFlightId(data.id)}
           </span>
         </div>
         {!isHover && (

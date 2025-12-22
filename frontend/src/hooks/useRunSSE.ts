@@ -181,11 +181,9 @@ export function useRunSSE(runId?: string) {
 
   const esRef = useRef<EventSource | null>(null);
 
+  // LOG de diagnóstico de estado (solo informativo)
   useEffect(() => {
     console.log(`%c[HOOK STATE] runState cambió a: ${runState}`, 'background: #000; color: #0f0; font-size: 14px; padding: 3px;');
-    if (runState === 'LOADING') {
-        console.log('%c[HOOK STATE] ⏳ ESTAMOS EN LOADING', 'background: orange; color: black; font-weight: bold; padding: 4px;');
-    }
   }, [runState]);
 
   const url = useMemo(() => {
@@ -201,87 +199,76 @@ export function useRunSSE(runId?: string) {
     }
   }, [runId]);
 
-  // Reset al cambiar runId
+  // Reset al cambiar runId (Limpieza de estado local)
   useEffect(() => {
-    console.log(`[HOOK RESET] Nuevo runId detectado: ${runId}`);
-    setConnected(false);
-    setError(null);
-    setRunState("PENDING"); 
-    setLoadingMessage("");
-    setLoadingProgress(0);
-    setSpeed(undefined);
-    setSimStart(undefined);
-    setSimNow(undefined);
-    setWindows([]);
-    setFinishedReason(null);
-    setAirportOccupancy({});
+    if (runId) {
+      console.log(`[HOOK RESET] Nuevo runId detectado: ${runId}`);
+      setConnected(false);
+      setError(null);
+      setRunState("PENDING"); 
+      setLoadingMessage("");
+      setLoadingProgress(0);
+      setSpeed(undefined);
+      setSimStart(undefined);
+      setSimNow(undefined);
+      setWindows([]);
+      setFinishedReason(null);
+      setAirportOccupancy({});
+    }
   }, [runId]);
 
   // =========================================================
-  // 📸 NUEVO: FETCH SNAPSHOT (Rehidratación)
+  // 📸 FETCH SNAPSHOT (Rehidratación) - opcional si ya lo manejas fuera
   // =========================================================
+  // Nota: Si ya lo estás llamando en runSession.tsx (el provider autónomo), 
+  // tenerlo aquí también podría duplicar llamadas, pero no rompe nada.
+  // Lo dejaremos por seguridad.
   useEffect(() => {
       if (!runId) return;
 
       const fetchSnapshot = async () => {
           try {
-              console.log(`%c[SNAPSHOT] Solicitando estado inicial para ${runId}...`, 'color: violet');
-              
               // Construir URL del snapshot
               const path = `runs/${runId}/snapshot`;
               const base = import.meta.env.VITE_API_BASE_URL as string | undefined;
               const snapshotUrl = base ? new URL(path, base).toString() : `/${path}`;
 
               const res = await fetch(snapshotUrl);
-              if (!res.ok) {
-                  console.warn("[SNAPSHOT] No se pudo obtener snapshot (quizás el run apenas inicia)");
-                  return;
-              }
+              if (!res.ok) return;
 
               const json = await res.json();
-              // Validar con Zod
               const data = SnapshotSchema.parse(json);
 
-              console.log(`%c[SNAPSHOT] Recibidos ${data.vuelos.length} vuelos activos`, 'color: violet');
-
-              // Actualizar tiempo simulado si no lo tenemos aún
+              console.log(`%c[SNAPSHOT HOOK] Recibidos ${data.vuelos.length} vuelos`, 'color: violet');
+              
               setSimNow(prev => prev || data.simNow);
-
-              // Inyectar como una "Ventana Sintética" inicial
-              // Usamos índice -999 para que quede al principio y no moleste a las ventanas reales
+              
               setWindows(prev => {
-                  // Si ya tenemos datos (por SSE muy rápido), no sobrescribimos agresivamente,
-                  // pero idealmente el snapshot llega primero o complementa.
-                  // Simplemente lo agregamos.
                   const snapshotWindow: WindowData = {
                       index: -999, 
                       startUtc: data.simNow,
                       endUtc: data.simNow,
                       vuelos: data.vuelos,
-                      pedidos: [] // El snapshot de vuelos no trae pedidos completos, solo carga
+                      pedidos: [] 
                   };
-                  
-                  // Evitar duplicados si el efecto corre dos veces
                   if (prev.some(w => w.index === -999)) return prev;
-                  
                   return [snapshotWindow, ...prev];
               });
 
           } catch (error) {
-              console.error("[SNAPSHOT] Error procesando snapshot:", error);
+              console.error("[SNAPSHOT HOOK] Error:", error);
           }
       };
-
       fetchSnapshot();
   }, [runId]);
 
   // =========================================================
-  // SSE CONNECTION
+  // SSE CONNECTION (CORREGIDO)
   // =========================================================
   useEffect(() => {
     if (!url) return;
 
-    console.log(`%c[RUN DIAG] Conectando a ${url}`, 'color: cyan');
+    console.log(`%c[RUN SSE] Iniciando conexión a ${url}`, 'color: cyan');
     const es = new EventSource(url, { withCredentials: false });
     esRef.current = es;
 
@@ -289,10 +276,11 @@ export function useRunSSE(runId?: string) {
 
     es.onopen = () => {
       if (!alive) return;
-      console.log("%c[SSE OPEN] Conexión abierta", 'color: cyan');
+      console.log("%c[SSE OPEN] Conectado", 'color: cyan');
       setConnected(true);
       setError(null);
-      if (runState === 'PENDING') setRunState("LOADING"); 
+      // No forzamos cambio de estado aquí para evitar loops, 
+      // dejamos que el evento LOADING o RUN_STARTED lo dicte.
     };
 
     es.onmessage = (ev) => {
@@ -300,8 +288,9 @@ export function useRunSSE(runId?: string) {
       try {
         const raw = JSON.parse(ev.data);
         
+        // Logs reducidos para no saturar, solo eventos clave
         if (raw.type !== 'TICK') {
-            console.log(`%c📩 [SSE RAW] Evento recibido: ${raw.type}`, 'color: #aaa', raw);
+            console.log(`%c📩 [SSE] ${raw.type}`, 'color: #aaa', raw);
         }
 
         const evt = RunEvtSchema.parse(raw); 
@@ -314,8 +303,8 @@ export function useRunSSE(runId?: string) {
             break;
 
           case "RUN_STARTED":
-            console.log("%c🚀 [SSE] RUN STARTED", 'color: lime');
-            setRunState("RUNNING");
+            console.log("%c🚀 RUN STARTED", 'color: lime');
+            setRunState("RUNNING"); // Esto ya no reiniciará la conexión
             setSimStart(evt.simStartUtc);
             setWallStart(evt.wallAnchorUtc);
             setSpeed(evt.speed);
@@ -335,6 +324,7 @@ export function useRunSSE(runId?: string) {
                 vuelos: evt.vuelos,
                 pedidos: evt.pedidos,
               };
+              // Evitar duplicados
               const idx = prev.findIndex((w) => w.index === nw.index);
               if (idx >= 0) {
                 const cp = [...prev];
@@ -346,7 +336,7 @@ export function useRunSSE(runId?: string) {
             break;
 
           case "FINISHED":
-            console.log("%c🏁 [SSE] FINISHED", 'color: red');
+            console.log("%c🏁 FINISHED", 'color: red');
             setRunState("COMPLETED");
             setFinishedReason(evt.reason);
             es.close();
@@ -354,7 +344,7 @@ export function useRunSSE(runId?: string) {
             break;
             
           case "ERROR":
-            console.error("❌ [SSE ERROR EVENT]", evt.message);
+            console.error("❌ SSE Error:", evt.message);
             setRunState("FAILED");
             setError(evt.message);
             es.close();
@@ -362,27 +352,34 @@ export function useRunSSE(runId?: string) {
         }
       } catch (err) {
         if (err instanceof z.ZodError) {
-          console.error("%c❌ [ZOD ERROR] El backend mandó datos inválidos:", 'background: red; color: white', err.issues);
-          setError("Error de validación de datos (Backend mismatch)");
+          console.error("%c❌ Zod Error:", 'color:red', err.issues);
+          // Opcional: No cerrar conexión por error de validación de un solo paquete
+          // setError("Data mismatch"); 
         } else {
-          console.error("SSE Error:", err);
+          console.error("SSE Parse Error:", err);
         }
       }
     };
 
     es.onerror = () => {
       if (!alive) return;
-      console.error("⚠️ [SSE NETWORK ERROR] Conexión fallida o cerrada");
+      console.error("⚠️ SSE Network Error");
       setConnected(false);
-      setError("Conexión perdida con el servidor");
+      // EventSource tiene reconexión automática nativa, 
+      // pero si falla fatalmente:
+      // setError("Conexión perdida");
     };
 
     return () => {
+      console.log("%c[SSE CLEANUP] Cerrando conexión...", 'color: gray');
       alive = false;
       es.close();
       esRef.current = null;
     };
-  }, [runState, url]);
+
+  // ⚠️ CORRECCIÓN CRÍTICA: Quitamos 'runState' de las dependencias.
+  // Ahora la conexión solo se reinicia si cambia la URL (runId).
+  }, [url]); 
 
   const disconnect = () => {
     if (esRef.current) esRef.current.close();

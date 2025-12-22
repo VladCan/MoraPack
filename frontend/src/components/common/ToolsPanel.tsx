@@ -81,8 +81,6 @@ export default function ToolsPanel({
   const [almacen, setAlmacen] = useState<string | null>(null);
 
   // CONEXIÓN CON EL CONTEXTO GLOBAL
-  // Al usar setSelectedVuelo o setSelectedPedido aquí, automáticamente
-  // se disparará el renderizado de la Card en Simulacion.tsx
   const { 
     begin, 
     simNow: simNowUtc, 
@@ -98,6 +96,9 @@ export default function ToolsPanel({
     selectedVuelo, 
     setSelectedVuelo 
   } = useRunSession();
+
+  // [DEBUG] Log de renderizado principal
+  // console.log(`[ToolsPanel] RENDER. RunId: ${currentRunId}, Windows: ${windows.length}, SimNow: ${simNowUtc}`);
   
   // Alias para mantener compatibilidad con tu código de subcomponentes
   const pedido = selectedPedido;
@@ -122,7 +123,7 @@ export default function ToolsPanel({
     if (!shouldFetchScheduled || !scheduledFlightsRaw || !Array.isArray(scheduledFlightsRaw)) {
       return [];
     }
-    return scheduledFlightsRaw.map((v: any) => ({
+    const mapped = scheduledFlightsRaw.map((v: any) => ({
       id: v.id || "",
       origen: v.origen || "",
       destino: v.destino || "",
@@ -136,6 +137,12 @@ export default function ToolsPanel({
     })).filter((v: VueloDTO) => 
       v.id && v.origen && v.destino && !vuelosCancelados.has(v.id)
     );
+    
+    // [DEBUG] Vuelos programados
+    if (mapped.length > 0) {
+      console.log(`[ToolsPanel] Vuelos Programados cargados: ${mapped.length}`);
+    }
+    return mapped;
   }, [scheduledFlightsRaw, shouldFetchScheduled, vuelosCancelados]);
 
   const warehouseOptions = useMemo(() => {
@@ -162,11 +169,13 @@ export default function ToolsPanel({
   // Limpiar vuelo si se cancela
   useEffect(() => {
     if (vuelo && vuelosCancelados.has(vuelo.id)) {
+      console.log(`[ToolsPanel] Vuelo seleccionado ${vuelo.id} fue cancelado, limpiando selección.`);
       setVuelo(null);
     }
   }, [vuelo, vuelosCancelados]);
 
   const handleSelectAlmacen = (codigo: string) => {
+    console.log("[ToolsPanel] Seleccionando almacén:", codigo);
     setAlmacen(codigo);
     setSelectedAirport(codigo);
   };
@@ -185,11 +194,15 @@ export default function ToolsPanel({
 
   // Obtener vuelos activos
   const vuelosActivos = useMemo<VueloDTO[]>(() => {
+    // [DEBUG] Inicio cálculo vuelos activos
+    // console.log(`[ToolsPanel DEBUG] Calculando VuelosActivos. Windows: ${windows.length}, SimNow: ${simNowUtc}`);
+
     if (windows.length === 0) return [];
     
     if (!simNowUtc) {
       const lastWindow = windows[windows.length - 1];
       const vuelos = lastWindow?.vuelos ?? [];
+      console.log(`[ToolsPanel DEBUG] Sin SimNow, usando última ventana. Vuelos encontrados: ${vuelos.length}`);
       return vuelos.filter(v => !vuelosCancelados.has(v.id));
     }
 
@@ -205,21 +218,30 @@ export default function ToolsPanel({
           const llegada = new Date(v.llegadaUtc).getTime();
           
           if (variant === "operacion") {
+             // En operación diaria mostramos vuelos que aún no han terminado
             if (llegada > now) vuelosActivosMap.set(v.id, v);
           } else {
-            if (now >= salida && now <= llegada) vuelosActivosMap.set(v.id, v);
+            // En simulación solo mostramos vuelos EN EL AIRE
+            if (now >= salida && now <= llegada) {
+                // console.log(`[ToolsPanel DEBUG] Vuelo ACTIVO detectado: ${v.id} (Now: ${now} entre ${salida} y ${llegada})`);
+                vuelosActivosMap.set(v.id, v);
+            }
           }
         }
       });
     });
     
     const resultado = Array.from(vuelosActivosMap.values());
+    
+    // Fallback si no hay activos (útil al inicio o si el reloj salta)
     if (resultado.length === 0) {
+      // console.warn("[ToolsPanel DEBUG] No se encontraron vuelos activos exactos, buscando en última ventana...");
       const lastWindow = windows[windows.length - 1];
       const vuelos = lastWindow?.vuelos ?? [];
       return vuelos.filter(v => !vuelosCancelados.has(v.id));
     }
     
+    console.log(`[ToolsPanel DEBUG] Total Vuelos Activos calculados: ${resultado.length}`);
     return resultado;
   }, [windows, simNowUtc, vuelosCancelados, variant]);
 
@@ -267,6 +289,7 @@ export default function ToolsPanel({
     const now = new Date(simNowUtc).getTime();
     const pedidosEnVueloSet = new Set<number>();
     
+    // Buscar pedidos que estén dentro de vuelos activos
     windows.forEach(window => {
       window.vuelos?.forEach(vuelo => {
         const salida = new Date(vuelo.salidaUtc).getTime();
@@ -279,6 +302,8 @@ export default function ToolsPanel({
     
     const lastWindow = windows[windows.length - 1];
     const resultado = (lastWindow?.pedidos || []).filter(p => pedidosEnVueloSet.has(p.id));
+    
+    // console.log(`[ToolsPanel DEBUG] Pedidos en vuelo calculados: ${resultado.length}`);
     return resultado.length === 0 ? (lastWindow?.pedidos ?? []) : resultado;
   }, [windows, simNowUtc, variant, pedidosPorIdOperacion]);
 
@@ -289,15 +314,18 @@ export default function ToolsPanel({
   const [loading, setLoading] = useState(false);
 
   const handleRun = async () => {
+    console.log("[ToolsPanel] Click en Iniciar Simulación");
     setLoading(true);
     try {
       const req = buildStartRunRequest(variant, {inicio, fin});
+      console.log("[ToolsPanel] Payload enviado:", req);
       const [data, error] = await handleApi(postJson<StartRunResponse>("runs", req))
 
       if (error) {
         console.error("❌ [ToolsPanel] Error al iniciar la simulación:", error);
         toast.custom((t) => <ToastCustom t={t} message={error+"❗"} type="error" />, { duration: 5000});
       } else if (data) {
+        console.log("[ToolsPanel] Simulación iniciada. RunID:", data.runId);
         toast.custom((t) => <ToastCustom t={t} message={"¡Simulación iniciada exitosamente!"} type="success" />, { duration: 5000});
         begin(data.runId);
       }
@@ -330,12 +358,14 @@ export default function ToolsPanel({
     setForcing(true);
     try {
       const path = `operacionDiaria/${currentRunId}/force`;
+      console.log("[ToolsPanel] Forzando replan en:", path);
       const [data, error] = await handleApi(postJson<ForceReplanResponse>(path))
 
       if (error) {
         console.error("[ToolsPanel] Error al forzar replan:", error);
         toast.custom((t) => <ToastCustom t={t} message={"Error al forzar planificación." + "❗"} type="error" />, { duration: 4000 });
       } else if (data){
+        console.log("[ToolsPanel] Replan forzado OK:", data);
         toast.custom((t) => <ToastCustom t={t} message={"Planificación forzada exitosamente!"} type="success" />, { duration: 4000 });
       }
     } catch (err) {
@@ -347,13 +377,7 @@ export default function ToolsPanel({
 
   return (
     <section className="mx-auto max-w-6xl px-3 sm:px-4">
-      {/* NOTA: Se han eliminado las tarjetas flotantes (FlightCard, OrderCard, AirportCard) de aquí.
-          Ahora se renderizan exclusivamente en el componente padre (ej. Simulacion.tsx) 
-          escuchando el contexto global (useRunSession).
-      */}
-
       {/* Selecciones principales (botones) */}
-      {/* Al seleccionar aquí, se actualiza el contexto y el Padre pinta la tarjeta */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 relative">
         <FlightSelectCard
           runId={currentRunId}
@@ -500,18 +524,7 @@ export default function ToolsPanel({
   );
 }
 
-// ... (Subcomponentes WarehouseSelectCard, FlightSelectCard, OrderSelectCard, Field, FilterChip se mantienen IGUAL abajo)
-// Solo asegúrate de copiar y pegar el resto del archivo original que me pasaste para los subcomponentes, 
-// ya que NO necesitan cambios, su lógica de onSelect ya actualiza el estado correctamente.
-
-/* ---------- Subcomponentes (COPIAR Y PEGAR DEL ARCHIVO ORIGINAL ABAJO) ---------- */
-/* ... WarehouseSelectCard ... */
-/* ... FlightSelectCard ... */
-/* ... OrderSelectCard ... */
-/* ... Field ... */
-/* ... FilterChip ... */
-/* ... OperacionDiariaToolsPanel ... */
-/* ... ColapsoToolsPanel ... */
+/* ---------- Subcomponentes ---------- */
 
 type WarehouseOption = { id: string; label: string; city?: string; country?: string };
 
@@ -680,6 +693,9 @@ function FlightSelectCard({
   const hasScheduledFlights = showScheduledToggle || (scheduledFlights !== undefined);
   const currentItems = showScheduled && scheduledFlights ? scheduledFlights : items;
 
+  // [DEBUG] Logs dentro del selector
+  // console.log(`[FlightSelectCard] Modo Programado: ${showScheduled}. Total Items: ${currentItems.length}`);
+
   // Función para verificar si un vuelo está en el aire (no se puede cancelar)
   const isVueloEnAire = useCallback((vuelo: VueloDTO): boolean => {
     if (!simNowUtc) return false;
@@ -731,6 +747,8 @@ function FlightSelectCard({
       }
     }
 
+    console.log(`[FlightSelectCard] Solicitando cancelación vuelo ${vuelo.id} en runId ${runId}`);
+
     try {
       const req : CancelarVueloRequest = {
         origen: vuelo.origen,
@@ -739,7 +757,6 @@ function FlightSelectCard({
         llegadaUtc: vuelo.llegadaUtc
       }
 
-      //Porseaca xd
       if (runId == null) return;
 
       const path = `vuelos/${runId}/cancelar`;
@@ -748,44 +765,49 @@ function FlightSelectCard({
         postJson<CancelarVueloResponse>(path, req)
       )
 
-      console.log("[cancelarVuelo] El data es:", data);
-      console.log("[cancelarVuelo] El error es:", error);
-
       if (error) {
-        // aquí tu toast o UI de error
         console.error("❌ [ToolsPanel] Error al cancelar el vuelo:", error);
-        
         toast.custom((t) => (
-          <ToastCustom
-            t={t}
-            message={error+"❗"}
-            type="error"
-          />),
+          <ToastCustom t={t} message={error+"❗"} type="error" />),
         { duration: 5000});
 
       } else if (data) {
-        // éxito - agregar vuelo a la lista de cancelados para ocultarlo inmediatamente
         if (cancelarVuelo) {
           cancelarVuelo(vuelo.id);
         }
         toast.custom((t) => (
-          <ToastCustom
-            t={t}
-            message={"Vuelo cancelado exitosamente!"}
-            type="success"
-          />),
+          <ToastCustom t={t} message={"Vuelo cancelado exitosamente!"} type="success" />),
         { duration: 5000});
       }
-
     }
     catch(err) {
       console.error("💥 [ToolsPanel] Error inesperado:", err);
     }
-
-
-
-    // TODO: Implementar cancelación de vuelo (acciones adicionales si aplica)
   };
+
+  // Helper para renderizar el contenido de la tarjeta de vuelo (Id, Ruta, Fecha)
+  const renderFlightContent = (v: VueloDTO) => (
+    <>
+      <div className="flex items-center justify-between mb-1">
+        <span className="font-mono text-xs truncate">{v.id}</span>
+      </div>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span className="font-mono">{v.origen}</span>
+        <span>→</span>
+        <span className="font-mono">{v.destino}</span>
+      </div>
+      <div className="mt-1 text-xs text-muted-foreground">
+        {new Date(v.salidaUtc).toLocaleString('es-PE', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'UTC'
+        })} UTC
+      </div>
+    </>
+  );
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -820,14 +842,10 @@ function FlightSelectCard({
         ].join(" ")}
       >
         <div className="space-y-2 mb-2">
-          {/* Toggle para alternar entre vuelos activos y programados */}
           {hasScheduledFlights && (
             <div className="flex items-center gap-2 pb-2 border-b border-border/50">
               <button
-                onClick={() => {
-                  setShowScheduled(false);
-                  setQ("");
-                }}
+                onClick={() => { setShowScheduled(false); setQ(""); }}
                 className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
                   !showScheduled
                     ? "bg-primary text-primary-foreground"
@@ -837,10 +855,7 @@ function FlightSelectCard({
                 Activos
               </button>
               <button
-                onClick={() => {
-                  setShowScheduled(true);
-                  setQ("");
-                }}
+                onClick={() => { setShowScheduled(true); setQ(""); }}
                 className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-1 ${
                   showScheduled
                     ? "bg-primary text-primary-foreground"
@@ -915,33 +930,16 @@ function FlightSelectCard({
                   }`}
                 >
                   {showScheduled ? (
-                    // Vista de vuelos programados con botón cancelar
+                    // --- VISTA DE VUELOS PROGRAMADOS ---
                     <div className="flex items-start justify-between gap-2">
                       <button
-                        onClick={() => {
-                          onSelect(v);
-                          setOpen(false);
-                          setQ("");
+                        onClick={() => { 
+                            console.log("[FlightSelectCard] Vuelo Programado seleccionado:", v.id);
+                            onSelect(v); setOpen(false); setQ(""); 
                         }}
                         className="flex-1 text-left min-w-0"
                       >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-mono text-xs truncate">{v.id}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span className="font-mono">{v.origen}</span>
-                          <span>→</span>
-                          <span className="font-mono">{v.destino}</span>
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {new Date(v.salidaUtc).toLocaleString('es-PE', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: 'UTC'
-                          })} UTC
-                        </div>
+                        {renderFlightContent(v)}
                       </button>
                       <button
                         onClick={(e) => handleCancelar(v, e)}
@@ -953,27 +951,21 @@ function FlightSelectCard({
                       </button>
                     </div>
                   ) : (
-                    // Vista normal de vuelos activos
+                    // --- VISTA DE VUELOS ACTIVOS (ACTUALIZADA) ---
                     variant === "operacion" ? (
-                      // Vista con botón cancelar para operación diaria
+                      // Operación Diaria: con botón cancelar y formato detallado
                       (() => {
                         const enVuelo = isVueloEnAire(v);
                         return (
                           <div className="flex items-start justify-between gap-2">
                             <button
-                              onClick={() => {
-                                onSelect(v);
-                                setOpen(false);
-                                setQ("");
+                              onClick={() => { 
+                                  console.log("[FlightSelectCard] Vuelo Activo seleccionado:", v.id);
+                                  onSelect(v); setOpen(false); setQ(""); 
                               }}
                               className="flex-1 text-left min-w-0"
                             >
-                              <div className="flex items-center justify-between">
-                                <span className="font-mono text-xs">{v.id}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {v.origen} → {v.destino}
-                                </span>
-                              </div>
+                              {renderFlightContent(v)}
                             </button>
                             <button
                               onClick={(e) => handleCancelar(v, e)}
@@ -992,21 +984,15 @@ function FlightSelectCard({
                         );
                       })()
                     ) : (
-                      // Vista normal sin botón cancelar
+                      // Simulación / Colapso: sin botón cancelar pero con formato detallado
                       <button
-                        onClick={() => {
-                          onSelect(v);
-                          setOpen(false);
-                          setQ("");
+                        onClick={() => { 
+                            console.log("[FlightSelectCard] Vuelo Simulación seleccionado:", v.id);
+                            onSelect(v); setOpen(false); setQ(""); 
                         }}
                         className="w-full text-left"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono">{v.id}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {v.origen} → {v.destino}
-                          </span>
-                        </div>
+                        {renderFlightContent(v)}
                       </button>
                     )
                   )}
@@ -1019,7 +1005,6 @@ function FlightSelectCard({
     </Popover>
   );
 }
-
 function OrderSelectCard({
   label,
   icon,
@@ -1223,6 +1208,7 @@ function OrderSelectCard({
               <li key={p.id}>
                 <button
                   onClick={() => {
+                    console.log("[ToolsPanel] Pedido seleccionado:", p.id);
                     onSelect(p);
                     setOpen(false);
                     setQ("");
