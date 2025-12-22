@@ -66,6 +66,7 @@ export function SimulacionContent() {
 
   const {
     runId,
+    simNow,
     selectedAirportId,
     setSelectedAirport,
     reset,
@@ -92,6 +93,8 @@ export function SimulacionContent() {
     wallStartUtc,
     disconnect,
   } = useRunSSE(runId || undefined);
+
+  const currentSimNow = simNow ?? simNowUtc;
 
   const vuelosMap = useMemo(() => {
     const map = new Map<string, VueloDTO>();
@@ -135,8 +138,8 @@ export function SimulacionContent() {
 
   // Flights render logic
   const flightsToRender = useMemo<FlightForRender[]>(() => {
-    if (!simNowUtc || windows.length === 0) return [];
-    const now = new Date(simNowUtc).getTime();
+    if (!currentSimNow || windows.length === 0) return [];
+    const now = new Date(currentSimNow).getTime();
     const allFlights: FlightForRender[] = [];
     const vuelosUnicos = new Map<string, typeof windows[0]["vuelos"][0]>();
 
