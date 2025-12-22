@@ -59,6 +59,19 @@ public class ALNS {
         System.out.println(CYAN + ">>> INICIANDO ALNS (MODO: PROFILING ACTIVADO) <<<" + RESET);
         System.out.println(CYAN + "=================================================" + RESET);
 
+        // --- 📦 LOG DE CARGA INICIAL (NUEVO BLOQUE) ---
+        int totalPedidos = this.pedidos.size();
+        // Asumiendo que Pedido tiene un método getCantidad(). Si es getDemanda(), cámbialo.
+        int totalProductos = this.pedidos.stream()
+                                         .mapToInt(Pedido::getCantidad) 
+                                         .sum();
+
+        System.out.println(PURPLE + "📦 CARGA DE TRABAJO: " + RESET + 
+                           YELLOW + totalPedidos + " Pedidos" + RESET + " | " + 
+                           YELLOW + totalProductos + " Unidades (productos) totales" + RESET);
+        System.out.println(CYAN + "-------------------------------------------------" + RESET);
+        // ----------------------------------------------
+
         // Inicializamos el operador de emergencia con una cantidad fija a borrar (ej. 20)
         this.emergencyOperator = new WarehouseCrisisRemoval(20, this.aeropuertosMap);
 

@@ -48,9 +48,9 @@ const VueloDTOSchema = z.object({
   llegadaUtc: z.string(),
   cantidadAsignada: z.number(),
   capacidad: z.number(),
-  residual: z.number(),
-  costo: z.number(),
   carga: z.array(CargaItemSchema),
+  residual: z.number().optional().nullable(),
+  costo: z.number().optional().nullable(),
 });
 
 const RecojoSchema = z.object({

@@ -116,124 +116,152 @@ public class Test {// ADAPTAIVE LARGE NEIGHBORHOOD SEARCH (ALNS)
         List<VueloCancelado> vuelosCanceladosTeg = new ArrayList<>();
         // guardaremos la solución anterior para poder replanificar
         SolucionProgramacion solucionAnterior = null;
-        OcupacionPorAeropuerto ocupacionPorAeropuerto = new OcupacionPorAeropuerto(aeropuertosMap);
+        
         
         while (!pedidos.isEmpty()) {
             long startVentanaDeTiempo = System.nanoTime();
-            // reloj avanza hacia el futuro el valro de HORAS_VENTANA
+            
+            // 1. AVANCE DEL RELOJ
             reloj = reloj.plus(Duration.ofHours(HORAS_VENTANA));
             Instant presenteUTC = reloj;
-            Instant finUTC = presenteUTC.plus(HORIZONTE_TEG_H, ChronoUnit.HOURS);// para TEG
+            Instant finUTC = presenteUTC.plus(HORIZONTE_TEG_H, ChronoUnit.HOURS);
+            
             System.out.print(String.format("Fecha y hora de ejecución (UTC): %s%n",
-                        DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss 'UTC'", 
-                        Locale.forLanguageTag("es-ES"))
-                        .withZone(ZoneOffset.UTC).format(presenteUTC)));
-            // quitamos pedidos cumplidos y actualizamos los pedidos medio cumplidos
-            //System.out.println("pedidos antes de eliminar: " + pedidos.getLista().size());
+                    DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss 'UTC'",
+                            Locale.forLanguageTag("es-ES"))
+                            .withZone(ZoneOffset.UTC).format(presenteUTC)));
+
+            // 2. LIMPIEZA DE PEDIDOS COMPLETADOS
             if (solucionAnterior != null)
-                pedidos.eliminarYActualizarCumplidosHasta(presenteUTC, solucionAnterior);
-            //System.out.println("pedidos después de eliminar: " + pedidos.getLista().size());
-            // imprimimos un reporte del estado de los pedididos en el tiempo presenteUTC
-            //if (solucionAnterior != null)
-            //    solucionAnterior.imprimirEnArchivo(presenteUTC, "out/reporteSimulacion.txt");
-            // solo copia los pedidos no desencola
-            VentanaPedidos ventana = pedidos.acumuladoHasta(presenteUTC);// solo sacamos los pedidos de la ventana
-            //System.out.println("cantidad de pedidos en la ventana: "+ventana.pedidos().size() + " pedidos para programar hasta "
-            //        + DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm 'UTC'")
-            //                .withZone(ZoneOffset.UTC).format(presenteUTC));
+                pedidos.eliminarYActualizarCumplidosHasta(presenteUTC, solucionAnterior,true);
+
+            // 3. OBTENCIÓN DE NUEVOS PEDIDOS
+            VentanaPedidos ventana = pedidos.acumuladoHasta(presenteUTC);
             List<Pedido> listaPedidos = ventana.pedidos();
-            if (listaPedidos.isEmpty()){
-                if(pedidos.isEmpty()){
+            
+            if (listaPedidos.isEmpty()) {
+                if (pedidos.isEmpty()) {
                     System.out.println("No hay más pedidos por procesar. Finalizando simulación.");
                     break;
                 }
                 System.out.println("No hay pedidos nuevos en esta ventana. Avanzando al siguiente periodo.");
                 continue;
             }
-                
-            // guardamos los vuelos en curso y las reservas de espacio en aereopuertos de la
-            // solución anterior
-            Map<String, List<ArriboExogeno>> enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior,
-                    presenteUTC);
 
-            List<OcupacionAlmacen> reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior,
-                    presenteUTC, Duration.ofHours(2));
-            // imprimimos enVuelo y reservas para debug
-            //DebugEstado.debugEstado(
-            //        enVuelo,
-            //        reservas,
-            //        presenteUTC,
-            //        Paths.get("out", "iteracionPrevia.txt"));
-            // definimos los valores necesarios para el Time Elapse Event Graph TEEG
+            // 4. EXTRACCIÓN DEL ESTADO ANTERIOR (LO QUE YA SUCEDIÓ O ESTÁ CONFIRMADO)
+            // Vuelos que ya están en el aire (inmutables)
+            Map<String, List<ArriboExogeno>> enVuelo = EstadoAnteriorExtractor.construirArribosEnVuelo(solucionAnterior, presenteUTC);
+            
+            // Carga que físicamente está en el almacén esperando (inmutable)
+            List<OcupacionAlmacen> reservas = EstadoAnteriorExtractor.reservasDesdeSolucionAnterior(solucionAnterior, presenteUTC, Duration.ofHours(2));
 
-            List<VueloCancelado> vuelosCanceladosArch = cancelados.obtenerVuelosCancelados(presenteUTC,finUTC);
-            vuelosCanceladosTeg.addAll(vuelosCanceladosArch);
-            if(!vuelosCanceladosTeg.isEmpty()){
-                System.out.println("Hay");
+            // =========================================================================================
+            // <--- !!! CAMBIO IMPORTANTE 1: INSTANCIAR LIMPIO !!!
+            // Creamos un mapa de ocupación virgen para no arrastrar errores de planificación futura de la ventana anterior.
+            OcupacionPorAeropuerto ocupacionPorAeropuerto = new OcupacionPorAeropuerto(aeropuertosMap);
+
+            // <--- !!! CAMBIO IMPORTANTE 2: REHIDRATAR CON LA REALIDAD (FIDELIDAD) !!!
+            // Le decimos al mapa nuevo: "Oye, estos almacenes YA tienen esta carga física de la iteración pasada".
+            if (reservas != null) {
+                for (OcupacionAlmacen res : reservas) {
+                    
+                    // 1. Filtro de Futuro (Mantener): Si empieza después de ahora, ignorar.
+                    if (res.desde().isAfter(presenteUTC)) {
+                        continue; 
+                    }
+
+                    // 2. CORRECCIÓN DE DURACIÓN (NUEVO):
+                    // El plan anterior decía que la carga se quedaba hasta 'res.hasta()' (ej: mañana).
+                    // Pero ahora estamos replanificando. Solo sabemos con certeza que la carga 
+                    // ocupa espacio HASTA AHORA (presenteUTC).
+                    // A partir de 'presenteUTC', el ALNS decidirá si la carga sigue ahí o se va.
+                    
+                    // Definimos el fin de la reserva "fija" como el momento actual (+ un epsilon de seguridad)
+                    Instant finReal = res.hasta();
+                    
+                    // Si la reserva original iba más allá del presente, la cortamos en el presente.
+                    // Así el ALNS es libre de usar esa carga inmediatamente.
+                    if (finReal.isAfter(presenteUTC)) {
+                        finReal = presenteUTC.plusSeconds(60); // 1 minuto de buffer
+                    }
+
+                    // Validación extra: Que no quede fin <= inicio
+                    if (!finReal.isAfter(res.desde())) {
+                        finReal = res.desde().plusSeconds(60);
+                    }
+
+                    ocupacionPorAeropuerto.reservar(
+                        res.aeropuerto(), 
+                        res.desde(), 
+                        finReal, // Usamos el fin cortado
+                        res.cantidad()
+                    );
+                }
             }
+            // =========================================================================================
+
+            // 5. CONFIGURACIÓN DEL TEG (Time-Expanded Graph)
+            List<VueloCancelado> vuelosCanceladosArch = cancelados.obtenerVuelosCancelados(presenteUTC, finUTC);
+            vuelosCanceladosTeg.addAll(vuelosCanceladosArch);
 
             TEGParametros params = TEGParametros.builder()
                     .inicioUtc(presenteUTC)
                     .finUtc(finUTC)
-                    // .capacidadWaitPorDefecto(null) // null => usa cap. de bodega del aeropuerto
                     .sedes(sedes)
-                    .arribosLibres(enVuelo) // <— vuelos ya despegados
-                    .reservasWaitIniciales(reservas) // <— ocupa bodega por pickup 2h
-                    // .stockInicial(stockInicial) //en caso sea conveniente para el modelo (en
-                    // evaluacion)
+                    .arribosLibres(enVuelo)          // Aviones en el aire
+                    .reservasWaitIniciales(reservas) // Carga en almacén (esto conecta el grafo con el stock real)
                     .vuelosCancelados(vuelosCanceladosTeg)
                     .build();
 
             VuelosTEG teg = new TEGEventBuilder(aeropuertosMap, mapa).construir(params);
-            // TODO --> tenemos que crear una función que alimente ocupacionPorAeropuerto
-            // con lo que tiene teg
-            // SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of());
 
+            // 6. GENERACIÓN DE SEED (SOLUCIÓN INICIAL)
+            // Usamos el 'ocupacionPorAeropuerto' que acabamos de limpiar y rellenar
             SSPGeneradorSeed ssp = new SSPGeneradorSeed(sedes, Map.of(), ocupacionPorAeropuerto);
             SolucionProgramacion seed = ssp.generarSeed(teg, listaPedidos, presenteUTC);
-            //ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt",presenteUTC);
-            // ALNS
-            
+            ImpresorSolucion.imprimirEnArchivo(seed, "out/solucionInicial.txt", presenteUTC);
+
+            // 7. CONFIGURACIÓN Y EJECUCIÓN DEL ALNS
             List<DestructionOperator> destructores = new ArrayList<>();
             destructores.add(new RandomRemoval(25));
             destructores.add(new RandomRemoval(60));
-            //destructores.add(new WorstRemoval(15));
-            destructores.add(new WarehouseCrisisRemoval(15, aeropuertosMap)); 
-            destructores.add(new WarehouseCrisisRemoval(40, aeropuertosMap)); // Versión agresiva
+            destructores.add(new WarehouseCrisisRemoval(15, aeropuertosMap));
+            destructores.add(new WarehouseCrisisRemoval(40, aeropuertosMap));
             destructores.add(new SlaBreachRemoval(20));
+
             List<RepairOperator> reparadores = new ArrayList<>();
-            //reparadores.add(new RegretRepair(2, new ArrayList<>(sedes), teg));
-            //reparadores.add(new SplitRepair(new ArrayList<>(sedes), teg));
             reparadores.add(new Regret2RepairFast(new ArrayList<>(sedes), teg));
             reparadores.add(new GreedyUrgencyRepair(new ArrayList<>(sedes), teg));
-            //reparadores.add(new UrgencySplitRepair(new ArrayList<>(sedes), teg));
-            ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC, ocupacionPorAeropuerto,aeropuertosMap);
+
+            // Pasamos el ocupacionPorAeropuerto limpio para que ALNS trabaje sobre él
+            ALNS alns = new ALNS(teg, listaPedidos, destructores, reparadores, presenteUTC, ocupacionPorAeropuerto, aeropuertosMap);
             SolucionProgramacion solucionOptima = alns.ejecutar(seed);
-            
-            //SEQM    410
-            //48
-            //24x410=9840
-            // System.out.println("ALNS");
-            // ImpresorSolucion.imprimirEnArchivo(solucionOptima);
+
+            if (solucionAnterior != null) {
+                for (var entry : solucionAnterior.getPlanPorPedido().entrySet()) {
+                    Integer idPedido = entry.getKey();
+                    // Si el pedido existía antes, pero no está en la solución nueva...
+                    if (!solucionOptima.getPlanPorPedido().containsKey(idPedido)) {
+                        // ...significa que es un pedido "En Progreso" (irreversible).
+                        // Lo copiamos tal cual a la nueva solución para mantener la memoria.
+                        solucionOptima.getPlanPorPedido().put(idPedido, entry.getValue());
+                    }
+                }
+            }
+
+            // 8. REPORTES Y VERIFICACIÓN
             ImpresorSolucion.imprimirEnArchivo(solucionOptima, "out/solucion.txt", presenteUTC);
             ImpresorSolucion.imprimirReporteAeropuertos(solucionOptima, aeropuertosMap, "out/reporteAereopuertos.txt");
+            
             solucionAnterior = solucionOptima;
-            // verificacionTotal(solucionAnterior)
-            // System.out.println("\n📊 FITNESS DE LA SOLUCIÓN:");
-            // solucionOptima.imprimirFitness(presenteUTC);
-            // System.exit(1);
-            //solucionAnterior = seed;
-            /* 
-            solucionOptima.imprimirCapacidadVuelosEnVentana(
-                    presenteUTC, finUTC,
-                    "out/reporteCapacidadVuelos_" + presenteUTC.toString().replace(':', '-') + ".txt");
-            */
-            if(VerificadorSLA.assertBasicos(solucionAnterior, Duration.ofHours(46),mapa, aeropuertosMap)){
+
+            if (VerificadorSLA.assertBasicos(solucionAnterior, Duration.ofHours(46), mapa, aeropuertosMap)) {
                 System.out.println("✅ Solución verificada para la ventana actual.");
             } else {
                 System.err.println("❌ La solución tiene violaciones en la ventana actual.");
                 System.exit(1);
             }
+
             long endVentanaDeTiempo = System.nanoTime();
             double durationSeconds = (endVentanaDeTiempo - startVentanaDeTiempo) / 1_000_000_000.0;
             System.out.println("⏱️ Tiempo total de ejecución: " + durationSeconds + " segundos");

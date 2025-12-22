@@ -31,6 +31,8 @@ public class CargarPedidos {
     private boolean utcNormalizada = false; // evita doble normalización
     private static final String SEPARATOR = "-";
 
+    private final Map<Integer, Pedido> historico = new HashMap<>();
+
     // DTO simple de la ventana
     public record VentanaPedidos(Instant presenteUTC, List<Pedido> pedidos) {
     }
@@ -40,6 +42,20 @@ public class CargarPedidos {
         colaPedidos.add(pedido);
     }
 
+    public void agregarAHistorico() {
+        for (Pedido pedido : colaPedidos) {
+            historico.put(pedido.getIdPedido(), pedido);
+        }
+    }
+
+    public List<Pedido> historicoHasta(Instant presenteUTC) {
+        if (presenteUTC == null) return List.of();
+        return historico.values().stream()
+                .filter(p -> p.getCreatedAtUtc() != null && !p.getCreatedAtUtc().isAfter(presenteUTC))
+                .sorted(Comparator.comparing(Pedido::getCreatedAtUtc))
+                .toList();
+    }
+    
     public void ordenarPorUTC() {
         List<Pedido> tmp = new ArrayList<>(colaPedidos);
         // Elige el getter correcto según tu modelo:
@@ -239,6 +255,59 @@ public class CargarPedidos {
     public boolean isEmpty() {
         return colaPedidos.isEmpty();
     }
+    
+    public void eliminarYActualizarCumplidosHasta(
+            Instant presenteUTC,
+            SolucionProgramacion solucionAnterior,
+            boolean congelarTodoLoPlanificado // 👈 NUEVO
+    ) {
+        if (solucionAnterior == null || presenteUTC == null) return;
+
+        Map<Integer, PlanPedido> planes = solucionAnterior.getPlanPorPedido();
+        if (planes == null || planes.isEmpty()) return;
+
+        for (Iterator<Pedido> it = colaPedidos.iterator(); it.hasNext();) {
+            Pedido pedido = it.next();
+            PlanPedido plan = planes.get(pedido.getIdPedido());
+            if (plan == null || plan.getRutas() == null || plan.getRutas().isEmpty()) continue;
+
+            int cubiertoIrrevocable = 0;
+
+            for (RutaAsignada ruta : plan.getRutas()) {
+                if (ruta == null || ruta.getTramos() == null || ruta.getTramos().isEmpty()) continue;
+
+                int q = ruta.getCantidad();
+
+                if (congelarTodoLoPlanificado) {
+                    // ✅ TODO lo planificado cuenta como irrevocable (incluye futuro)
+                    cubiertoIrrevocable += q;
+                    continue;
+                }
+
+                // --- tu lógica actual (entregado + enProgreso) ---
+                var tramos = ruta.getTramos();
+                TramoAsignado first = tramos.get(0);
+                TramoAsignado last  = tramos.get(tramos.size() - 1);
+
+                Instant salidaPrimera = (first.getVuelo() != null) ? first.getVuelo().getSalidaUtc() : null;
+                Instant llegadaFinal  = (last.getLlegadaUtc() != null) ? last.getLlegadaUtc() : null;
+
+                if (llegadaFinal != null && !llegadaFinal.isAfter(presenteUTC)) {
+                    cubiertoIrrevocable += q;
+                    continue;
+                }
+                if (salidaPrimera != null && !salidaPrimera.isAfter(presenteUTC)) {
+                    cubiertoIrrevocable += q;
+                }
+            }
+
+            int demandaPendiente = pedido.getCantidad(); // OJO: aquí “cantidad” debe ser la PENDIENTE
+            int remanente = Math.max(0, demandaPendiente - cubiertoIrrevocable);
+
+            if (remanente == 0) it.remove();
+            else pedido.setCantidad(remanente);
+        }
+    }
 
     public void eliminarYActualizarCumplidosHasta(Instant presenteUTC, SolucionProgramacion solucionAnterior) {
         if (solucionAnterior == null || presenteUTC == null)
@@ -282,7 +351,7 @@ public class CargarPedidos {
                 // 2) Ruta ya iniciada (comprometida) pero no entregada aún:
                 // primer tramo despegó antes del corte (aunque esté en vuelo o esperando
                 // conexión)
-                if (salidaPrimera != null && salidaPrimera.isBefore(presenteUTC)) {
+                if (salidaPrimera != null && !salidaPrimera.isAfter(presenteUTC)) {
                     enProgreso += q;
                 }
                 // 3) Si primer tramo sale ≥ corte => futuro, no suma a irrevocable

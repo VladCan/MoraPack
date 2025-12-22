@@ -1,7 +1,9 @@
 // src/pages/Simulacion.tsx
 "use client";
 import MainMap from "@/components/common/MainMap";
-import AirportMarkers, { type AirportPoint } from "@/components/common/map/AirportMarkers";
+import AirportMarkers, {
+  type AirportPoint,
+} from "@/components/common/map/AirportMarkers";
 import FlightPath from "@/components/common/FlightPath";
 import { useAirports } from "@/hooks/useAirports";
 import { useRunSSE, type VueloDTO } from "@/hooks/useRunSSE";
@@ -13,10 +15,13 @@ import { downloadFile } from "@/services/api";
 
 // Importamos las Cards
 import AirportCard from "@/components/common/cards/AirportCard";
-import FlightCard, { type FlightCardData } from "@/components/common/cards/FlightCard";
+import FlightCard, {
+  type FlightCardData,
+} from "@/components/common/cards/FlightCard";
 import OrderCard from "@/components/common/cards/OrderCard";
 import { RunSessionProvider } from "@/lib/runSession";
 import TopNav from "@/components/common/TopNav";
+import SimulationStatusWidget from "@/components/common/SimulationStatusWidget";
 
 const COLOR_SEDE = "#005097";
 const COLOR_NORMAL = "#38bdf8";
@@ -41,8 +46,12 @@ type FlightForRender = FlightCardData & {
 export function SimulacionContent() {
   const { data: airportsDtoRaw } = useAirports();
   const [hoveredAirportId, setHoveredAirportId] = useState<string | null>(null);
-  const [activeFlight, setActiveFlight] = useState<FlightForRender | null>(null);
-  const [hoveredFlight, setHoveredFlight] = useState<FlightForRender | null>(null);
+  const [activeFlight, setActiveFlight] = useState<FlightForRender | null>(
+    null
+  );
+  const [hoveredFlight, setHoveredFlight] = useState<FlightForRender | null>(
+    null
+  );
 
   // Parsear aeropuertos
   const airports: AirportPoint[] = useMemo(() => {
@@ -82,7 +91,7 @@ export function SimulacionContent() {
     loadingProgress,
   } = useRunSession();
 
-  const showOverlay = showLoadingOverlay && windows.length === 1; 
+  const showOverlay = showLoadingOverlay && windows.length === 1;
 
   const {
     simNowUtc,
@@ -121,9 +130,9 @@ export function SimulacionContent() {
   const vuelosRelacionadosAlPedido = useMemo<Set<string>>(() => {
     if (!selectedPedido || !selectedPedido.rutas) return new Set();
     const vuelosIds = new Set<string>();
-    selectedPedido.rutas.forEach(ruta => {
-      ruta.vuelos.forEach(vuelo => {
-        const salidaUtcSinColon = vuelo.salidaUtc.replace(/:/g, '');
+    selectedPedido.rutas.forEach((ruta) => {
+      ruta.vuelos.forEach((vuelo) => {
+        const salidaUtcSinColon = vuelo.salidaUtc.replace(/:/g, "");
         const vueloId = `${vuelo.origen}-${vuelo.destino}-${salidaUtcSinColon}`;
         vuelosIds.add(vueloId);
       });
@@ -131,13 +140,19 @@ export function SimulacionContent() {
     return vuelosIds;
   }, [selectedPedido]);
 
+  console.log("DEBUG TIEMPO:", { 
+    simNowUtc, 
+    parsed: simNowUtc ? new Date(simNowUtc).toISOString() : undefined,
+    vuelosTotal: windows.length > 0 ? windows[windows.length-1].vuelos.length : 0 
+  });
+
   // Flights render logic
   const flightsToRender = useMemo<FlightForRender[]>(() => {
     if (!simNowUtc || windows.length === 0) return [];
     const now = new Date(simNowUtc).getTime();
     const allFlights: FlightForRender[] = [];
     const seenIds = new Set<string>();
-    const vuelosUnicos = new Map<string, typeof windows[0]["vuelos"][0]>();
+    const vuelosUnicos = new Map<string, (typeof windows)[0]["vuelos"][0]>();
 
     windows.forEach((window) => {
       window.vuelos.forEach((vuelo) => {
@@ -145,11 +160,13 @@ export function SimulacionContent() {
       });
     });
 
-    const tienePedidoSeleccionado = selectedPedido !== null && vuelosRelacionadosAlPedido.size > 0;
+    const tienePedidoSeleccionado =
+      selectedPedido !== null && vuelosRelacionadosAlPedido.size > 0;
 
     vuelosUnicos.forEach((vuelo) => {
       if (vuelosCancelados.has(vuelo.id)) return;
-      if (tienePedidoSeleccionado && !vuelosRelacionadosAlPedido.has(vuelo.id)) return;
+      if (tienePedidoSeleccionado && !vuelosRelacionadosAlPedido.has(vuelo.id))
+        return;
 
       const origen = airportsMap.get(vuelo.origen);
       const destino = airportsMap.get(vuelo.destino);
@@ -204,7 +221,14 @@ export function SimulacionContent() {
     });
 
     return allFlights;
-  }, [windows, simNowUtc, airportsMap, vuelosCancelados, selectedPedido, vuelosRelacionadosAlPedido]);
+  }, [
+    windows,
+    simNowUtc,
+    airportsMap,
+    vuelosCancelados,
+    selectedPedido,
+    vuelosRelacionadosAlPedido,
+  ]);
 
   // Sincronizar vuelo activo (hover/click)
   useEffect(() => {
@@ -233,35 +257,34 @@ export function SimulacionContent() {
 
   // Cálculos de vuelos y RECOJOS futuros
   const vuelosFuturos = useMemo(() => {
-    if (!selectedAirportId || !simNowUtc)
-      return { llegadas: [], salidas: [] };
+    if (!selectedAirportId || !simNowUtc) return { llegadas: [], salidas: [] };
 
     const now = new Date(simNowUtc).getTime();
     const next24h = now + 24 * 60 * 60 * 1000;
-    
+
     // --- TIPOS ACTUALIZADOS: Incluyen pedidoId ---
-    const llegadas: Array<{ 
-        id: string; 
-        origen: string; 
-        cantidad: number; 
-        salidaUtc: string; 
-        llegadaUtc: string; 
-        isPickup?: boolean; 
-        pedidoId?: number 
+    const llegadas: Array<{
+      id: string;
+      origen: string;
+      cantidad: number;
+      salidaUtc: string;
+      llegadaUtc: string;
+      isPickup?: boolean;
+      pedidoId?: number;
     }> = [];
-    
-    const salidas: Array<{ 
-        id: string; 
-        destino: string; 
-        cantidad: number; 
-        salidaUtc: string; 
-        llegadaUtc: string; 
-        isPickup?: boolean; 
-        pedidoId?: number 
+
+    const salidas: Array<{
+      id: string;
+      destino: string;
+      cantidad: number;
+      salidaUtc: string;
+      llegadaUtc: string;
+      isPickup?: boolean;
+      pedidoId?: number;
     }> = [];
-    
+
     // 1. PROCESAR VUELOS
-    const vuelosUnicos = new Map<string, typeof windows[0]["vuelos"][0]>();
+    const vuelosUnicos = new Map<string, (typeof windows)[0]["vuelos"][0]>();
     windows.forEach((window) => {
       window.vuelos.forEach((vuelo) => {
         if (!vuelosCancelados.has(vuelo.id) && !vuelosUnicos.has(vuelo.id)) {
@@ -274,59 +297,72 @@ export function SimulacionContent() {
       const salidaTime = new Date(vuelo.salidaUtc).getTime();
       const llegadaTime = new Date(vuelo.llegadaUtc).getTime();
 
-      if (vuelo.destino === selectedAirportId && llegadaTime > now && llegadaTime <= next24h) {
-        llegadas.push({ 
-          id: vuelo.id, 
-          origen: vuelo.origen, 
+      if (
+        vuelo.destino === selectedAirportId &&
+        llegadaTime > now &&
+        llegadaTime <= next24h
+      ) {
+        llegadas.push({
+          id: vuelo.id,
+          origen: vuelo.origen,
           cantidad: vuelo.cantidadAsignada,
           salidaUtc: vuelo.salidaUtc,
-          llegadaUtc: vuelo.llegadaUtc
+          llegadaUtc: vuelo.llegadaUtc,
         });
       }
-      if (vuelo.origen === selectedAirportId && salidaTime <= next24h && llegadaTime > now) {
-        salidas.push({ 
-          id: vuelo.id, 
-          destino: vuelo.destino, 
+      if (
+        vuelo.origen === selectedAirportId &&
+        salidaTime <= next24h &&
+        llegadaTime > now
+      ) {
+        salidas.push({
+          id: vuelo.id,
+          destino: vuelo.destino,
           cantidad: vuelo.cantidadAsignada,
           salidaUtc: vuelo.salidaUtc,
-          llegadaUtc: vuelo.llegadaUtc
+          llegadaUtc: vuelo.llegadaUtc,
         });
       }
     });
 
     // 2. PROCESAR RECOJOS DE CLIENTES
-    const pedidosUnicos = new Map<number, typeof windows[0]["pedidos"][0]>();
-    windows.forEach(w => {
-        if(w.pedidos) w.pedidos.forEach(p => pedidosUnicos.set(p.id, p));
+    const pedidosUnicos = new Map<number, (typeof windows)[0]["pedidos"][0]>();
+    windows.forEach((w) => {
+      if (w.pedidos) w.pedidos.forEach((p) => pedidosUnicos.set(p.id, p));
     });
 
-    pedidosUnicos.forEach(pedido => {
-        if (pedido.destino === selectedAirportId && pedido.recojos) {
-            
-            pedido.recojos.forEach((recojo, idx) => {
-                const inicioEspera = new Date(recojo.inicioRecojo).getTime();
-                const finEspera = new Date(recojo.finRecojo).getTime();
+    pedidosUnicos.forEach((pedido) => {
+      if (pedido.destino === selectedAirportId && pedido.recojos) {
+        pedido.recojos.forEach((recojo, idx) => {
+          const inicioEspera = new Date(recojo.inicioRecojo).getTime();
+          const finEspera = new Date(recojo.finRecojo).getTime();
 
-                const esFuturoCercano = (inicioEspera > now && inicioEspera <= next24h);
-                const estaOcurriendo = (now >= inicioEspera && now <= finEspera);
+          const esFuturoCercano = inicioEspera > now && inicioEspera <= next24h;
+          const estaOcurriendo = now >= inicioEspera && now <= finEspera;
 
-                if (esFuturoCercano || estaOcurriendo) {
-                    salidas.push({
-                        id: `PICKUP-${pedido.id}-${idx}`, 
-                        destino: `Cliente ${pedido.idCliente}`, 
-                        cantidad: recojo.cantidad,
-                        salidaUtc: recojo.inicioRecojo, 
-                        llegadaUtc: recojo.finRecojo,   
-                        isPickup: true,
-                        pedidoId: pedido.id // <--- AQUÍ SE PASA EL ID DEL PEDIDO
-                    });
-                }
+          if (esFuturoCercano || estaOcurriendo) {
+            salidas.push({
+              id: `PICKUP-${pedido.id}-${idx}`,
+              destino: `Cliente ${pedido.idCliente}`,
+              cantidad: recojo.cantidad,
+              salidaUtc: recojo.inicioRecojo,
+              llegadaUtc: recojo.finRecojo,
+              isPickup: true,
+              pedidoId: pedido.id, // <--- AQUÍ SE PASA EL ID DEL PEDIDO
             });
-        }
+          }
+        });
+      }
     });
 
-    llegadas.sort((a, b) => new Date(a.llegadaUtc).getTime() - new Date(b.llegadaUtc).getTime());
-    salidas.sort((a, b) => new Date(a.salidaUtc).getTime() - new Date(b.salidaUtc).getTime());
+    llegadas.sort(
+      (a, b) =>
+        new Date(a.llegadaUtc).getTime() - new Date(b.llegadaUtc).getTime()
+    );
+    salidas.sort(
+      (a, b) =>
+        new Date(a.salidaUtc).getTime() - new Date(b.salidaUtc).getTime()
+    );
 
     return { llegadas, salidas };
   }, [selectedAirportId, simNowUtc, windows, vuelosCancelados]);
@@ -351,8 +387,14 @@ export function SimulacionContent() {
 
   const handleDownloadReports = async () => {
     if (!runId) return;
-    await downloadFile(`reportes/downloadReporteSimulacion`, "reporteSimulacion.txt");
-    await downloadFile(`reportes/downloadUltimaPlanificacion`, "ultimaPlanificacion.txt");
+    await downloadFile(
+      `reportes/downloadReporteSimulacion`,
+      "reporteSimulacion.txt"
+    );
+    await downloadFile(
+      `reportes/downloadUltimaPlanificacion`,
+      "ultimaPlanificacion.txt"
+    );
   };
 
   const handleCloseOverlay = () => {
@@ -368,8 +410,8 @@ export function SimulacionContent() {
       return {
         ...selectedVuelo,
         origenCodigo: selectedVuelo.origen,
-        destinoCodigo: selectedVuelo.destino
-      } as FlightCardData; 
+        destinoCodigo: selectedVuelo.destino,
+      } as FlightCardData;
     }
     if (hoveredFlight && !selectedAirportId) {
       return hoveredFlight;
@@ -379,45 +421,46 @@ export function SimulacionContent() {
 
   return (
     <div className="min-h-screen bg-neutral-50 relative">
+    <SimulationStatusWidget />
       {/* Toast de carga */}
       {/* Overlay de carga */}
-{showOverlay && (
-  <>
-    {/* Fondo borroso */}
-    <div
-      className="
+      {showOverlay && (
+        <>
+          {/* Fondo borroso */}
+          <div
+            className="
         fixed inset-0 z-[90]
         bg-white/40 dark:bg-slate-950/40
         backdrop-blur-sm
         transition-opacity
       "
-    />
+          />
 
-      {/* Toast de carga */}
-      <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-xl p-4 flex items-center gap-4 max-w-sm">
-          <div className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full items-center justify-center bg-blue-50 dark:bg-blue-900/20">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+          {/* Toast de carga */}
+          <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl rounded-xl p-4 flex items-center gap-4 max-w-sm">
+              <div className="relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full items-center justify-center bg-blue-50 dark:bg-blue-900/20">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+              </div>
+
+              <div className="grid gap-1">
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+                  Cargando simulación…
+                </p>
+
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {loadingMessage || "Preparando entorno…"}
+                  {loadingProgress > 0 && (
+                    <span className="ml-1 font-mono">
+                      ({Math.round(loadingProgress)}%)
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
           </div>
-
-          <div className="grid gap-1">
-            <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-              Cargando simulación…
-            </p>
-
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {loadingMessage || "Preparando entorno…"}
-              {loadingProgress > 0 && (
-                <span className="ml-1 font-mono">
-                  ({Math.round(loadingProgress)}%)
-                </span>
-              )}
-            </p>
-          </div>
-        </div>
-      </div>
-    </>
-  )}
+        </>
+      )}
 
       {/* 1. TARJETA DE AEROPUERTO */}
       {activeAirportData && selectedAirportId && (
@@ -440,7 +483,7 @@ export function SimulacionContent() {
             setSelectedVuelo(null);
             setHoveredFlight(null);
           }}
-          isHover={!!hoveredFlight && !selectedVuelo} 
+          isHover={!!hoveredFlight && !selectedVuelo}
         />
       )}
 
@@ -467,7 +510,9 @@ export function SimulacionContent() {
             onMouseEnter={() => setHoveredFlight(flight)}
             onMouseLeave={() => setHoveredFlight(null)}
             onClick={() => {
-              setActiveFlight((prev) => (prev?.id === flight.id ? null : flight));
+              setActiveFlight((prev) =>
+                prev?.id === flight.id ? null : flight
+              );
               const vueloDto = vuelosMap.get(flight.id);
               if (vueloDto) {
                 setSelectedVuelo(vueloDto);

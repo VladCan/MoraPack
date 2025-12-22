@@ -95,19 +95,42 @@ public final class EstadoAnteriorExtractor {
                 List<TramoAsignado> legs = r.getTramos();
                 if (legs == null || legs.isEmpty()) continue;
 
-                // último tramo de la ruta (destino final de la ruta)
-                TramoAsignado last = legs.get(legs.size() - 1);
-                VueloProgramadoId v = last.getVuelo();
-                if (v == null) continue;
-                Instant arr = v.getLlegadaUtc();
-                if (arr == null) continue;
+                // CORRECCIÓN: Iteramos por TODOS los tramos, no solo el último
+                for (int i = 0; i < legs.size(); i++) {
+                    TramoAsignado currentLeg = legs.get(i);
+                    VueloProgramadoId vueloLlegada = currentLeg.getVuelo();
+                    
+                    if (vueloLlegada == null || vueloLlegada.getLlegadaUtc() == null) continue;
 
-                Instant hasta = arr.plus(waitDur);
-                // activa si llegada ≤ presente < llegada+wait
-                if (!arr.isAfter(presenteUTC) && hasta.isAfter(presenteUTC)) {
-                    Instant desde = arr.isAfter(presenteUTC) ? arr : presenteUTC;
-                    String apDestinoFinal = v.getDestino(); // normalmente coincide con p.getDestinoIcao()
-                    res.add(new OcupacionAlmacen(apDestinoFinal, desde, hasta, q));
+                    Instant momentoLlegada = vueloLlegada.getLlegadaUtc();
+                    Instant momentoLiberacion;
+
+                    // CASO A: Es una ESCALA (no es el último tramo)
+                    if (i < legs.size() - 1) {
+                        TramoAsignado nextLeg = legs.get(i + 1);
+                        if (nextLeg.getVuelo() == null) continue; 
+                        
+                        // La carga ocupa espacio hasta que sale el siguiente vuelo
+                        momentoLiberacion = nextLeg.getVuelo().getSalidaUtc();
+                    } 
+                    // CASO B: Es el DESTINO FINAL
+                    else {
+                        // La carga ocupa espacio hasta que el cliente recoge (waitDur)
+                        momentoLiberacion = momentoLlegada.plus(waitDur);
+                    }
+
+                    if (momentoLiberacion == null) continue;
+
+                    // LÓGICA DE ESTADO: ¿Está la carga en el suelo AHORA?
+                    // Sí, si ya llegó (llegada <= ahora) Y todavía no se libera (liberacion > ahora)
+                    if (!momentoLlegada.isAfter(presenteUTC) && momentoLiberacion.isAfter(presenteUTC)) {
+                        
+                        // La reserva empieza AHORA (porque lo de atrás ya pasó) hasta la liberación planificada
+                        Instant inicioReserva = presenteUTC;
+                        String aeropuertoAlmacen = vueloLlegada.getDestino();
+
+                        res.add(new OcupacionAlmacen(aeropuertoAlmacen, inicioReserva, momentoLiberacion, q));
+                    }
                 }
             }
         }
