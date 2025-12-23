@@ -156,6 +156,7 @@ export function SimulacionContent() {
     const allFlights: FlightForRender[] = [];
     const seenIds = new Set<string>();
     const vuelosUnicos = new Map<string, (typeof windows)[0]["vuelos"][0]>();
+    const vuelosEnAireAhora = new Set<string>();
 
     windows.forEach((window) => {
       window.vuelos.forEach((vuelo) => {
@@ -176,6 +177,12 @@ export function SimulacionContent() {
         rejectedByCancel++;
         return;
       }
+
+      const salidaTime = new Date(vuelo.salidaUtc).getTime();
+      const llegadaTime = new Date(vuelo.llegadaUtc).getTime();
+      const enAire = now >= salidaTime && now <= llegadaTime;
+      if (enAire) vuelosEnAireAhora.add(vuelo.id);
+
       if (tienePedidoSeleccionado && !vuelosRelacionadosAlPedido.has(vuelo.id))
         return;
 
@@ -188,11 +195,8 @@ export function SimulacionContent() {
         return;
       }
 
-      const salidaTime = new Date(vuelo.salidaUtc).getTime();
-      const llegadaTime = new Date(vuelo.llegadaUtc).getTime();
-
       // [DEBUG LOGIC] ¿Está el vuelo en el aire AHORA?
-      if (now < salidaTime || now > llegadaTime) {
+      if (!enAire) {
         rejectedByTime++;
         return;
       }
@@ -237,7 +241,7 @@ export function SimulacionContent() {
     });
 
     flightFirstSeenRef.current.forEach((_, key) => {
-      if (!seenIds.has(key)) flightFirstSeenRef.current.delete(key);
+      if (!vuelosEnAireAhora.has(key)) flightFirstSeenRef.current.delete(key);
     });
 
     // [DEBUG LOG] Resumen del ciclo de renderizado
