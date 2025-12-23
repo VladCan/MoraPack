@@ -34,6 +34,7 @@ public class ALNS {
     private static final double PEN_CAPACIDAD_VUELO     =   500_000_000_000.0;
     private static final double PEN_SLA                 =    50_000_000_000.0;
     private static final double PEN_CAPACIDAD_BODEGA_BASE =   1_000_000.0;
+    //private static final double PEN_CAPACIDAD_BODEGA_BASE =   1_000_000_000_000.0;
 
     // Operador de emergencia (ahora será WarehouseCrisisRemoval)
     private WarehouseCrisisRemoval emergencyOperator;
@@ -74,6 +75,7 @@ public class ALNS {
 
         // Inicializamos el operador de emergencia con una cantidad fija a borrar (ej. 20)
         this.emergencyOperator = new WarehouseCrisisRemoval(20, this.aeropuertosMap);
+        //this.emergencyOperator = new WarehouseCrisisRemoval(50, this.aeropuertosMap);
 
         // Reset stats
         destroyTotalTimeNs.clear(); destroyCount.clear();
@@ -309,7 +311,11 @@ public class ALNS {
         if (!sol.respetaCapacidadesVuelos()) return PEN_CAPACIDAD_VUELO;
 
         if (occ.hayExcesoDeCapacidad()) {
+            //int exceso = occ.maxExcesoGlobal();
             costo += PEN_CAPACIDAD_BODEGA_BASE;
+            //if (exceso > 0) {
+               // costo += exceso * 1_000_000_000.0;
+            //}
         }
 
         Collection<PlanPedido> planes = sol.getPlanPorPedido().values();

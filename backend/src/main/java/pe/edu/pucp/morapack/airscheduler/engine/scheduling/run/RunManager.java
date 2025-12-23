@@ -808,6 +808,7 @@ public class RunManager {
                 List<DestructionOperator> destructores = new ArrayList<>();
                 destructores.add(new RandomRemoval(30));
                 destructores.add(new WorstRemoval(15));
+                //destructores.add(new WarehouseCrisisRemoval(50,aeropuertosMap));
                 destructores.add(new WarehouseCrisisRemoval(15,aeropuertosMap));
                 destructores.add(new SlaBreachRemoval(10));
                 
@@ -1017,6 +1018,7 @@ public class RunManager {
                 List<DestructionOperator> destructores = new ArrayList<>();
                 destructores.add(new RandomRemoval(30));
                 destructores.add(new WorstRemoval(15));
+                //destructores.add(new WarehouseCrisisRemoval(50,aeropuertosMap));
                 destructores.add(new WarehouseCrisisRemoval(15,aeropuertosMap));
                 destructores.add(new SlaBreachRemoval(10));
                 List<RepairOperator> reparadores = new ArrayList<>();

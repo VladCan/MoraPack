@@ -254,9 +254,6 @@ public class OcupacionPorAeropuerto {
     public boolean hayExcesoDeCapacidad() {
         for (var entry : eventos.entrySet()) {
             String idAeropuerto = entry.getKey();
-            
-            // Ignorar sedes infinitas si fuera necesario, pero mejor manejarlo en el ALNS
-            // if (SEDES_INFINITAS.contains(idAeropuerto)) continue;
 
             TreeMap<Instant, Integer> deltas = entry.getValue();
             if (deltas == null || deltas.isEmpty()) continue;
@@ -265,7 +262,8 @@ public class OcupacionPorAeropuerto {
             try {
                 capacidad = capacidadDe(idAeropuerto);
             } catch (Exception e) {
-                capacidad = 0; 
+                capacidad = 0;
+                //continue;
             }
 
             int ocupacionActual = 0;
@@ -277,6 +275,30 @@ public class OcupacionPorAeropuerto {
         }
         return false;
     }
+    /*
+    public int maxExcesoGlobal() {
+        int maxExceso = 0;
+        for (var entry : eventos.entrySet()) {
+            String idAeropuerto = entry.getKey();
+            TreeMap<Instant, Integer> deltas = entry.getValue();
+            if (deltas == null || deltas.isEmpty()) continue;
+
+            int capacidad;
+            try {
+                capacidad = capacidadDe(idAeropuerto);
+            } catch (Exception e) {
+                continue;
+            }
+
+            int ocupacionActual = 0;
+            for (Integer delta : deltas.values()) {
+                ocupacionActual += delta;
+                int exceso = ocupacionActual - capacidad;
+                if (exceso > maxExceso) maxExceso = exceso;
+            }
+        }
+        return maxExceso;
+    }*/
     /**
      * Calcula la ocupación máxima histórica registrada para un aeropuerto
      * iterando sobre todos sus eventos cronológicos.

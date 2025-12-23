@@ -11,6 +11,7 @@ import java.util.Set;
 public class RouteTransaction {
 
     private static final Set<String> HUBS = Set.of("SPIM", "EBCI", "UBBB");
+    //private static final Duration PICKUP_FINAL = Duration.ofHours(1);
     private static final Duration PICKUP_FINAL = Duration.ofHours(2);
 
     /**

@@ -273,13 +273,13 @@ public final class VerificadorSLA {
                     VueloProgramadoId v = tramo.getVuelo();
                     if (v == null) continue;
                     
-                    // ORIGEN
-                    Instant llegadaAnterior = (i == 0) ? plan.getCreadoUtc() 
-                            : tramos.get(i - 1).getVuelo().getLlegadaUtc();
-                    
-                    if (llegadaAnterior != null && v.getSalidaUtc() != null && !v.getSalidaUtc().isBefore(llegadaAnterior)) {
-                        addDelta(deltasPorAeropuerto, v.getOrigen(), llegadaAnterior, q);   
-                        addDelta(deltasPorAeropuerto, v.getOrigen(), v.getSalidaUtc(), -q); 
+                    // ORIGEN (solo para el primer tramo, evita doble conteo en escalas)
+                    if (i == 0) {
+                        Instant llegadaAnterior = plan.getCreadoUtc();
+                        if (llegadaAnterior != null && v.getSalidaUtc() != null && !v.getSalidaUtc().isBefore(llegadaAnterior)) {
+                            addDelta(deltasPorAeropuerto, v.getOrigen(), llegadaAnterior, q);
+                            addDelta(deltasPorAeropuerto, v.getOrigen(), v.getSalidaUtc(), -q);
+                        }
                     }
 
                     // DESTINO
