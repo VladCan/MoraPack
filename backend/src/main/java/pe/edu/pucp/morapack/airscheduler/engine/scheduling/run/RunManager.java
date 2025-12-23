@@ -3,10 +3,13 @@ package pe.edu.pucp.morapack.airscheduler.engine.scheduling.run;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -54,6 +57,10 @@ public class RunManager {
     private static boolean firstExecution = false;
 
     private static final String VUELOS_CANCELADOS_FILENAME = "cancelaciones.txt";
+
+    private static final String REPORTES_SUBDIR = "reportes"; // Subcarpeta para orden
+    private static final String OPERACION_PEDIDOS_FILENAME = "operacion_diaria_pedidos.txt";
+    private static final String OPERACION_PLAN_FILENAME = "operacion_diaria_planificacion.txt";
 
     private static final Duration PLANNING_LATENCY = Duration.ofSeconds(30);
     // DIARIO MAESTRO: Mapea ID_PEDIDO -> Su Último Plan Confirmado.
@@ -874,9 +881,12 @@ public class RunManager {
     /// 2. Run de Operación Diaria
     private void runOperacion(RunId runId, RunConfig config){
         final String id = runId.value();
+       // 1. Reiniciar flag de colapso
         final AtomicBoolean slaFlag = slaBroken.computeIfAbsent(id, k -> new AtomicBoolean(false));
         slaFlag.set(false);
 
+        // 2. Limpiar archivos de operación previa al inicio
+        limpiarArchivosOperacion();
         Instant wStart = config.fechaInicio();
 
         /// Nota: Dado que ahorita solo enviamos horasVentana (osea, horas), estoy comentando esto.
@@ -958,7 +968,12 @@ public class RunManager {
                 ///  2. Obtener pedidos de la ventana actual
 
                     /// Primero, cargamos de queue a pedidosCargados y limpiamos queue
-                    cargarPedidosDesdeQueue(id, pedidosCargados);
+                    List<Pedido> nuevosPedidos = cargarPedidosDesdeQueue(id, pedidosCargados);
+                
+                    // >>> NUEVO: Guardar en archivo los pedidos que acaban de llegar <<<
+                    if (!nuevosPedidos.isEmpty()) {
+                        guardarPedidosOperacion(nuevosPedidos);
+                    }
                     VentanaPedidos ventana = pedidosCargados.acumuladoHasta(wEnd);
                     List<Pedido> pedidosVentana = ventana.pedidos();
 
@@ -1043,6 +1058,11 @@ public class RunManager {
                     slaFlag.set(true); // Marcar que se rompió
                     break;             // Romper el bucle while principal
                 }
+
+                // --- 2. GUARDAR PLANIFICACIÓN GLOBAL ---
+                // Se guarda la solución óptima actual (snapshot del plan para esta ventana)
+                // Usamos wStart como referencia de tiempo actual
+                guardarPlanificacionOperacion(solucionOptima, wStart);
                 // ------------------------------------
 
                 /// 6. Guardar solución para la siguiente ventana y sincronizar ocupación
@@ -2033,5 +2053,65 @@ public class RunManager {
             System.err.println("[RunManager] Error generando snapshot: " + e.getMessage());
         }
         return activeFlights;
+    }
+
+
+    private void limpiarArchivosOperacion() {
+        try {
+            // 1. Construimos la ruta usando EXACTAMENTE tu manager
+            Path dir = Paths.get(archivoManager.getUploadDir(), REPORTES_SUBDIR);
+            
+            if (Files.exists(dir)) {
+                Files.deleteIfExists(dir.resolve(OPERACION_PEDIDOS_FILENAME));
+                Files.deleteIfExists(dir.resolve(OPERACION_PLAN_FILENAME));
+            }
+        } catch (IOException e) {
+            System.err.println("[RunManager] Error limpiando archivos de operación: " + e.getMessage());
+        }
+    }
+
+    private void guardarPedidosOperacion(List<Pedido> nuevosPedidos) {
+        try {
+            // 1. Usar ruta oficial
+            Path dir = Paths.get(archivoManager.getUploadDir(), REPORTES_SUBDIR);
+            if (!Files.exists(dir)) Files.createDirectories(dir);
+
+            Path path = dir.resolve(OPERACION_PEDIDOS_FILENAME);
+            
+            // 2. Escribir (APPEND si existe, CREATE si no)
+            try (BufferedWriter writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8, 
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+                
+                for (Pedido p : nuevosPedidos) {
+                    // Formato simple: ID, FECHA, DESTINO, CANTIDAD
+                    String linea = String.format("PEDIDO #%d | UTC: %s | Dest: %s | Cant: %d | Cliente: %d",
+                            p.getIdPedido(),
+                            p.getCreatedAtUtc(),
+                            p.getDestino(),
+                            p.getCantidad(),
+                            p.getIdCliente());
+                    writer.write(linea);
+                    writer.newLine();
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("[RunManager] Error guardando log de pedidos: " + e.getMessage());
+        }
+    }
+
+    private void guardarPlanificacionOperacion(SolucionProgramacion solucion, Instant fechaReferencia) {
+        try {
+            // 1. Usar ruta oficial
+            Path dir = Paths.get(archivoManager.getUploadDir(), REPORTES_SUBDIR);
+            if (!Files.exists(dir)) Files.createDirectories(dir);
+
+            Path path = dir.resolve(OPERACION_PLAN_FILENAME);
+
+            // 2. Usar tu impresor existente, pasándole la ruta absoluta como string
+            ImpresorSolucion.imprimirUltimaPlanificacion(solucion, path.toAbsolutePath().toString(), fechaReferencia);
+            
+        } catch (Exception e) {
+             System.err.println("[RunManager] Error guardando plan de operación: " + e.getMessage());
+        }
     }
 }
