@@ -214,7 +214,7 @@ export default function OrderCard({ pedido, simNowUtc, onClose, variant = "simul
                                                             <PlaneTakeoff className="w-3 h-3" /> Salida
                                                         </div>
                                                         <span className="font-mono bg-slate-50 px-1 rounded w-fit">
-                                                            {new Date(v.salidaUtc).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC
+                                                            {new Date(v.salidaUtc).toLocaleTimeString("es-PE", {day: "2-digit",month: "2-digit",year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC
                                                         </span>
                                                     </div>
                                                     <div className="flex flex-col text-right items-end">
@@ -222,7 +222,7 @@ export default function OrderCard({ pedido, simNowUtc, onClose, variant = "simul
                                                             Llegada <PlaneLanding className="w-3 h-3" />
                                                         </div>
                                                         <span className="font-mono bg-slate-50 px-1 rounded w-fit">
-                                                            {new Date(v.llegadaUtc).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC
+                                                            {new Date(v.llegadaUtc).toLocaleTimeString("es-PE", {day: "2-digit",month: "2-digit",year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} UTC
                                                         </span>
                                                     </div>
                                                 </div>

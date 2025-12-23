@@ -874,6 +874,8 @@ public class RunManager {
     /// 2. Run de Operación Diaria
     private void runOperacion(RunId runId, RunConfig config){
         final String id = runId.value();
+        final AtomicBoolean slaFlag = slaBroken.computeIfAbsent(id, k -> new AtomicBoolean(false));
+        slaFlag.set(false);
 
         Instant wStart = config.fechaInicio();
 
@@ -1031,6 +1033,17 @@ public class RunManager {
                 SolucionProgramacion solucionOptima = alns.ejecutar(seed);
 
                 mergeSolucion(solucionOptima);
+
+                // --- AGREGAR BLOQUE DE VALIDACIÓN ---
+                // Verifica colapso de almacenes o SLA crítico (igual que en runSimulacion)
+                boolean SlaOk = VerificadorSLA.assertBasicos(solucionOptima, Duration.ofHours(46), vuelosMap, aeropuertosMap);
+                
+                if (!SlaOk){
+                    System.err.println("[RunManager] COLAPSO DETECTADO EN OPERACIÓN DIARIA. Deteniendo run...");
+                    slaFlag.set(true); // Marcar que se rompió
+                    break;             // Romper el bucle while principal
+                }
+                // ------------------------------------
 
                 /// 6. Guardar solución para la siguiente ventana y sincronizar ocupación
                 actualizarOcupacionDesdeSolucion(id, solucionOptima, solucionAnterior, reservas, enVuelo, wStart);
