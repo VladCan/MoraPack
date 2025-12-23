@@ -883,7 +883,7 @@ public class RunManager {
         /// Tenemos que hacer cambios para que soporte por minutos (no en el algoritmo, creo que ahí no,
         /// sino en RunConfig (línea 59 en dicho archivo))
 
-        Duration minutosVentana = Duration.ofMinutes(30);
+        Duration minutosVentana = Duration.ofMinutes(5);
 
         //Instant wEnd = wStart.plus(config.horasVentana());
         Instant wEnd = wStart.plus(minutosVentana);

@@ -6,7 +6,6 @@ import FlightPath from "@/components/common/FlightPath";
 import MainMap from "@/components/common/MainMap";
 import AirportMarkers, { type AirportPoint } from "@/components/common/map/AirportMarkers";
 import { useAirports } from "@/hooks/useAirports";
-// import { useFlightsSSE } from "@/hooks/useFlightsSSE"; // YA NO SE NECESITA
 import { useRunSession } from "@/lib/runSession";
 import { useRunSSE, type VueloDTO } from "@/hooks/useRunSSE";
 import type { AeropuertoDTO } from "@/types/api";
@@ -36,7 +35,7 @@ const AirportDtoSchema = z.object({
 });
 const AirportsDtoSchema = z.array(AirportDtoSchema);
 
-// Tipo para vuelos de la solución (con información completa)
+// Tipo para vuelos de la solución
 type FlightForRender = {
   id: string;
   origin: { lat: number; lon: number };
@@ -44,7 +43,7 @@ type FlightForRender = {
   progress: number;
   pathColor: string;
   planeColor: string;
-  // Información adicional para el tooltip (solo vuelos de la solución)
+  // Información adicional para el tooltip
   origenCodigo?: string;
   destinoCodigo?: string;
   salidaUtc?: string;
@@ -57,7 +56,7 @@ type FlightForRender = {
     destinoFinal: string;
     esConexion: boolean;
   }>;
-  esDeSolucion?: boolean; // Flag para distinguir vuelos de la solución
+  esDeSolucion?: boolean;
 };
 
 export  function OperacionContent() {
@@ -119,10 +118,6 @@ export  function OperacionContent() {
       });
       return map;
     }, [windows]);
-
-  // ELIMINADO: Ya no llamamos a useFlightsSSE aquí porque no queremos vuelos "extra"
-  // const liveFlightsEndpoint = ... 
-  // const { data: liveFlights } = useFlightsSSE(...)
   
   // Crear mapa de aeropuertos para calcular posiciones
   const airportsMap = useMemo(() => {
@@ -131,7 +126,7 @@ export  function OperacionContent() {
     return map;
   }, [airports]);
 
-  // Crear mapa de capacidades de aeropuertos desde el frontend
+  // Crear mapa de capacidades
   const airportsCapacityMap = useMemo(() => {
     const map = new Map<string, number>();
     if (airportsDtoRaw) {
@@ -151,7 +146,6 @@ export  function OperacionContent() {
     if (!selectedPedido || !selectedPedido.rutas) {
       return new Set();
     }
-    
     const vuelosIds = new Set<string>();
     selectedPedido.rutas.forEach(ruta => {
       ruta.vuelos.forEach(vuelo => {
@@ -160,7 +154,6 @@ export  function OperacionContent() {
         vuelosIds.add(vueloId);
       });
     });
-    
     return vuelosIds;
   }, [selectedPedido]);
 
@@ -169,14 +162,12 @@ export  function OperacionContent() {
     const allFlights: FlightForRender[] = [];
     const seenIds = new Set<string>();
 
-    // Si hay un pedido seleccionado, solo mostrar vuelos relacionados
     const tienePedidoSeleccionado = selectedPedido !== null && vuelosRelacionadosAlPedido.size > 0;
 
-    // 1. SOLAMENTE: Vuelos planificados por el algoritmo ALNS
+    // Vuelos planificados por el algoritmo ALNS
     if (windows.length > 0 && simNowUtc) {
       const vuelosUnicos = new Map<string, typeof windows[0]['vuelos'][0]>();
       
-      // Acumular vuelos de todas las ventanas
       windows.forEach(window => {
         window.vuelos.forEach(vuelo => {
           if (!vuelosCancelados.has(vuelo.id) && !vuelosUnicos.has(vuelo.id)) {
@@ -185,7 +176,6 @@ export  function OperacionContent() {
         });
       });
 
-      // Procesar vuelos planificados que están en el aire
       vuelosUnicos.forEach(vuelo => {
         if (tienePedidoSeleccionado && !vuelosRelacionadosAlPedido.has(vuelo.id)) {
           return;
@@ -199,9 +189,7 @@ export  function OperacionContent() {
         const salidaTime = new Date(vuelo.salidaUtc).getTime();
         const llegadaTime = new Date(vuelo.llegadaUtc).getTime();
 
-        // Solo mostrar vuelos que ya salieron y no han llegado
         if (now >= salidaTime && now <= llegadaTime) {
-          // Calcular progreso
           if (!flightFirstSeenRef.current.has(vuelo.id)) {
             flightFirstSeenRef.current.set(vuelo.id, Math.max(now, salidaTime));
           }
@@ -211,7 +199,7 @@ export  function OperacionContent() {
           const progress = Math.min(1, transcurridoDesdeVista / duracionRestante);
 
           const ocupacion = vuelo.cantidadAsignada / vuelo.capacidad;
-          let pathColor = "#38bdf8"; // Azul claro
+          let pathColor = "#38bdf8"; 
           let planeColor = "#0284c7";
           if (ocupacion > 0.8) {
             pathColor = "#dc2626";
@@ -228,7 +216,6 @@ export  function OperacionContent() {
             progress,
             pathColor,
             planeColor,
-            // Información completa para el tooltip
             origenCodigo: vuelo.origen,
             destinoCodigo: vuelo.destino,
             salidaUtc: vuelo.salidaUtc,
@@ -243,10 +230,6 @@ export  function OperacionContent() {
       });
     }
 
-    // 2. ELIMINADO: Ya no agregamos vuelos "extra" de liveFlights. 
-    //    Esto limpia el mapa de aviones sin carga/pedido.
-
-    // Limpiar vuelos que ya no están visibles
     flightFirstSeenRef.current.forEach((_, key) => {
       if (!seenIds.has(key)) {
         flightFirstSeenRef.current.delete(key);
@@ -271,7 +254,6 @@ export  function OperacionContent() {
     }
   }, [flightPaths, activeFlight, vuelosCancelados]);
 
-  // Obtener datos del aeropuerto activo
   const activeAirportData = selectedAirportId
     ? (airportOccupancy[selectedAirportId] || {
         ocupacionActual: 0,
@@ -290,19 +272,18 @@ export  function OperacionContent() {
     return airports.find((a) => a.id === selectedAirportId);
   }, [airports, selectedAirportId]);
 
-  // Calcular vuelos futuros (llegadas/salidas) + RECOJOS DE CLIENTES
+  // Calcular vuelos futuros y recojos
   const vuelosFuturos = useMemo(() => {
     if (!selectedAirportId || !simNowUtc || windows.length === 0) {
       return { llegadas: [], salidas: [] };
     }
 
     const now = new Date(simNowUtc).getTime();
-    const next24h = now + 24 * 60 * 60 * 1000; // 24 horas en ms
+    const next24h = now + 24 * 60 * 60 * 1000;
 
     const llegadas: Array<{ id: string; origen: string; cantidad: number; salidaUtc: string; llegadaUtc: string; isPickup?: boolean; pedidoId?: number }> = [];
     const salidas: Array<{ id: string; destino: string; cantidad: number; salidaUtc: string; llegadaUtc: string; isPickup?: boolean; pedidoId?: number }> = [];
 
-    // Recopilar todos los vuelos únicos de todas las ventanas
     const vuelosUnicos = new Map<string, typeof windows[0]['vuelos'][0]>();
     windows.forEach(window => {
       window.vuelos.forEach(vuelo => {
@@ -316,7 +297,6 @@ export  function OperacionContent() {
       const salidaTime = new Date(vuelo.salidaUtc).getTime();
       const llegadaTime = new Date(vuelo.llegadaUtc).getTime();
 
-      // Vuelos que llegarán al aeropuerto seleccionado (solo futuros)
       if (vuelo.destino === selectedAirportId && llegadaTime > now && llegadaTime <= next24h) {
         llegadas.push({ 
           id: vuelo.id, 
@@ -327,7 +307,6 @@ export  function OperacionContent() {
         });
       }
 
-      // Vuelos que saldrán del aeropuerto seleccionado
       if (vuelo.origen === selectedAirportId && salidaTime <= next24h && llegadaTime > now) {
         salidas.push({ 
           id: vuelo.id, 
@@ -339,72 +318,70 @@ export  function OperacionContent() {
       }
     });
 
-    // --- NUEVO: PROCESAR RECOJOS DE CLIENTES ---
-    // Iteramos los pedidos únicos de todas las ventanas
     const pedidosUnicos = new Map<number, typeof windows[0]["pedidos"][0]>();
     windows.forEach(w => {
         if(w.pedidos) w.pedidos.forEach(p => pedidosUnicos.set(p.id, p));
     });
 
     pedidosUnicos.forEach(pedido => {
-        // Solo si el destino es este aeropuerto y tiene recojos
         if (pedido.destino === selectedAirportId && pedido.recojos) {
-            
             pedido.recojos.forEach((recojo, idx) => {
                 const inicioEspera = new Date(recojo.inicioRecojo).getTime();
                 const finEspera = new Date(recojo.finRecojo).getTime();
 
-                // Lógica de visualización:
                 const esFuturoCercano = (inicioEspera > now && inicioEspera <= next24h);
                 const estaOcurriendo = (now >= inicioEspera && now <= finEspera);
 
                 if (esFuturoCercano || estaOcurriendo) {
                     salidas.push({
-                        id: `PICKUP-${pedido.id}-${idx}`, // ID único visual
-                        destino: `Cliente ${pedido.idCliente}`, // Se verá en la Card
+                        id: `PICKUP-${pedido.id}-${idx}`,
+                        destino: `Cliente ${pedido.idCliente}`,
                         cantidad: recojo.cantidad,
-                        salidaUtc: recojo.inicioRecojo, // Usamos inicio como "Salida" visual
-                        llegadaUtc: recojo.finRecojo,   // Usamos fin como "Llegada" visual
-                        isPickup: true, // Flag importante
-                        pedidoId: pedido.id // <--- PASAMOS EL ID DEL PEDIDO
+                        salidaUtc: recojo.inicioRecojo,
+                        llegadaUtc: recojo.finRecojo, 
+                        isPickup: true,
+                        pedidoId: pedido.id
                     });
                 }
             });
         }
     });
 
-    // Ordenar cronológicamente
     llegadas.sort((a, b) => new Date(a.llegadaUtc).getTime() - new Date(b.llegadaUtc).getTime());
     salidas.sort((a, b) => new Date(a.salidaUtc).getTime() - new Date(b.salidaUtc).getTime());
 
     return { llegadas, salidas };
   }, [selectedAirportId, simNowUtc, windows, vuelosCancelados]);
 
-  // --- LÓGICA DE FIN ACTUALIZADA ---
+  // --- LÓGICA DE FIN DE SIMULACIÓN / COLAPSO ---
   const [finishedAt, setFinishedAt] = useState<number | null>(null);
   const [overlayVisible, setOverlayVisible] = useState(true);
 
-  // Usamos finishedReason en lugar de finished
+  // 1. Detectar cuando finaliza (sea por colapso, fin de rango o manual)
   useEffect(() => {
     if (!finishedReason) return;
-    console.log ("🔚 [Operación] Terminó:", finishedReason);
+    console.log("🔚 [Operación] Terminó. Razón:", finishedReason);
     setOverlayVisible(true);
-  }, [finishedReason, disconnect, reset]);
+  }, [finishedReason]);
 
+  // 2. Marcar timestamp de finalización
   useEffect(() => {
     if (finishedReason && !finishedAt) {
       setFinishedAt(Date.now());
     }
   }, [finishedReason, finishedAt]);
 
+  // 3. Limpiar timestamp si cambia el run
   useEffect(() => {
     setFinishedAt(null);
   }, [runId]);
 
+  // 4. Descarga de archivos (URL Corregida)
   const handleDownloadReports = async () => {
     if (!runId) return;
     await downloadFile(`reportes/downloadReporteSimulacion`, "reporteSimulacion.txt");
-    await downloadFile(`reportes/downloadUltimaPlan`, "ultimaPlanificacion.txt")
+    // Corrección aquí: usar la URL correcta que coincide con el backend
+    await downloadFile(`reportes/downloadUltimaPlanificacion`, "ultimaPlanificacion.txt");
   };
 
   const handleCloseOverlay = () => {
@@ -413,11 +390,11 @@ export  function OperacionContent() {
     reset();
   };
 
+  // Mostrar overlay si hay razón, hay runId y el overlay no se cerró manualmente
   const showFinishedOverlay = !!finishedReason && !!runId && overlayVisible;
 
   // --- ADAPTADOR DE DATOS PARA FLIGHTCARD ---
   const flightDataForCard = useMemo(() => {
-    // 1. Prioridad: Vuelo seleccionado por Click (desde Mapa o Panel)
     if (selectedVuelo) {
       return {
         ...selectedVuelo,
@@ -425,13 +402,11 @@ export  function OperacionContent() {
         destinoCodigo: selectedVuelo.destino
       } as FlightCardData;
     }
-    // 2. Prioridad: Vuelo en Hover (solo si es de solución)
     if (hoveredFlight && hoveredFlight.esDeSolucion && !selectedAirportId) {
-        // En Operación, los tipos ya coinciden bastante bien, solo aseguramos el casteo
         if(hoveredFlight.origenCodigo && hoveredFlight.destinoCodigo && hoveredFlight.salidaUtc && hoveredFlight.llegadaUtc) {
              return {
                 id: hoveredFlight.id,
-                origen: hoveredFlight.origenCodigo, // Card espera string
+                origen: hoveredFlight.origenCodigo, 
                 destino: hoveredFlight.destinoCodigo,
                 salidaUtc: hoveredFlight.salidaUtc,
                 llegadaUtc: hoveredFlight.llegadaUtc,
@@ -471,8 +446,6 @@ export  function OperacionContent() {
       )}
 
       {/* --- CARDS FLOTANTES --- */}
-
-      {/* 1. AEROPUERTO */}
       {selectedAirportId && activeAirportData && (
         <AirportCard
           airportId={selectedAirportId}
@@ -484,7 +457,6 @@ export  function OperacionContent() {
         />
       )}
 
-      {/* 2. VUELO */}
       {flightDataForCard && !selectedAirportId && (
         <FlightCard
           data={flightDataForCard}
@@ -497,7 +469,6 @@ export  function OperacionContent() {
         />
       )}
 
-      {/* 3. PEDIDO */}
       {selectedPedido && !selectedVuelo && !selectedAirportId && (
         <OrderCard
           pedido={selectedPedido}
@@ -508,7 +479,6 @@ export  function OperacionContent() {
       )}
 
       <MainMap>
-        {/* Renderizar vuelos animados */}
         {flightPaths.map((flight) => (
           <FlightPath
             key={flight.id}
@@ -529,19 +499,15 @@ export  function OperacionContent() {
               : undefined
             }
             onClick={
-              // Solo permitir click en vuelos de la solución
               flight.esDeSolucion
                 ? () => {
                    setActiveFlight((prev) => (prev?.id === flight.id ? null : flight))
-
-                   // sincroniza con el panel:
                    const vueloDto = vuelosMap.get(flight.id);
                    if (vueloDto) {
                      setSelectedVuelo(vueloDto);
                      setSelectedAirport(null);
                      setToolsPanelOpen(true);
                    }
-                   //Para asegurar que el hover no quede abierto
                    setHoveredFlight(null);
                 }
                 : undefined
@@ -549,7 +515,6 @@ export  function OperacionContent() {
           />
         ))}
 
-        {/* Renderizar aeropuertos */}
         <AirportMarkers
           items={airports}
           activeId={selectedAirportId}
@@ -570,6 +535,11 @@ export  function OperacionContent() {
         />
       </MainMap>
 
+      {/* --- OVERLAY DE COLAPSO / FIN --- */}
+      {/* Ahora que el Backend envía StopReason.COLAPSO, este componente
+         automáticamente mostrará la pantalla roja de "Colapso Logístico"
+         porque lee la prop `reason`.
+      */}
       {finishedReason && runId && (
         <SimulationFinishedOverlay
           open={showFinishedOverlay}
