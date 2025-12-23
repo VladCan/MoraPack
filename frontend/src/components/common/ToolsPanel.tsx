@@ -281,30 +281,29 @@ export default function ToolsPanel({
     }
 
     if (windows.length === 0) return [];
-    if (!simNowUtc) {
-      const lastWindow = windows[windows.length - 1];
-      return lastWindow?.pedidos ?? [];
-    }
-    
-    const now = new Date(simNowUtc).getTime();
-    const pedidosEnVueloSet = new Set<number>();
-    
-    // Buscar pedidos que estén dentro de vuelos activos
-    windows.forEach(window => {
-      window.vuelos?.forEach(vuelo => {
-        const salida = new Date(vuelo.salidaUtc).getTime();
-        const llegada = new Date(vuelo.llegadaUtc).getTime();
-        if (now >= salida && now <= llegada) {
-          vuelo.carga?.forEach(item => pedidosEnVueloSet.add(item.pedidoId));
-        }
-      });
+
+    const pedidosMap = new Map<number, PedidoDTO>();
+    windows.forEach(w => {
+      w.pedidos?.forEach(p => pedidosMap.set(p.id, p));
     });
-    
-    const lastWindow = windows[windows.length - 1];
-    const resultado = (lastWindow?.pedidos || []).filter(p => pedidosEnVueloSet.has(p.id));
-    
-    // console.log(`[ToolsPanel DEBUG] Pedidos en vuelo calculados: ${resultado.length}`);
-    return resultado.length === 0 ? (lastWindow?.pedidos ?? []) : resultado;
+    const pedidosUnicos = Array.from(pedidosMap.values());
+
+    if (!simNowUtc) return pedidosUnicos;
+
+    const now = new Date(simNowUtc).getTime();
+
+    return pedidosUnicos.filter(pedido => {
+      if (!pedido.rutas || pedido.rutas.length === 0) return true;
+      let llegadaMax = -Infinity;
+      pedido.rutas.forEach(ruta => {
+        if (!ruta.vuelos || ruta.vuelos.length === 0) return;
+        ruta.vuelos.forEach(vuelo => {
+          const llegada = new Date(vuelo.llegadaUtc).getTime();
+          if (llegada > llegadaMax) llegadaMax = llegada;
+        });
+      });
+      return now <= llegadaMax;
+    });
   }, [windows, simNowUtc, variant, pedidosPorIdOperacion]);
 
   const toggleNivel = (k: NivelCarga) =>
