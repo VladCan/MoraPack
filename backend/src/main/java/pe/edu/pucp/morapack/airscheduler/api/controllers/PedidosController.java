@@ -267,6 +267,7 @@ public class PedidosController {
                     "a " + request.destino + " creado correctamente con id " + idGenerado + " a las " + fecha + " (" + destino + ")";
 
             runManager.pushOrder(runId, pedido);
+            pedidosService.appendPedido(pedido);
 
             return Response
                     .ok(new PedidoResponse("success", msg, runId))

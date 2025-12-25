@@ -4,10 +4,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption; // Importante para sobrescribir
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
 import java.util.Optional;
 import java.util.Scanner;
 
@@ -102,4 +100,17 @@ public class ArchivoManager {
         System.out.println("[ArchivoManager] Archivo guardado exitosamente: " + destinationPath);
         System.out.println("[ArchivoManager] Tamaño: " + (bytesCopied / 1024 / 1024) + " MB");
     }
+
+    public void appendText(Path path, String content) throws IOException {
+        Files.createDirectories(path.getParent());
+        Files.writeString(
+                path,
+                content,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.WRITE,
+                StandardOpenOption.APPEND
+        );
+    }
+
 }

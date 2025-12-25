@@ -8,6 +8,7 @@ import jakarta.ws.rs.core.Response;
 import pe.edu.pucp.morapack.airscheduler.api.mapper.PedidoMapper;
 import pe.edu.pucp.morapack.airscheduler.api.response.JsonResponse;
 import pe.edu.pucp.morapack.airscheduler.api.response.PedidoResponse;
+import pe.edu.pucp.morapack.airscheduler.api.service.PedidosService;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoUtils;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.CargarPedidos;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
@@ -24,6 +25,9 @@ import java.util.Scanner;
 public class OperacionDiariaController {
 
     private static boolean archivoCargado = false;
+
+    @Inject
+    PedidosService pedidosService;
 
     @Inject
     RunManager runManager;
@@ -85,6 +89,7 @@ public class OperacionDiariaController {
 
             /// 3) Encolamos en la cola existente en RunManager
             runManager.pushOrders(runId, pedidos.getLista());
+            pedidosService.appendPedidos(pedidos.getLista());
 
             /// 4) Operación exitosa, mostramos mensajes de conformidad.
             int cantPedidos = pedidos.getLista().size();
