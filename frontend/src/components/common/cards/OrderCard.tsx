@@ -6,11 +6,13 @@ import { useAirports } from "@/hooks/useAirports";
 interface OrderCardProps {
   pedido: PedidoDTO;
   simNowUtc?: string | null;
+  pedidoSource?: "PLANIFICADO" | "BD";
   onClose: () => void;
   variant?: "simulacion" | "operacion" | "colapso";
 }
 
-export default function OrderCard({ pedido, simNowUtc, onClose, variant = "simulacion" }: OrderCardProps) {
+export default function OrderCard({ pedido, simNowUtc, pedidoSource = "PLANIFICADO",
+     onClose, variant = "simulacion" }: OrderCardProps) {
   
   // 1. Obtener datos de aeropuertos para enriquecer la UI
   const { data: airportsData } = useAirports();
@@ -128,26 +130,52 @@ export default function OrderCard({ pedido, simNowUtc, onClose, variant = "simul
                 </div>
             </div>
             
-            <div className={`px-3 py-1.5 rounded-full text-xs font-bold border ${statusColors[pedidoState.estado as keyof typeof statusColors] || statusColors.PENDIENTE}`}>
+            {pedidoSource !== "BD" ? (
+            <div
+                className={`px-3 py-1.5 rounded-full text-xs font-bold border ${
+                statusColors[pedidoState.estado as keyof typeof statusColors] || statusColors.PENDIENTE
+                }`}
+            >
                 {pedidoState.estado}
             </div>
+            ) : (
+            // En BD: sin estado (informativo)
+            <div className="px-3 py-1.5 rounded-full text-xs font-bold border bg-violet-100 text-violet-700 border-violet-200">
+                EN BD
+            </div>
+            )}
+
+
         </div>
 
-        {/* Barra de Progreso */}
+        {/* Cantidad / Progreso */}
+        {pedidoSource === "BD" ? (
+        <div className="flex justify-between items-center text-sm">
+            <span className="font-medium text-slate-500">Cantidad</span>
+            <span className="font-bold text-slate-700 dark:text-slate-300">
+            {pedido.cantidad} productos
+            </span>
+        </div>
+        ) : (
         <div>
             <div className="flex justify-between text-sm mb-2">
-                <span className="font-medium text-slate-500">Progreso de envío</span>
-                <span className="font-bold text-slate-700 dark:text-slate-300">{pedidoState.cantidadEnCurso} / {pedido.cantidad} productos</span>
+            <span className="font-medium text-slate-500">Progreso de envío</span>
+            <span className="font-bold text-slate-700 dark:text-slate-300">
+                {pedidoState.cantidadEnCurso} / {pedido.cantidad} productos
+            </span>
             </div>
             <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div 
-                    className={`h-full transition-all duration-700 ease-out ${progressColors[pedidoState.estado as keyof typeof progressColors] || "bg-slate-400"}`}
-                    style={{ 
-                        width: `${pedidoState.progreso <= 0 ? 0 : Math.max(5, pedidoState.progreso)}%` 
-                    }} 
-                />
+            <div
+                className={`h-full transition-all duration-700 ease-out ${
+                progressColors[pedidoState.estado as keyof typeof progressColors] || "bg-slate-400"
+                }`}
+                style={{
+                width: `${pedidoState.progreso <= 0 ? 0 : Math.max(5, pedidoState.progreso)}%`,
+                }}
+            />
             </div>
         </div>
+        )}
 
         {/* Lista de Rutas */}
         {pedido.rutas && pedido.rutas.length > 0 && (

@@ -93,6 +93,7 @@ export default function ToolsPanel({
     status, 
     selectedPedido, 
     setSelectedPedido, 
+    setPedidoSource,
     selectedVuelo, 
     setSelectedVuelo 
   } = useRunSession();
@@ -446,6 +447,7 @@ export default function ToolsPanel({
           value={pedido}
           items={pedidosParaSelector}
           onSelect={setPedido}
+          setPedidoSource={setPedidoSource}
           simNowUtc={simNowUtc}
           showBDToggle={variant === "operacion"}         // solo operación diaria
           showPedidosBD={showPedidosBD}
@@ -1059,6 +1061,7 @@ function OrderSelectCard({
   value,
   items,
   onSelect,
+  setPedidoSource,
   simNowUtc,
   showBDToggle,
   showPedidosBD,
@@ -1073,6 +1076,7 @@ function OrderSelectCard({
   value: PedidoDTO | null;
   items: PedidoDTO[];
   onSelect: (val: PedidoDTO) => void;
+  setPedidoSource?: (src: "PLANIFICADO" | "BD") => void;
   simNowUtc?: string | null;
 
   showBDToggle?: boolean;
@@ -1280,6 +1284,7 @@ function OrderSelectCard({
                   onClick={() => {
                     console.log("[ToolsPanel] Pedido seleccionado:", p.id);
                     onSelect(p);
+                    setPedidoSource?.(showPedidosBD ? "BD" : "PLANIFICADO"); 
                     setOpen(false);
                     setQ("");
                   }}

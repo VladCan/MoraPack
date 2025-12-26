@@ -92,7 +92,8 @@ export  function OperacionContent() {
     setSelectedPedido,
     selectedVuelo,
     setSelectedVuelo,
-    setToolsPanelOpen 
+    setToolsPanelOpen,
+    pedidoSource 
   } = useRunSession();
   
   const { 
@@ -474,6 +475,7 @@ export  function OperacionContent() {
           pedido={selectedPedido}
           simNowUtc={simNowUtc}
           variant="operacion" 
+          pedidoSource={pedidoSource}
           onClose={() => setSelectedPedido(null)}
         />
       )}

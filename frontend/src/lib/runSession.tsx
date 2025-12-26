@@ -7,6 +7,8 @@ import ToastCustom from "@/components/common/ToastCustom";
 
 export type RunStatus = "idle" | "running" | "finished" | "failed";
 
+export type PedidoSource = "PLANIFICADO" | "BD";
+
 export interface RunWindow{
     index: number;
     startUtc: string;
@@ -25,6 +27,8 @@ interface RunSessionState {
     activePedidos: PedidoDTO[];
     selectedAirportId: string | null;
     selectedPedido: PedidoDTO | null;
+    pedidoSource: PedidoSource;
+    setPedidoSource: (src: PedidoSource) => void;
     vuelosCancelados: Set<string>;
     selectedVuelo: VueloDTO | null;
     setSelectedVuelo: (vuelo: VueloDTO | null) => void;
@@ -73,6 +77,9 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
     const [windows, setWindows] = useState<RunWindow[]>([]);
     const [selectedAirportId, setSelectedAirportId] = useState<string | null>(null);
     const [selectedPedido, setSelectedPedidoState] = useState<PedidoDTO | null>(null);
+
+    const [pedidoSource, setPedidoSourceState] = useState<PedidoSource>("PLANIFICADO");
+
     const [vuelosCancelados, setVuelosCancelados] = useState<Set<string>>(new Set());
 
     const [selectedVuelo, setSelectedVueloState] = useState<VueloDTO | null>(null);
@@ -155,6 +162,7 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setWindows([]);
         setSelectedAirportId(null);
         setSelectedPedidoState(null);
+        setPedidoSourceState("PLANIFICADO");
         setVuelosCancelados(new Set());
         setSelectedVueloState(null);
         setLoadingMessage("");
@@ -176,6 +184,7 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         setWindows([]);
         setSelectedAirportId(null);
         setSelectedPedidoState(null);
+        setPedidoSourceState("PLANIFICADO");
         setVuelosCancelados(new Set());
         setSelectedVueloState(null); 
         setLoadingMessage("");
@@ -213,6 +222,10 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
 
     const setSelectedPedido = useCallback((pedido: PedidoDTO | null) => {
         setSelectedPedidoState(pedido);
+    }, []);
+
+    const setPedidoSource = useCallback((src: PedidoSource) => {
+        setPedidoSourceState(src);
     }, []);
 
     const setSelectedVuelo = useCallback((vuelo: VueloDTO | null) => {
@@ -311,6 +324,8 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
         activePedidos,
         selectedAirportId,
         selectedPedido,
+        pedidoSource,
+        setPedidoSource,
         vuelosCancelados,
         selectedVuelo,
         setSelectedVuelo,
@@ -334,7 +349,7 @@ export function RunSessionProvider({children}: {children: React.ReactNode}){
     }), [
         runId, status, simNow, lastWindow, windows, 
         activeFlights, activePedidos,
-        selectedAirportId, selectedPedido, vuelosCancelados,
+        selectedAirportId, selectedPedido, pedidoSource, setPedidoSource, vuelosCancelados,
         selectedVuelo, setSelectedVuelo,
         toolsPanelOpen, setToolsPanelOpen,
         begin, end, setSimNow, setWindow, setSelectedAirport, setSelectedPedido, cancelarVuelo, reset, autoReconnect,
