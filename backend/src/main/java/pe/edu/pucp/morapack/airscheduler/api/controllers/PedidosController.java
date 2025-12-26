@@ -27,6 +27,7 @@ import pe.edu.pucp.morapack.airscheduler.api.response.JsonResponse;
 import pe.edu.pucp.morapack.airscheduler.api.response.PedidoResponse;
 import pe.edu.pucp.morapack.airscheduler.api.service.PedidosService;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.PedidoDTO;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 import pe.edu.pucp.morapack.airscheduler.api.mapper.PedidoMapper;
 
@@ -328,6 +329,21 @@ public class PedidosController {
                             "Error al crear pedido de prueba: " + e.getMessage(), null))
                     .build();
         }
+    }
+
+    @GET
+    @Path("/bd")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getPedidosBD() throws IOException{
+        try {
+            List<PedidoDTO> pedidos = pedidosService.leerPedidosBD();
+            return Response.ok(pedidos).build();
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", "No se pudo leer pedidos BD", "detail", e.getMessage()))
+                    .build();
+        }
+
     }
 
 

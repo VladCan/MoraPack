@@ -5,14 +5,21 @@ import jakarta.inject.Inject;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.io.ArchivoManager;
 import pe.edu.pucp.morapack.airscheduler.engine.infrastructure.model.Pedido;
+import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.PedidoDTO;
 import pe.edu.pucp.morapack.airscheduler.engine.scheduling.run.RunManager;
 
 @ApplicationScoped
@@ -35,6 +42,12 @@ public class PedidosService {
     private static final String BDPEDIDOS_SUBDIR = "BDPedidos";
 
     private static final String FILENAME = "pedidos.txt";
+
+    // Regex robusta para el formato:
+    // PEDIDO #1 | UTC: 2025-... | Dest: SCEL | Cant: 990 | Cliente: 7729
+    private static final Pattern BD_LINE_PATTERN = Pattern.compile(
+            "^\\s*PEDIDO\\s*#(?<id>\\d+)\\s*\\|\\s*UTC:\\s*(?<utc>[^|]+)\\s*\\|\\s*Dest:\\s*(?<dest>[A-Za-z]{3,4})\\s*\\|\\s*Cant:\\s*(?<cant>\\d+)\\s*\\|\\s*Cliente:\\s*(?<cli>\\d+)\\s*$"
+    );
 
     /**
      * Construye el Path del archivo de pedidos para un código dado.
@@ -144,6 +157,58 @@ public class PedidosService {
                 " | Cant: " + cant +
                 " | Cliente: " + cliente +
                 System.lineSeparator();
+    }
+
+    public List<PedidoDTO> leerPedidosBD() throws IOException {
+        Path file = getBDPedidosFilePath();
+
+        if (!Files.exists(file)) {
+            return Collections.emptyList();
+        }
+
+        List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+        List<PedidoDTO> out = new ArrayList<>();
+
+        for (String line : lines) {
+            line = line.trim();
+            if (line.isEmpty()) continue;
+
+            Matcher m = BD_LINE_PATTERN.matcher(line);
+            if (!m.matches()) {
+                // Si quieres, loguea para detectar líneas rotas
+                System.err.println("[PedidosService] Línea inválida en pedidos.txt: " + line);
+                continue;
+            }
+
+            int id = Integer.parseInt(m.group("id"));
+            String utc = m.group("utc").trim();
+            String dest = m.group("dest").trim();
+            int cant = Integer.parseInt(m.group("cant"));
+            int cli = Integer.parseInt(m.group("cli"));
+
+            PedidoDTO dto = new PedidoDTO();
+            dto.id = id;
+            dto.idCliente = cli;
+            dto.destino = dest;
+            dto.cantidad = cant;
+
+            dto.numPaquetes = null;
+            dto.origen = null;                 // para tu union (string | string[] | null)
+            dto.cantidadAsignada = 0;
+            dto.estadoAsignacion = "PENDIENTE"; // el front lo valida con zod enum
+            dto.fechaCreacion = utc;            // string ISO (como viene en archivo)
+            dto.fechaLocal = null;
+            dto.continenteDestino = null;
+
+            dto.rutas = List.of();
+            dto.recojos = List.of();
+
+            out.add(dto);
+        }
+
+        // opcional: ordenarlos por id
+        out.sort(Comparator.comparingInt(p -> p.id));
+        return out;
     }
 
 
