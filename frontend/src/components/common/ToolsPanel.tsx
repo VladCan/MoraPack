@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { buildStartRunRequest } from "@/services/buildStartRunRequest";
-import { handleApi, postJson } from "@/services/api";
+import { getJson, handleApi, postJson } from "@/services/api";
 import type { StartRunResponse } from "@/types/runs";
 import { useRunSession } from "@/lib/runSession";
 import { useAirports } from "@/hooks/useAirports";
@@ -105,6 +105,41 @@ export default function ToolsPanel({
   const setPedido = setSelectedPedido;
   const vuelo = selectedVuelo;
   const setVuelo = setSelectedVuelo;
+
+  const [showPedidosBD, setShowPedidosBD] = useState(false);
+  const [pedidosBD, setPedidosBD] = useState<PedidoDTO[]>([]);
+  const [loadingPedidosBD, setLoadingPedidosBD] = useState(false);
+  const [errorPedidosBD, setErrorPedidosBD] = useState<string | null>(null);
+
+  const fetchPedidosBD = useCallback(async () => {
+    setLoadingPedidosBD(true);
+    setErrorPedidosBD(null);
+
+    try {
+      const [data, error] = await handleApi(
+        getJson<PedidoDTO[]>("pedidos/bd")
+      );
+
+      if (error) {
+        setErrorPedidosBD(String(error));
+        setPedidosBD([]);
+        return;
+      }
+      setPedidosBD(Array.isArray(data) ? data : []);
+
+      if (data){
+        console.log("Los pedidos de BD son:", pedidosBD)
+      }
+
+    }
+    catch (e: any) {
+    setErrorPedidosBD(e?.message ?? "Error cargando pedidos BD");
+    setPedidosBD([]);
+  } finally {
+    setLoadingPedidosBD(false);
+  }
+
+  }, []);
 
   const { data: airportsData } = useAirports();
 
@@ -374,6 +409,10 @@ export default function ToolsPanel({
     }
   }
 
+  const pedidosParaSelector = useMemo(() => {
+    return showPedidosBD ? pedidosBD : pedidosActivos;
+  }, [showPedidosBD, pedidosBD, pedidosActivos] );
+
   return (
     <section className="mx-auto max-w-6xl px-3 sm:px-4">
       {/* Selecciones principales (botones) */}
@@ -405,9 +444,19 @@ export default function ToolsPanel({
           icon={<Package className="h-4 w-4" />}
           placeholder="Seleccionar pedido"
           value={pedido}
-          items={pedidosActivos}
+          items={pedidosParaSelector}
           onSelect={setPedido}
           simNowUtc={simNowUtc}
+          showBDToggle={variant === "operacion"}         // solo operación diaria
+          showPedidosBD={showPedidosBD}
+          onTogglePedidosBD={async (next) => {
+            setShowPedidosBD(next);
+            if (next && pedidosBD.length === 0) {
+              await fetchPedidosBD();
+            }
+          }}
+          loadingBD={loadingPedidosBD}
+          errorBD={errorPedidosBD}
         />
       </div>
 
@@ -1011,6 +1060,12 @@ function OrderSelectCard({
   items,
   onSelect,
   simNowUtc,
+  showBDToggle,
+  showPedidosBD,
+  onTogglePedidosBD,
+  loadingBD,
+  errorBD,
+
 }: {
   label: string;
   icon: React.ReactNode;
@@ -1019,6 +1074,13 @@ function OrderSelectCard({
   items: PedidoDTO[];
   onSelect: (val: PedidoDTO) => void;
   simNowUtc?: string | null;
+
+  showBDToggle?: boolean;
+  showPedidosBD?: boolean;
+  onTogglePedidosBD?: (next: boolean) => void;
+  loadingBD?: boolean;
+  errorBD?: string | null;
+
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -1120,6 +1182,48 @@ function OrderSelectCard({
           "animate-in fade-in-0 zoom-in-95",
         ].join(" ")}
       >
+
+        {showPedidosBD && errorBD && (
+          <p className="text-xs text-rose-600 px-1 pt-2">
+            {errorBD}
+          </p>
+        )}
+
+        {/* 🔹🔹🔹 AQUÍ VAN LOS BOTONES 🔹🔹🔹 */}
+        {showBDToggle && (
+          <div className="flex items-center gap-2 pb-2 mb-2 border-b border-border/50">
+            <button
+              onClick={() => {
+                onTogglePedidosBD?.(false);
+                setQ("");
+              }}
+              className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                !showPedidosBD
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card/50 text-muted-foreground hover:bg-card/70"
+              }`}
+            >
+              Planificados
+            </button>
+
+            <button
+              onClick={() => {
+                onTogglePedidosBD?.(true);
+                setQ("");
+              }}
+              className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                showPedidosBD
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card/50 text-muted-foreground hover:bg-card/70"
+              }`}
+            >
+              En BD
+              {loadingBD && <span className="ml-1 text-[10px] opacity-70">(…)</span>}
+              {!loadingBD && <span className="ml-1 text-[10px] opacity-70">({items.length})</span>}
+            </button>
+          </div>
+        )}
+
         <div className="space-y-2 mb-2">
           {(estados.length > 1 || destinos.length > 1) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1184,12 +1288,13 @@ function OrderSelectCard({
                   <div className="flex items-center justify-between">
                     <span className="font-mono">PED-{p.id}</span>
                     {(() => {
-                      const estado = calcularEstado(p);
+                      const estado = showPedidosBD ? "EN BD" : calcularEstado(p);
                       return (
                         <span className={`text-xs px-1.5 py-0.5 rounded ${
                           estado === "COMPLETO" ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200" :
                           estado === "EN CAMINO" ? "bg-blue-100 text-blue-900 dark:bg-blue-900/30 dark:text-blue-200" :
                           estado === "PROGRAMADO" ? "bg-slate-100 text-slate-900 dark:bg-slate-800/60 dark:text-slate-200" :
+                          estado === "EN BD" ? "bg-violet-100 text-violet-900 dark:bg-violet-900/30 dark:text-violet-200" :
                           "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200"
                         }`}>
                           {estado}
